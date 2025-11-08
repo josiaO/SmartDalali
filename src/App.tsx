@@ -10,6 +10,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
 import Home from "./pages/Home";
 import Properties from "./pages/Properties";
+import PropertyDetail from "./pages/PropertyDetail";
 import MapView from "./pages/MapView";
 import Login from "./pages/Login";
 import UserDashboard from "./pages/UserDashboard";
@@ -80,6 +81,7 @@ function AppRoutes() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/properties" element={<Properties />} />
+              <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/map" element={<MapView />} />
               <Route 
                 path="/login" 

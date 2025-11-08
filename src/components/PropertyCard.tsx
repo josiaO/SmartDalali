@@ -1,77 +1,70 @@
-import { MapPin, Bed, Bath, Maximize, Phone } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge";
+import { Bed, Bath, MapPin, Square, Heart } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Property } from "@/data/properties";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface PropertyCardProps {
   property: Property;
 }
 
 export function PropertyCard({ property }: PropertyCardProps) {
-  const { t } = useLanguage();
-  
-  const formatPrice = (price: number, type: string) => {
-    if (type === "rent") {
-      return `TSh ${price.toLocaleString()}/mo`;
-    }
-    return `TSh ${price.toLocaleString()}`;
+  const navigate = useNavigate();
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  const handleClick = () => {
+    navigate(`/properties/${property.id}`);
   };
 
-  const getTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      sale: t("property.forSale"),
-      rent: t("property.forRent"),
-      land: t("property.land"),
-    };
-    return labels[type] || type;
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsFavorite(!isFavorite);
   };
 
   return (
-    <Card className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 overflow-hidden">
-      <div className="relative h-48 overflow-hidden">
+    <Card className="overflow-hidden hover-lift cursor-pointer group" onClick={handleClick}>
+      <div className="relative aspect-video overflow-hidden">
         <img
           src={property.images[0]}
           alt={property.title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
-        {property.featured && (
-          <Badge className="absolute top-3 right-3 bg-accent">Featured</Badge>
-        )}
-        <Badge
-          className={`absolute top-3 left-3 ${
-            property.type === "sale"
-              ? "bg-primary"
-              : property.type === "rent"
-              ? "bg-info"
-              : "bg-warning"
-          }`}
-        >
-          {getTypeLabel(property.type)}
-        </Badge>
-      </div>
-
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg group-hover:text-primary transition-colors line-clamp-1">
-            {property.title}
-          </CardTitle>
-          <span className="text-lg font-bold text-primary whitespace-nowrap">
-            {formatPrice(property.price, property.type)}
-          </span>
+        <div className="absolute top-2 left-2 right-2 flex items-start justify-between">
+          {property.featured && (
+            <Badge className="bg-gradient-to-r from-primary to-accent">Featured</Badge>
+          )}
+          <Button
+            size="icon"
+            variant="secondary"
+            className="ml-auto"
+            onClick={handleFavoriteClick}
+          >
+            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+          </Button>
         </div>
-        <CardDescription className="flex items-center gap-1 text-sm">
-          <MapPin className="w-3 h-3" />
-          {property.location.address}, {property.location.city}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-          {property.description}
-        </p>
-
-        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+        <div className="absolute bottom-2 left-2">
+          <Badge variant="secondary" className="capitalize">
+            {property.type}
+          </Badge>
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <div className="mb-2">
+          <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">
+            {property.title}
+          </h3>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+            <MapPin className="w-3 h-3" />
+            <span className="line-clamp-1">{property.location.city}</span>
+          </div>
+        </div>
+        <div className="text-2xl font-bold text-primary mb-3">
+          TSh {property.price.toLocaleString()}
+          {property.type === "rent" && <span className="text-sm text-muted-foreground">/mo</span>}
+        </div>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground pt-3 border-t">
           {property.bedrooms && (
             <div className="flex items-center gap-1">
               <Bed className="w-4 h-4" />
@@ -85,18 +78,8 @@ export function PropertyCard({ property }: PropertyCardProps) {
             </div>
           )}
           <div className="flex items-center gap-1">
-            <Maximize className="w-4 h-4" />
-            <span>{property.area} m²</span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-3 border-t">
-          <div className="text-sm">
-            <p className="font-medium text-foreground">{property.agentName}</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Phone className="w-3 h-3" />
-              {property.agentPhone}
-            </p>
+            <Square className="w-4 h-4" />
+            <span>{property.area}m²</span>
           </div>
         </div>
       </CardContent>

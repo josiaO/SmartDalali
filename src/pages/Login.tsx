@@ -161,6 +161,54 @@ export default function Login() {
                   </Alert>
                 )}
 
+                {/* Mock Users Info */}
+                <Alert className="bg-primary/5 border-primary/20">
+                  <AlertDescription className="text-xs">
+                    <div className="font-semibold mb-2">Demo Accounts:</div>
+                    <div className="space-y-1 font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-500">👑 Admin:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginEmail("admin@smartdalali.com");
+                            setLoginPassword("admin123");
+                          }}
+                          className="text-xs underline hover:text-primary"
+                        >
+                          admin@smartdalali.com / admin123
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-500">🏢 Agent:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginEmail("agent@smartdalali.com");
+                            setLoginPassword("agent123");
+                          }}
+                          className="text-xs underline hover:text-primary"
+                        >
+                          agent@smartdalali.com / agent123
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-500">👤 User:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginEmail("user@smartdalali.com");
+                            setLoginPassword("user123");
+                          }}
+                          className="text-xs underline hover:text-primary"
+                        >
+                          user@smartdalali.com / user123
+                        </button>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Email</label>
                   <div className="relative">

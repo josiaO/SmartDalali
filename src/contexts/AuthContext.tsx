@@ -33,6 +33,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
       const token = localStorage.getItem("access_token");
       if (token) {
+        // Handle mock tokens
+        if (token.startsWith("mock_token_")) {
+          const mockUsers = [
+            {
+              id: "1",
+              email: "admin@smartdalali.com",
+              username: "admin",
+              name: "Admin User",
+              role: "superuser" as UserRole,
+              avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=admin",
+              subscriptionActive: true,
+            },
+            {
+              id: "2",
+              email: "agent@smartdalali.com",
+              username: "agent",
+              name: "John Agent",
+              role: "agent" as UserRole,
+              avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=agent",
+              subscriptionActive: true,
+              trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            },
+            {
+              id: "3",
+              email: "user@smartdalali.com",
+              username: "user",
+              name: "Jane Buyer",
+              role: "user" as UserRole,
+              avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=user",
+              subscriptionActive: false,
+            },
+          ];
+          
+          const userId = token.replace("mock_token_", "");
+          const mockUser = mockUsers.find(u => u.id === userId);
+          
+          if (mockUser) {
+            setUser(mockUser);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // Handle real API tokens
         try {
           const { data } = await api.get("/auth/me/");
           setUser({
@@ -57,6 +101,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
+    // Mock users for testing
+    const mockUsers = [
+      {
+        id: "1",
+        email: "admin@smartdalali.com",
+        password: "admin123",
+        username: "admin",
+        name: "Admin User",
+        role: "superuser" as UserRole,
+        avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=admin",
+        subscriptionActive: true,
+      },
+      {
+        id: "2",
+        email: "agent@smartdalali.com",
+        password: "agent123",
+        username: "agent",
+        name: "John Agent",
+        role: "agent" as UserRole,
+        avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=agent",
+        subscriptionActive: true,
+        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: "3",
+        email: "user@smartdalali.com",
+        password: "user123",
+        username: "user",
+        name: "Jane Buyer",
+        role: "user" as UserRole,
+        avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=user",
+        subscriptionActive: false,
+      },
+    ];
+
+    // Check mock users first
+    const mockUser = mockUsers.find(u => u.email === email && u.password === password);
+    if (mockUser) {
+      const { password: _, ...userWithoutPassword } = mockUser;
+      const userObj: User = userWithoutPassword;
+      
+      // Store mock token
+      localStorage.setItem("access_token", `mock_token_${mockUser.id}`);
+      localStorage.setItem("refresh_token", `mock_refresh_${mockUser.id}`);
+      
+      setUser(userObj);
+      return userObj;
+    }
+
+    // If not a mock user, try the real API
     try {
       // Get JWT tokens
       const { data: tokenData } = await api.post("/auth/token/", {

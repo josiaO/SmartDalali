@@ -1,5 +1,5 @@
-import { Home, Building2, LayoutDashboard, Users, Settings, Map, LogOut } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Home, Building2, LayoutDashboard, Users, Settings, Map, Plus, Shield } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -11,63 +11,68 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const location = useLocation();
 
   const getNavItems = () => {
-    const baseItems = [
-      { title: t("home"), url: "/", icon: Home },
-      { title: t("properties"), url: "/properties", icon: Building2 },
+    const publicItems = [
+      { title: "Home", url: "/", icon: Home },
+      { title: "Properties", url: "/properties", icon: Building2 },
       { title: "Map View", url: "/map", icon: Map },
     ];
 
+    const userItems = [];
+    const managementItems = [];
+
     if (user?.role === "superuser") {
-      baseItems.unshift({ title: "Admin Dashboard", url: "/admin", icon: LayoutDashboard });
-      baseItems.push({ title: "Users", url: "/admin/users", icon: Users });
-      baseItems.push({ title: "Settings", url: "/admin/settings", icon: Settings });
+      userItems.push({ title: "Admin Dashboard", url: "/admin", icon: Shield });
+      managementItems.push(
+        { title: "Users Management", url: "/admin/users", icon: Users },
+        { title: "All Properties", url: "/properties", icon: Building2 },
+        { title: "Settings", url: "/admin/settings", icon: Settings }
+      );
     } else if (user?.role === "agent") {
-      baseItems.unshift({ title: "My Dashboard", url: "/agent", icon: LayoutDashboard });
-      baseItems.push({ title: "My Listings", url: "/agent/listings", icon: Building2 });
+      userItems.push({ title: "My Dashboard", url: "/agent", icon: LayoutDashboard });
+      managementItems.push(
+        { title: "My Listings", url: "/agent/listings", icon: Building2 },
+        { title: "Add Property", url: "/properties/new", icon: Plus }
+      );
     } else if (user?.role === "user") {
-      baseItems.unshift({ title: "My Dashboard", url: "/dashboard", icon: LayoutDashboard });
+      userItems.push({ title: "My Dashboard", url: "/dashboard", icon: LayoutDashboard });
     }
 
-    return baseItems;
+    return { publicItems, userItems, managementItems };
   };
 
-  const items = getNavItems();
+  const { publicItems, userItems, managementItems } = getNavItems();
 
   return (
     <Sidebar className="border-r">
       <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2">
-          <Building2 className="h-8 w-8 text-primary" />
+        <NavLink to="/" className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary via-accent to-primary flex items-center justify-center shadow-lg">
+            <Building2 className="h-5 w-5 text-white" />
+          </div>
           <div>
             <h2 className="font-bold text-lg">SmartDalali</h2>
             <p className="text-xs text-muted-foreground">Real Estate Platform</p>
           </div>
-        </div>
+        </NavLink>
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Public Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {publicItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -88,26 +93,71 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-      </SidebarContent>
 
-      {user && (
-        <SidebarFooter className="p-4 border-t">
-          <div className="flex items-center gap-3 mb-3">
-            <Avatar>
-              <AvatarImage src={user.avatarUrl} />
-              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleLogout} className="w-full">
-            <LogOut className="h-4 w-4 mr-2" />
-            {t("logout")}
-          </Button>
-        </SidebarFooter>
-      )}
+        {/* User-specific items */}
+        {user && userItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <div className="flex items-center justify-between w-full">
+                <span>Dashboard</span>
+                <Badge variant="secondary" className="text-xs capitalize">
+                  {user.role}
+                </Badge>
+              </div>
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {userItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        end={item.url === "/"}
+                        className={({ isActive }) =>
+                          isActive
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "hover:bg-muted/50"
+                        }
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Management items */}
+        {managementItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Management</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {managementItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        className={({ isActive }) =>
+                          isActive
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "hover:bg-muted/50"
+                        }
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+      </SidebarContent>
     </Sidebar>
   );
 }

@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Users, Building2, DollarSign, TrendingUp, CheckCircle, XCircle, Clock, Settings as SettingsIcon, Home, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -272,11 +273,14 @@ function AdminOverview() {
 }
 
 export default function AdminDashboard() {
+  const AdminUsers = lazy(() => import("@/pages/AdminUsers"));
+  const AdminSettings = lazy(() => import("@/pages/AdminSettings"));
+  
   return (
     <Routes>
       <Route index element={<AdminOverview />} />
-      <Route path="users" element={<div className="p-8"><h2 className="text-2xl font-bold">User Management (Coming Soon)</h2></div>} />
-      <Route path="settings" element={<div className="p-8"><h2 className="text-2xl font-bold">Settings (Coming Soon)</h2></div>} />
+      <Route path="users" element={<AdminUsers />} />
+      <Route path="settings" element={<AdminSettings />} />
     </Routes>
   );
 }

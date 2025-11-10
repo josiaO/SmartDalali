@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { Plus, TrendingUp, DollarSign, Calendar, Building2, Eye, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -278,10 +278,12 @@ function AgentOverview() {
 }
 
 export default function AgentDashboard() {
+  const AgentListings = lazy(() => import("@/pages/AgentListings"));
+  
   return (
     <Routes>
       <Route index element={<AgentOverview />} />
-      <Route path="listings" element={<div className="p-8"><h2 className="text-2xl font-bold">My Listings (Coming Soon)</h2></div>} />
+      <Route path="listings" element={<AgentListings />} />
     </Routes>
   );
 }

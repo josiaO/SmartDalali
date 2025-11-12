@@ -18,6 +18,7 @@ import AgentDashboard from "./pages/AgentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import PropertyForm from "./pages/PropertyForm";
+import Messages from "./pages/Messages";
 import { Header } from "./components/Header";
 
 const queryClient = new QueryClient();
@@ -84,6 +85,7 @@ function AppRoutes() {
               <Route path="/properties" element={<Properties />} />
               <Route path="/properties/:id" element={<PropertyDetail />} />
               <Route path="/map" element={<MapView />} />
+              <Route path="/messages" element={<ProtectedRoute allowedRoles={['user', 'agent', 'superuser']}><Messages /></ProtectedRoute>} />
               <Route 
                 path="/login" 
                 element={user ? <DashboardRedirect /> : <Login />} 

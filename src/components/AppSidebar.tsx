@@ -1,4 +1,4 @@
-import { Home, Building2, LayoutDashboard, Users, Settings, Map, Plus, Shield } from "lucide-react";
+import { Home, Building2, LayoutDashboard, Users, Settings, Map, Plus, Shield, MessageSquare } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -26,6 +26,10 @@ export function AppSidebar() {
       { title: "Properties", url: "/properties", icon: Building2 },
       { title: "Map View", url: "/map", icon: Map },
     ];
+
+    if (user) {
+      publicItems.push({ title: "Messages", url: "/messages", icon: MessageSquare });
+    }
 
     const userItems = [];
     const managementItems = [];

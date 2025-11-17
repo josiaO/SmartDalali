@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { Property } from "@/data/properties";
 import { PropertyCard } from "@/components/PropertyCard";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +12,9 @@ export default function Properties() {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const response = await api.get("/properties/");
-        setProperties(response.data.results);
+        const response = await propertiesService.fetchListings();
+        const list = Array.isArray(response.data) ? response.data : response.data.results;
+        setProperties(list || []);
       } catch (err) {
         setError("Failed to fetch properties.");
         console.error(err);

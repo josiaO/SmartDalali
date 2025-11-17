@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Property } from "@/data/properties"; // Updated import
 import { useLanguage } from "@/contexts/LanguageContext";
-import api from "@/lib/api"; // Import api
+import propertiesService from "@/services/properties";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
 
 export default function PropertyDetail() {
@@ -28,7 +28,7 @@ export default function PropertyDetail() {
   useEffect(() => {
     const fetchProperty = async () => {
       try {
-        const response = await api.get(`/properties/${id}/`);
+        const response = await propertiesService.fetchListing(id!);
         setProperty(response.data);
       } catch (err) {
         setError("Failed to fetch property details.");

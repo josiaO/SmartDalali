@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import api from "@/lib/api";
+import accountsService from "@/services/accounts";
 
 export type UserRole = "superuser" | "agent" | "user";
 
@@ -43,11 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const accessToken = localStorage.getItem("access_token");
       if (accessToken) {
         try {
-          const { data } = await api.get("/accounts/me/");
+          const { data } = await accountsService.fetchProfile();
           setUser(normalizeUser(data));
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          // Token might be expired, so we log out
           await logout();
         }
       }
@@ -57,14 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
-    const { data: tokens } = await api.post("/accounts/token/", {
-      email,
-      password,
-    });
+    const { data: tokens } = await accountsService.login(email, password);
     localStorage.setItem("access_token", tokens.access);
     localStorage.setItem("refresh_token", tokens.refresh);
 
-    const { data: user } = await api.get("/accounts/me/");
+    const { data: user } = await accountsService.fetchProfile();
     const normalized = normalizeUser(user);
     setUser(normalized);
     return normalized;
@@ -109,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshToken = localStorage.getItem("refresh_token");
     if (refreshToken) {
       try {
-        await api.post("/accounts/logout/", { refresh: refreshToken });
+        await accountsService.logout(refreshToken);
       } catch (error) {
         console.error("Error logging out:", error);
       }

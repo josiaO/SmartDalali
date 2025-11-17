@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function UserOverview() {
@@ -33,8 +33,11 @@ function UserOverview() {
       try {
         // Assuming a hypothetical endpoint like /accounts/profiles/me/favorites/
         // For now, we'll fetch all properties and simulate favorites
-        const allPropertiesResponse = await api.get<{results: Property[]}>("/properties/?is_published=true");
-        setFavoriteProperties(allPropertiesResponse.data.results.slice(0, 3)); // Simulate some favorites
+        const allPropertiesResponse = await propertiesService.fetchListings({ is_published: true });
+        const list = Array.isArray(allPropertiesResponse.data)
+          ? allPropertiesResponse.data
+          : allPropertiesResponse.data.results || [];
+        setFavoriteProperties(list.slice(0, 3));
       } catch (err) {
         setErrorFavorites("Failed to load favorite properties.");
         console.error(err);
@@ -45,8 +48,11 @@ function UserOverview() {
       // Fetch recently viewed properties (PLACEHOLDER: Requires backend endpoint or client-side tracking)
       setLoadingRecent(true);
       try {
-        const allPropertiesResponse = await api.get<{results: Property[]}>("/properties/?is_published=true");
-        setRecentlyViewed(allPropertiesResponse.data.results.slice(3, 6)); // Simulate some recently viewed
+        const allPropertiesResponse = await propertiesService.fetchListings({ is_published: true });
+        const list = Array.isArray(allPropertiesResponse.data)
+          ? allPropertiesResponse.data
+          : allPropertiesResponse.data.results || [];
+        setRecentlyViewed(list.slice(3, 6));
       } catch (err) {
         setErrorRecent("Failed to load recently viewed properties.");
         console.error(err);

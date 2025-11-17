@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MpesaPaymentForm } from "@/components/MpesaPaymentForm";
 import { StripePaymentForm } from "@/components/StripePaymentForm";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function AgentOverview() {
@@ -39,10 +39,12 @@ function AgentOverview() {
       // Fetch agent properties
       setLoadingProperties(true);
       try {
-        const propertyResponse = await api.get(`/properties/?owner=${user.id}&is_published=true`);
-        setAgentProperties(propertyResponse.data.results || []);
-        // Calculate total views and inquiries from properties if available, or fetch from a dedicated endpoint
-        setTotalViews(propertyResponse.data.results.reduce((sum: number, p: Property) => sum + (p.view_count || 0), 0));
+        const propertyResponse = await propertiesService.fetchListings({ owner: user.id, is_published: true });
+        const list: Property[] = Array.isArray(propertyResponse.data)
+          ? propertyResponse.data
+          : propertyResponse.data.results || [];
+        setAgentProperties(list);
+        setTotalViews(list.reduce((sum: number, p: Property) => sum + (p.view_count || 0), 0));
         // For inquiries and earnings, a separate agent stats endpoint would be ideal. Mocking for now.
         setTotalInquiries(45); // Placeholder
         setEarnings(125000); // Placeholder
@@ -56,9 +58,9 @@ function AgentOverview() {
       // Fetch subscription plans
       setLoadingPlans(true);
       try {
-        const plansResponse = await api.get("/payments/subscription/"); // This endpoint returns plans data
-        setMonthlyPrice(plansResponse.data.monthly.price);
-        setAnnualPrice(plansResponse.data.annual.price);
+        const plansResponse = await propertiesService.fetchSubscriptionPlans();
+        setMonthlyPrice(plansResponse.data.monthly?.price || 0);
+        setAnnualPrice(plansResponse.data.annual?.price || 0);
       } catch (err) {
         setPlansError("Failed to load subscription plans.");
         console.error(err);

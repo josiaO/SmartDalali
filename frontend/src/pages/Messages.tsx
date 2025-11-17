@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import api from "@/lib/api";
+import communicationsService from "@/services/communications";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -60,9 +60,10 @@ export default function Messages() {
     if (!user) return;
     setLoading(true);
     setError(null);
-    try {
-      const response = await api.get<{ results: Conversation[] }>("/messaging/conversations/");
-      setConversations(response.data.results || []);
+      try {
+        const response = await communicationsService.fetchConversations();
+        const list = Array.isArray(response.data) ? response.data : response.data.results;
+        setConversations(list || []);
     } catch (err) {
       setError("Failed to load conversations.");
       console.error(err);
@@ -87,8 +88,9 @@ export default function Messages() {
       setMessagesLoading(true);
       setMessagesError(null);
       try {
-        const response = await api.get<{ results: Message[] }>(`/messaging/conversations/${convId}/messages/`);
-        setMessages(response.data.results || []);
+        const response = await communicationsService.fetchConversationMessages(convId);
+        const list = Array.isArray(response.data) ? response.data : response.data.results;
+        setMessages(list || []);
         await markMessagesAsRead(convId);
       } catch (err) {
         setMessagesError("Failed to load messages for this conversation.");
@@ -110,7 +112,7 @@ export default function Messages() {
       // Find all unread messages for the current user in this conversation
       const unreadMessages = messages.filter(msg => !msg.is_read && msg.sender !== user.id);
       for (const msg of unreadMessages) {
-        await api.post(`/messaging/messages/${msg.id}/mark_read/`);
+        await communicationsService.markMessageRead(msg.id);
       }
       // Update local state
       setMessages(prev => prev.map(msg => msg.sender !== user.id ? { ...msg, is_read: true } : msg));
@@ -124,13 +126,14 @@ export default function Messages() {
     if (!newMessage.trim() || !selectedConversationId || !user) return;
 
     try {
-      await api.post(`/messaging/conversations/${selectedConversationId}/send_message/`, {
+      await communicationsService.sendConversationMessage(selectedConversationId, {
         content: newMessage.trim(),
       });
       setNewMessage("");
       // Refetch messages to show the new one
-      const response = await api.get<{ results: Message[] }>(`/messaging/conversations/${selectedConversationId}/messages/`);
-      setMessages(response.data.results || []);
+      const response = await communicationsService.fetchConversationMessages(selectedConversationId);
+      const list = Array.isArray(response.data) ? response.data : response.data.results;
+      setMessages(list || []);
       fetchConversations(); // Update conversation list (e.g., last message)
     } catch (err) {
       console.error("Error sending message:", error);

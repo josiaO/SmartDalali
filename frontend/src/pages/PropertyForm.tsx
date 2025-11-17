@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, X, Plus, MapPin, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,7 +61,7 @@ export default function PropertyForm() {
       setLoading(true);
       setFetchError(null);
       try {
-        const response = await api.get<Property>(`/properties/${id}/`);
+        const response = await propertiesService.fetchListing(id);
         const propertyData = response.data;
 
         setFormData({
@@ -194,14 +194,10 @@ export default function PropertyForm() {
 
     try {
       if (isEdit) {
-        await api.patch(`/properties/${id}/`, payload, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        await propertiesService.partialUpdateListing(id!, payload);
         toast.success("Property updated successfully!");
       } else {
-        await api.post("/properties/", payload, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        await propertiesService.createListing(payload);
         toast.success(isDraft ? "Property saved as draft" : "Property submitted for approval");
       }
       navigate("/agent/listings"); // Redirect to agent dashboard or listings

@@ -2,8 +2,8 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
 from datetime import timezone
-from django.contrib.gis.db import models
 from django.core.validators import FileExtensionValidator
+import uuid
 
 PROPERTY_TYPES = (
         ('House', 'House'),
@@ -59,9 +59,9 @@ class Property(models.Model):
     #location
     city = models.CharField(max_length=100)
     adress = models.CharField(max_length=300, blank=True)
-    location = models.PointField(default='POINT(34.888822 -6.369028)')
     latitude = models.DecimalField(max_digits=20, decimal_places=12, null=True, blank=True)
     longitude = models.DecimalField(max_digits=20, decimal_places=12, null=True, blank=True)
+    google_place_id = models.CharField(max_length=255, blank=True, null=True)
     
     # Publishing & Business Logic
     is_published = models.BooleanField(default=False)
@@ -74,12 +74,10 @@ class Property(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def get_lat_lng(self):
-        """Extract latitude and longitude from the location field."""
-        if self.location:
-            lat_lng = self.location.split(',')
-            if len(lat_lng) == 2:
-                return lat_lng[0], lat_lng[1]
-        return '0', '0'  # default values
+        """Return persisted latitude and longitude, if available."""
+        if self.latitude is not None and self.longitude is not None:
+            return str(self.latitude), str(self.longitude)
+        return None, None
 
 
     def __str__(self):
@@ -127,3 +125,108 @@ class PropertyVisit(models.Model):
     class Meta:
         app_label = 'properties'
         ordering = ['scheduled_time']
+
+
+# Models from payments app
+class Payment(models.Model):
+    PAYMENT_METHODS = (
+        ('mpesa', 'M-Pesa'),
+        ('stripe', 'Stripe'),
+    )
+
+    PAYMENT_STATUS = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled')
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    method = models.CharField(max_length=20, choices=PAYMENT_METHODS)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    transaction_id = models.CharField(max_length=128, blank=True)
+    status = models.CharField(max_length=32, choices=PAYMENT_STATUS)
+    raw_payload = models.JSONField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'properties'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.method} {self.amount} {self.status}"
+
+
+# Models from support app
+class SupportTicket(models.Model):
+    PRIORITY_CHOICES = (
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    )
+    
+    STATUS_CHOICES = (
+        ('open', 'Open'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+        ('closed', 'Closed'),
+    )
+    
+    CATEGORY_CHOICES = (
+        ('account', 'Account Issues'),
+        ('property', 'Property Listing'),
+        ('payment', 'Payment & Billing'),
+        ('technical', 'Technical Support'),
+        ('report', 'Report a Problem'),
+        ('feature', 'Feature Request'),
+        ('other', 'Other'),
+    )
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ticket_number = models.CharField(max_length=20, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='support_tickets')
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='open')
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    admin_reply = models.TextField(blank=True, null=True)
+    user_reply = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        app_label = 'properties'
+    
+    def save(self, *args, **kwargs):
+        if not self.ticket_number:
+            self.ticket_number = f"SD-{timezone.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.ticket_number} - {self.title}"
+
+
+class TicketReply(models.Model):
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='replies')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.TextField()
+    is_admin_reply = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        app_label = 'properties'
+    
+    def __str__(self):
+        return f"Reply to {self.ticket.ticket_number} by {self.user.username}"

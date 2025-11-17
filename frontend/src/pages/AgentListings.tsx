@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -39,8 +39,11 @@ export default function AgentListings() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(`/properties/?owner=${user.id}`); // Filter by owner (current user)
-      setAgentProperties(response.data.results || []);
+      const response = await propertiesService.fetchListings({ owner: user.id });
+      const list: Property[] = Array.isArray(response.data)
+        ? response.data
+        : response.data.results || [];
+      setAgentProperties(list);
     } catch (err) {
       setError("Failed to load your property listings.");
       console.error(err);
@@ -68,7 +71,7 @@ export default function AgentListings() {
   const confirmDelete = async () => {
     if (!deleteId) return;
     try {
-      await api.delete(`/properties/${deleteId}/`);
+      await propertiesService.deleteListing(deleteId);
       setAgentProperties(prev => prev.filter(p => p.id.toString() !== deleteId));
       toast({ title: "Property deleted", description: "Your property has been successfully removed." });
     } catch (err) {

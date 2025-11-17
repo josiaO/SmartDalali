@@ -1,6 +1,12 @@
+from decimal import Decimal
+
 from rest_framework import serializers
-from .models import AgentProfile, Property, MediaProperty, Features, PropertyVisit
+from .models import (
+    AgentProfile, Property, MediaProperty, Features, PropertyVisit,
+    Payment, SupportTicket, TicketReply
+)
 from accounts.models import Profile
+from utils.google_maps import geocode_address, build_maps_url
 
 
 class MediaPropertySerializer(serializers.ModelSerializer):
@@ -26,17 +32,19 @@ class SerializerProperty(serializers.ModelSerializer):
     agent = serializers.SerializerMethodField()
     main_image_url = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
+    maps_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
         fields = [
             'id', 'title', 'description', 'price', 'status', 'type',
             'rooms', 'bedrooms', 'bathrooms', 'area', 'city', 'address',
-            'location', 'latitude', 'longitude', 'is_published', 'is_paid',
+            'latitude', 'longitude', 'google_place_id', 'maps_url',
+            'is_published', 'is_paid',
             'featured_until', 'view_count', 'owner', 'created_at', 'updated_at',
             'MediaProperty', 'Features_Property', 'agent', 'main_image_url'
         ]
-        read_only_fields = ['owner', 'created_at', 'updated_at', 'view_count']
+        read_only_fields = ['owner', 'created_at', 'updated_at', 'view_count', 'google_place_id', 'maps_url']
 
     def get_agent(self, obj):
         try:
@@ -69,6 +77,12 @@ class SerializerProperty(serializers.ModelSerializer):
     def get_address(self, obj):
         # model currently has a typo 'adress' — expose it as 'address' for API consistency
         return getattr(obj, 'adress', None)
+
+    def get_maps_url(self, obj):
+        lat, lng = obj.get_lat_lng()
+        if lat and lng:
+            return build_maps_url(lat, lng)
+        return None
 
     def create(self, validated_data, owner=None):
         # Handle nested lists if provided in validated_data
@@ -110,6 +124,7 @@ class SerializerProperty(serializers.ModelSerializer):
             if val:
                 Features.objects.create(property=property_instance, features=val)
 
+        self._sync_coordinates(property_instance, validated_data)
         return property_instance
 
     def update(self, instance, validated_data):
@@ -160,4 +175,96 @@ class SerializerProperty(serializers.ModelSerializer):
                 for f in files:
                     MediaProperty.objects.create(property=instance, Images=f)
 
+        should_refresh_coordinates = any(
+            field in validated_data for field in ('adress', 'city')
+        ) or instance.latitude is None or instance.longitude is None
+        if should_refresh_coordinates:
+            self._sync_coordinates(instance, validated_data)
         return instance
+
+    def _sync_coordinates(self, instance, data, save=True):
+        """Use Google Maps Geocoding API to fill latitude/longitude."""
+        address = data.get('adress', instance.adress)
+        city = data.get('city', instance.city)
+        geo = geocode_address(address, city)
+        if not geo:
+            return
+        lat = geo.get('lat')
+        lng = geo.get('lng')
+        place_id = geo.get('place_id')
+        updated_fields = []
+        if lat is not None:
+            instance.latitude = Decimal(str(lat))
+            updated_fields.append('latitude')
+        if lng is not None:
+            instance.longitude = Decimal(str(lng))
+            updated_fields.append('longitude')
+        if place_id:
+            instance.google_place_id = place_id
+            updated_fields.append('google_place_id')
+        if updated_fields and save is not False:
+            instance.save(update_fields=updated_fields)
+
+
+# Serializers from payments app
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['id', 'user', 'property', 'method', 'amount', 'status', 'transaction_id', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class SubscriptionPaymentSerializer(serializers.Serializer):
+    """For handling subscription payment requests."""
+    plan = serializers.ChoiceField(choices=['monthly', 'annual'])
+    phone = serializers.CharField(max_length=20)  # For M-Pesa number
+
+
+# Serializers from support app
+class TicketReplySerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    user_role = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = TicketReply
+        fields = ['id', 'user', 'user_name', 'user_role', 'message', 'is_admin_reply', 'created_at']
+        read_only_fields = ['user', 'is_admin_reply', 'created_at']
+    
+    def get_user_role(self, obj):
+        if obj.user.is_superuser:
+            return 'admin'
+        elif obj.user.groups.filter(name='agent').exists():
+            return 'agent'
+        else:
+            return 'user'
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.username', read_only=True)
+    replies = TicketReplySerializer(many=True, read_only=True)
+    reply_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SupportTicket
+        fields = [
+            'id', 'ticket_number', 'user', 'user_name', 'user_email',
+            'title', 'description', 'category', 'priority', 'status',
+            'assigned_to', 'assigned_to_name', 'admin_reply', 'user_reply',
+            'created_at', 'updated_at', 'closed_at', 'replies', 'reply_count'
+        ]
+        read_only_fields = ['user', 'ticket_number', 'created_at', 'updated_at', 'closed_at']
+    
+    def get_reply_count(self, obj):
+        return obj.replies.count()
+
+
+class CreateSupportTicketSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupportTicket
+        fields = ['title', 'description', 'category', 'priority']
+    
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)

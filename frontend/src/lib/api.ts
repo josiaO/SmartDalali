@@ -1,10 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // Use Vite env variable if provided. For local development we prefer a relative
-// URL ('/api') so the Vite dev server proxy forwards requests to the backend
-// and avoids CORS. If you need to point directly to a backend, set
-// VITE_API_URL in your .env (e.g. http://127.0.0.1:8000/api).
-const API_BASE = (import.meta.env.VITE_API_URL as string) || '/api';
+// Default to the versioned API root so all endpoints are routed consistently.
+// In development, the Vite proxy should map /api/v1 to the Django backend.
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -72,7 +71,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const resp = await axios.post(`${API_BASE}/accounts/token/refresh/`, {
+        const resp = await axios.post(`${API_BASE}/accounts/auth/token/refresh/`, {
           refresh: refreshToken,
         });
         const newAccess = resp.data?.access;

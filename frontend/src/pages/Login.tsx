@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Building2, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
-import api from "@/lib/api"; // Import api
+import accountsService from "@/services/accounts";
 
 export default function Login() {
   // Login form
@@ -88,11 +88,11 @@ export default function Login() {
 
     try {
       // Directly call api.post for registration
-      await api.post("/accounts/register/", {
+      await accountsService.register({
         username: registerUsername,
         email: registerEmail,
         password: registerPassword1,
-        is_agent: isRegisteringAgent, // Pass the is_agent flag
+        is_agent: isRegisteringAgent,
       });
       
       toast({

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { PropertyMap } from "@/components/PropertyMap";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,8 +22,10 @@ export default function MapView() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get("/properties/?is_published=true"); // Fetch all published properties
-      const fetchedProperties: Property[] = response.data.results || [];
+      const response = await propertiesService.fetchListings({ is_published: true });
+      const fetchedProperties: Property[] = Array.isArray(response.data)
+        ? response.data
+        : response.data.results || [];
       setProperties(fetchedProperties);
       
       let filtered = fetchedProperties;

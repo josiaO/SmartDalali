@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, Search, Filter, UserPlus, Edit, Trash2, Mail, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import api from "@/lib/api";
+import accountsService from "@/services/accounts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -45,8 +45,9 @@ export default function AdminUsers() {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get("/accounts/users/");
-        setUsers(response.data.results || []);
+        const { data } = await accountsService.fetchUsers();
+        const normalized = Array.isArray(data) ? data : data.results || [];
+        setUsers(normalized);
       } catch (err) {
         setError("Failed to fetch users.");
         console.error(err);
@@ -85,7 +86,7 @@ export default function AdminUsers() {
   const toggleUserActiveStatus = async (userId: number, currentStatus: boolean) => {
     try {
       // Assuming a backend endpoint for toggling active status
-      await api.patch(`/accounts/users/${userId}/`, { is_active: !currentStatus });
+      await accountsService.toggleActiveStatus(userId);
       setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, is_active: !currentStatus } : u));
       console.log(`Toggled active status for user ${userId}`);
     } catch (err) {
@@ -98,8 +99,7 @@ export default function AdminUsers() {
       // Assuming a backend endpoint for toggling agent status (e.g., adding/removing from 'agent' group)
       // This might be more complex, involving group management. For now, a simplified patch.
       // A dedicated endpoint like /accounts/users/{id}/toggle_agent_role/ would be ideal.
-      console.log(`Toggling agent status for user ${userId}. Current: ${isCurrentlyAgent}`);
-      // For now, just update frontend state
+      await accountsService.toggleAgentStatus(userId);
       setUsers(prevUsers => prevUsers.map(u => {
         if (u.id === userId) {
           const newGroups = isCurrentlyAgent
@@ -114,14 +114,8 @@ export default function AdminUsers() {
     }
   };
 
-  const deleteUser = async (userId: number) => {
-    try {
-      await api.delete(`/accounts/users/${userId}/`);
-      setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
-      console.log(`Deleted user ${userId}`);
-    } catch (err) {
-      console.error("Failed to delete user:", err);
-    }
+  const deleteUser = async (_userId: number) => {
+    console.warn("User deletion is managed through Django admin.");
   };
 
   return (
@@ -279,9 +273,9 @@ export default function AdminUsers() {
                                 {isAgent ? "Remove Agent Role" : "Make Agent"}
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem className="gap-2 text-destructive" onClick={() => deleteUser(user.id)}>
+                            <DropdownMenuItem className="gap-2 text-destructive" disabled onClick={() => deleteUser(user.id)}>
                               <Trash2 className="w-4 h-4" />
-                              Delete User
+                              Delete User (admin only)
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

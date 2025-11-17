@@ -60,7 +60,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.gis',
     'django.contrib.sites',
     'allauth',
     'allauth.account',
@@ -78,10 +77,7 @@ INSTALLED_APPS = [
     # Local apps
     'accounts',
     'properties',
-    'payments',
-    'messaging',
-    'notifications',
-    'support',
+    'communications',
 ]
 
 SITE_ID = 1
@@ -219,14 +215,8 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-LOCATION_FIELD = {
-    'provider.google.api': '//maps.google.com/maps/api/js?sensor=false',
-    'provider.google.api_key': os.getenv('GOOGLE_MAPS_API_KEY'),
-    'provider.google.api_libraries': '',
-    'provider.google.map.type': 'SATELLITE', # Map type: Satellite (Residential)
-    'provider.google.center': {'lat':  -6.369028, 'lng': 34.888822},  #Tanzania Coordinates
-    'provider.google.zoom': 12, # Default zoom level
-}
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
+GOOGLE_MAPS_GEOCODE_TIMEOUT = int(os.getenv('GOOGLE_MAPS_GEOCODE_TIMEOUT', '5'))
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -267,7 +257,8 @@ ASGI_APPLICATION = 'backend.asgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
+        # SQLite is sufficient for non-GIS workloads. Swap for PostgreSQL in production.
+        'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }

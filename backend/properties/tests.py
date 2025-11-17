@@ -110,5 +110,7 @@ class PropertySerializerTest(TestCase):
 
 		self.assertTrue(prop.MediaProperty.exists())
 		media = prop.MediaProperty.first()
-		# ensure file name saved (backend storage may vary)
-		self.assertIn('test.jpg', getattr(media.Images, 'name', ''))
+		# ensure file persisted and retains extension (storage may append suffix)
+		image_name = getattr(media.Images, 'name', '')
+		self.assertTrue(image_name.startswith('property_images/'))
+		self.assertTrue(image_name.lower().endswith('.jpg'))

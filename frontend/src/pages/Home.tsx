@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PropertyCard } from "@/components/PropertyCard";
 import { useLanguage } from "@/contexts/LanguageContext";
-import api from "@/lib/api";
+import propertiesService from "@/services/properties";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Property } from "@/data/properties";
 
@@ -18,8 +18,10 @@ export default function Home() {
   useEffect(() => {
     const fetchFeaturedProperties = async () => {
       try {
-        const response = await api.get("/properties/");
-        const allProperties: Property[] = response.data;
+        const response = await propertiesService.fetchListings({ is_published: true });
+        const allProperties: Property[] = Array.isArray(response.data)
+          ? response.data
+          : response.data.results || [];
         const featured = allProperties
           .filter((p) => p.featured_until && new Date(p.featured_until) > new Date())
           .slice(0, 3);

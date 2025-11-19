@@ -49,6 +49,10 @@ export const propertiesService = {
   closeTicket: (id: number | string) =>
     api.post(`/properties/support/tickets/${id}/close/`),
   ticketStats: () => api.get('/properties/support/tickets/stats/'),
+  fetchSupportTickets: (params?: Params) => api.get('/properties/tickets/', { params }),
+
+  // Agent stats
+  fetchAgentStats: () => api.get('/agents/stats/'),
 };
 
 export default propertiesService;

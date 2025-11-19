@@ -167,9 +167,9 @@ export default function AgentDashboard() {
             <div className="flex-1">
               <p className="text-sm text-neutral-foreground3Rest font-medium">{title}</p>
               <div className="flex items-baseline gap-2 mt-2">
-                <p className="text-3xl font-bold text-neutral-foreground1">
+                <div className="text-3xl font-bold text-neutral-foreground1">
                   {loading ? <Skeleton className="h-9 w-20" /> : value}
-                </p>
+                </div>
                 {trend !== undefined && (
                   <div className={`flex items-center gap-1 text-sm font-semibold ${trend >= 0 ? "text-green-600" : "text-red-600"}`}>
                     {trend >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}

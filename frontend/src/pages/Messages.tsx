@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Send, MessageSquare, User, Search, Phone, Mail } from "lucide-react";
+import { Send, MessageSquare, User, Search, Phone, Mail, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface Conversation {
   id: number;
@@ -56,15 +57,31 @@ export default function Messages() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // WebSocket hook - only connects when a conversation is selected
+  const {
+    isConnected,
+    error: wsError,
+    typingUsers,
+    sendMessage: sendWSMessage,
+    sendTypingIndicator,
+    reconnect,
+  } = useWebSocket({
+    conversationId: selectedConversationId || undefined,
+    autoConnect: false,
+  });
 
   const fetchConversations = async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
-      try {
-        const response = await communicationsService.fetchConversations();
-        const list = Array.isArray(response.data) ? response.data : response.data.results;
-        setConversations(list || []);
+    try {
+      const response = await communicationsService.fetchConversations();
+      const list = Array.isArray(response.data) ? response.data : response.data.results;
+      setConversations(list || []);
     } catch (err) {
       setError("Failed to load conversations.");
       console.error(err);
@@ -78,10 +95,10 @@ export default function Messages() {
 
     fetchConversations();
 
-    // Polling for new conversations or updates (simulating real-time without websockets for now)
-    const interval = setInterval(fetchConversations, 10000); // Poll every 10 seconds
+    // Polling for new conversations (fallback/supplement to WebSocket)
+    const interval = setInterval(fetchConversations, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
-  }, [user]); // Removed supabase dependencies
+  }, [user]);
 
   // Fetch messages for selected conversation
   useEffect(() => {
@@ -100,12 +117,17 @@ export default function Messages() {
         setMessagesLoading(false);
       }
     };
+
     if (selectedConversationId) {
       fetchMessages(selectedConversationId);
-      const interval = setInterval(() => fetchMessages(selectedConversationId), 5000); // Poll for new messages
-      return () => clearInterval(interval);
+      // Polling for new messages only if WebSocket is not connected
+      const pollInterval = setInterval(
+        () => !isConnected && fetchMessages(selectedConversationId),
+        5000
+      );
+      return () => clearInterval(pollInterval);
     }
-  }, [selectedConversationId, user]); // Added user to dependencies
+  }, [selectedConversationId, isConnected]); // Re-run when connection status changes
 
   const markMessagesAsRead = async (convId: number) => {
     if (!user) return;
@@ -127,17 +149,22 @@ export default function Messages() {
     if (!newMessage.trim() || !selectedConversationId || !user) return;
 
     try {
+      // Use REST API to send the message (WebSocket is for receiving)
       await communicationsService.sendConversationMessage(selectedConversationId, {
         content: newMessage.trim(),
       });
       setNewMessage("");
+      setIsTyping(false);
+      if (typingTimeout) clearTimeout(typingTimeout);
+      sendTypingIndicator(false);
+      
       // Refetch messages to show the new one
       const response = await communicationsService.fetchConversationMessages(selectedConversationId);
       const list = Array.isArray(response.data) ? response.data : response.data.results;
       setMessages(list || []);
       fetchConversations(); // Update conversation list (e.g., last message)
     } catch (err) {
-      console.error("Error sending message:", error);
+      console.error("Error sending message:", err);
       toast({
         title: "Error",
         description: "Failed to send message",
@@ -154,8 +181,46 @@ export default function Messages() {
       propertyTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
       conv.last_message?.content.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }
-  );
+  });
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Handle typing indicator
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewMessage(value);
+
+    // Clear previous timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+
+    // Send typing indicator if WebSocket is connected
+    if (isConnected && !isTyping && value.length > 0) {
+      setIsTyping(true);
+      sendTypingIndicator(true);
+    }
+
+    // Stop typing after 2 seconds of inactivity
+    setTypingTimeout(
+      setTimeout(() => {
+        setIsTyping(false);
+        if (isConnected) {
+          sendTypingIndicator(false);
+        }
+      }, 2000)
+    );
+  };
+
+  const getTypingText = () => {
+    const typers = Array.from(typingUsers.keys());
+    if (typers.length === 0) return null;
+    if (typers.length === 1) return 'Someone is typing...';
+    return `${typers.length} people are typing...`;
+  };
 
   if (!user) {
     return (
@@ -249,14 +314,34 @@ export default function Messages() {
           {/* Messages Area */}
           <Card className="lg:col-span-2 glass-effect">
             {selectedConversationId ? (
-              <>
+            <>
                 <CardHeader>
-                  <CardTitle>
-                    {conversations.find((c) => c.id === selectedConversationId)?.other_participant?.name ||
-                     conversations.find((c) => c.id === selectedConversationId)?.other_participant?.username || "Conversation"}
-                    {conversations.find((c) => c.id === selectedConversationId)?.property_title &&
-                     ` (${conversations.find((c) => c.id === selectedConversationId)?.property_title})`}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>
+                        {conversations.find((c) => c.id === selectedConversationId)?.other_participant?.name ||
+                         conversations.find((c) => c.id === selectedConversationId)?.other_participant?.username || "Conversation"}
+                        {conversations.find((c) => c.id === selectedConversationId)?.property_title &&
+                         ` (${conversations.find((c) => c.id === selectedConversationId)?.property_title})`}
+                      </CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isConnected ? (
+                        <>
+                          <Wifi className="w-4 h-4 text-green-500" />
+                          <span className="text-xs text-green-600">Live</span>
+                        </>
+                      ) : (
+                        <>
+                          <WifiOff className="w-4 h-4 text-red-500" />
+                          <span className="text-xs text-red-600">Offline</span>
+                          <Button size="sm" variant="outline" onClick={reconnect} className="ml-2">
+                            Reconnect
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
                   <ScrollArea className="h-[480px] pr-4">
@@ -299,6 +384,26 @@ export default function Messages() {
                             </div>
                           </div>
                         ))}
+
+                        {/* Typing Indicator */}
+                        {getTypingText() && (
+                          <div className="flex gap-2 text-gray-500 text-sm">
+                            <span>{getTypingText()}</span>
+                            <div className="flex gap-1">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                              <span
+                                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                style={{ animationDelay: '0.2s' }}
+                              />
+                              <span
+                                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                style={{ animationDelay: '0.4s' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div ref={messagesEndRef} />
                       </div>
                     )}
                   </ScrollArea>
@@ -309,7 +414,7 @@ export default function Messages() {
                     <Textarea
                       placeholder="Type your message..."
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={handleInputChange}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();

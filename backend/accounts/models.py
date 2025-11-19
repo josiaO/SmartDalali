@@ -18,21 +18,6 @@ class Profile(models.Model):
         return self.user.username
 
 
-# Proxy model to present AgentProfile under the `accounts` app in Django admin
-try:
-    from properties.models import AgentProfile as _AgentProfile
-
-    class AgentProfileProxy(_AgentProfile):
-        class Meta:
-            proxy = True
-            app_label = 'accounts'
-            verbose_name = 'Agent Profile'
-            verbose_name_plural = 'Agent Profiles'
-
-except Exception:
-    # properties app or AgentProfile may not be importable at import time in some test contexts
-    AgentProfileProxy = None
-
 # Create or update Profile when User is created or saved
 @receiver(post_save, sender=User)
 def create_or_update_profile(sender, instance, created, **kwargs):

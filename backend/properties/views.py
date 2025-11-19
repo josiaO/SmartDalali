@@ -1,16 +1,18 @@
 from rest_framework import generics, permissions, viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import MethodNotAllowed
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.utils import timezone
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
 import json
+from django_filters.rest_framework import DjangoFilterBackend
+from utils.google_maps import geocode_address, build_maps_url
 
 from .models import (
     PropertyVisit, Property, Payment, SupportTicket, TicketReply, AgentProfile
@@ -26,7 +28,24 @@ from accounts.permissions import IsAdmin
 class PropertyListCreateView(generics.ListCreateAPIView):
     queryset = Property.objects.all().order_by('-created_at')
     serializer_class = SerializerProperty
+    # Allow anyone to list properties, but creating requires agent or admin
     permission_classes = [permissions.AllowAny]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = {
+        'city': ['exact', 'icontains'],
+        'type': ['exact'],
+        'status': ['exact'],
+        'is_published': ['exact'],
+        'price': ['exact', 'gte', 'lte'],
+    }
+
+    def get_permissions(self):
+        # Allow GET for everyone
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        # For POST require authenticated agent or admin
+        from accounts.permissions import IsAgent
+        return [permissions.IsAuthenticated(), IsAgent()]
 
     def perform_create(self, serializer):
         # set owner to request user if authenticated
@@ -41,13 +60,39 @@ class PropertyListCreateView(generics.ListCreateAPIView):
 class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Property.objects.all()
     serializer_class = SerializerProperty
+    # Allow anyone to retrieve, but updates/deletes require owner or admin
     permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+
+        # For unsafe methods ensure user is authenticated and is owner or admin
+        class IsOwnerOrAdmin(permissions.BasePermission):
+            def has_object_permission(self, request, view, obj):
+                if not request.user or request.user.is_anonymous:
+                    return False
+                if getattr(request.user, 'is_superuser', False):
+                    return True
+                return obj.owner == request.user
+
+        return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
 
 
 class PropertyVisitListCreateView(generics.ListCreateAPIView):
     queryset = PropertyVisit.objects.all()
     serializer_class = PropertyVisitSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or user.is_staff:
+            return PropertyVisit.objects.all()
+        # Agents can view visits for properties they own
+        if user.groups.filter(name='agent').exists():
+            return PropertyVisit.objects.filter(Q(property__owner=user) | Q(visitor=user))
+        # Regular users only see their own visits
+        return PropertyVisit.objects.filter(visitor=user)
 
 
 class PropertyVisitRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -153,7 +198,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def admin_list(self, request):
         """Get all payments for admin panel with extended details."""
-        if not request.user.is_superuser:
+        # Use IsAdmin permission class to determine access
+        from accounts.permissions import IsAdmin as IsAdminPerm
+        if not IsAdminPerm().has_permission(request, self):
             raise PermissionDenied("Only administrators can access this endpoint")
         
         payments = Payment.objects.all().order_by('-created_at')
@@ -172,7 +219,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def retry(self, request, pk=None):
         """Retry a failed payment."""
-        if not request.user.is_superuser:
+        from accounts.permissions import IsAdmin as IsAdminPerm
+        if not IsAdminPerm().has_permission(request, self):
             raise PermissionDenied("Only administrators can retry payments")
 
         payment = self.get_object()
@@ -293,7 +341,7 @@ def mpesa_callback(request):
 
 
 @api_view(['GET'])
-@login_required
+@permission_classes([IsAuthenticated])
 def payment_status(request, payment_id):
     """Return payment status so frontend can poll for completion."""
     # Validate payment_id to prevent SQL injection
@@ -318,6 +366,59 @@ def payment_status(request, payment_id):
         'raw_payload': payment.raw_payload,
     }
     return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def geocode_property_location(request):
+    """Return coordinates for a provided property address to drive map previews."""
+    address = request.data.get('address')
+    city = request.data.get('city')
+
+    if not address and not city:
+        return Response(
+            {'error': 'Provide either address or city to geocode.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    geo = geocode_address(address, city)
+    if not geo:
+        return Response({'error': 'Location not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    latitude = geo.get('lat')
+    longitude = geo.get('lng')
+    return Response({
+        'latitude': latitude,
+        'longitude': longitude,
+        'place_id': geo.get('place_id'),
+        'formatted_address': geo.get('formatted_address'),
+        'maps_url': build_maps_url(latitude, longitude)
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def agent_stats(request):
+    """Return aggregate stats for the authenticated agent (or admin viewing own portfolio)."""
+    user = request.user
+    if not (user.is_superuser or user.groups.filter(name='agent').exists()):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+    agent_properties = Property.objects.filter(owner=user)
+    total_listings = agent_properties.count()
+    total_views = agent_properties.aggregate(total=Sum('view_count'))['total'] or 0
+    total_inquiries = PropertyVisit.objects.filter(property__owner=user).count()
+    total_earnings = Payment.objects.filter(
+        property__owner=user,
+        status='completed'
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    return Response({
+        'total_listings': total_listings,
+        'total_views': total_views,
+        'total_inquiries': total_inquiries,
+        'earnings': float(total_earnings),
+    })
 
 
 # Views from support app

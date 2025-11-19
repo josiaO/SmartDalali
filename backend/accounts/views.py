@@ -8,14 +8,18 @@ from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from django.http import JsonResponse
+import json
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .permissions import IsAdmin
+from rest_framework.exceptions import ValidationError
+from django.db import transaction
+from .permissions import IsAdmin, IsAgent
 from datetime import timedelta
 from .models import Profile
 from properties.models import AgentProfile, Property
 from .serializers import UserSerializer, UserProfileSerializer, AgentProfileSerializer
 from .forms import SignupForm, ActivationForm
-from .roles import get_user_role
+from .roles import get_user_role, is_agent
 
 
 class UserManagementViewSet(viewsets.ReadOnlyModelViewSet):
@@ -66,7 +70,7 @@ class UserManagementViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             user.groups.add(agent_group)
             # Create agent profile if doesn't exist
-            AgentProfile.objects.get_or_create(user=user)
+            AgentProfile.objects.get_or_create(user=user, profile=user.profile)
             message = f"{user.username} is now an agent"
         
         return Response({'message': message})
@@ -137,7 +141,7 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 class AgentProfileViewSet(viewsets.ModelViewSet):
     serializer_class = AgentProfileSerializer
     # Only authenticated agents or admins can access agent profile endpoints
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAgent]
     
     def get_queryset(self):
         if self.request.user.is_superuser:
@@ -179,11 +183,15 @@ class AgentProfileViewSet(viewsets.ModelViewSet):
 
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
+        logger.info('MyTokenObtainPairSerializer.get_token called for user=%s id=%s', user.username, user.id)
         token = super().get_token(user)
         token['username'] = user.username
         return token
@@ -199,21 +207,44 @@ class MyTokenObtainPairView(TokenObtainPairView):
         token serializer flow. This keeps frontend callers that send 'email' working.
         """
         data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        logger.info('TokenObtain POST: incoming data email=%s username=%s', data.get('email'), data.get('username'))
+
         if 'email' in data and 'username' not in data:
             from django.contrib.auth import get_user_model
             UserModel = get_user_model()
             try:
                 u = UserModel.objects.get(email__iexact=data.get('email'))
                 data['username'] = u.get_username()
+                # Log resolved username for debugging login/token issues
+                try:
+                    logger.info('TokenObtain: resolved email=%s to username=%s id=%s', data.get('email'), data['username'], u.id)
+                except Exception:
+                    pass
             except UserModel.DoesNotExist:
                 # leave username absent so the serializer will return the usual error
                 pass
+        else:
+            # Log when username is provided directly
+            try:
+                if 'username' in data:
+                    logger.info('TokenObtain: login with username=%s', data.get('username'))
+            except Exception:
+                pass
 
+        logger.info('TokenObtain: about to validate serializer with data username=%s', data.get('username'))
         serializer = self.get_serializer(data=data)
         try:
             serializer.is_valid(raise_exception=True)
         except Exception as e:
+            logger.error('TokenObtain: serializer validation failed: %s', str(e))
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Log which user's token is being issued
+        try:
+            if hasattr(serializer, 'user'):
+                logger.info('TokenObtain: issuing token for user=%s id=%s', serializer.user.username, serializer.user.id)
+        except Exception:
+            pass
 
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
@@ -230,16 +261,25 @@ def get_user_routes(request):
 from rest_framework_simplejwt.tokens import RefreshToken
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # Allow unauthenticated logout (browser might have expired token)
 def auth_logout(request):
-    """Logout endpoint"""
+    """Logout endpoint - blacklist refresh token"""
     try:
-        refresh_token = request.data["refresh"]
-        token = RefreshToken(refresh_token)
-        token.blacklist()
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            # If no refresh token provided, still return 205 (logout is idempotent)
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception as e:
+            logger.warning('Logout: could not blacklist token: %s', str(e))
+            # Still return 205 even if blacklist fails (token will expire naturally)
         return Response(status=status.HTTP_205_RESET_CONTENT)
     except Exception as e:
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        logger.error('Logout failed: %s', str(e))
+        # Return 205 anyway since we cleared tokens on the frontend
+        return Response(status=status.HTTP_205_RESET_CONTENT)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -263,7 +303,8 @@ def register(request):
         return Response({'error': 'username already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = User.objects.create_user(username=username, email=email, password=password)
-    user.is_active = False
+    # Auto-activate users immediately so they can sign in; activation email is still sent for verification
+    user.is_active = True
     user.save()
 
     # If requested, add agent group and create AgentProfile
@@ -272,111 +313,222 @@ def register(request):
         user.groups.add(agent_group)
         # create AgentProfile if not exists
         try:
-            AgentProfile.objects.get_or_create(user=user)
+            AgentProfile.objects.get_or_create(user=user, profile=user.profile)
         except Exception:
             pass
 
-    # Send activation email with profile code (Profile created via signal)
+    # Profile will be created via signal; send activation email with templated content
     try:
         profile = user.profile
-        send_mail(
-            'Activate Your Account',
-            f'Welcome {username}\nUse this code {profile.code} to activate your account.',
-            settings.EMAIL_HOST_USER,
-            [email] if email else [],
-            fail_silently=True,
-        )
+        if email:
+            from django.template.loader import render_to_string
+            frontend = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+            activation_link = f"{frontend}/activate?username={username}&code={profile.code}"
+            subject = 'Activate Your SmartDalali Account'
+            text_body = render_to_string('emails/activation_email.txt', {
+                'username': username,
+                'activation_link': activation_link,
+            })
+            html_body = render_to_string('emails/activation_email.html', {
+                'username': username,
+                'activation_link': activation_link,
+            })
+            send_mail(
+                subject,
+                text_body,
+                settings.EMAIL_HOST_USER,
+                [email],
+                html_message=html_body,
+                fail_silently=True,
+            )
     except Exception:
-        # Non-fatal if email/profile unavailable
         pass
 
-    return Response({'message': 'User created successfully. Please check your email to activate your account.'}, status=status.HTTP_201_CREATED)
+    return Response({'message': 'User created successfully. Please check your email to activate the account.'}, status=status.HTTP_201_CREATED)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def user_profile(request):
-    """Get user profile"""
-    try:
-        user = request.user
-        profile = getattr(user, 'profile', None)
-        
-        # Determine user role using central helper
-        role = get_user_role(user)
-        
-        profile_data = {}
-        if profile:
-            profile_data = {
-                'name': profile.name,
-                'phone_number': profile.phone_number,
-                'address': profile.address,
-                'image': profile.image.url if profile.image else None,
-            }
-        # Include agent subscription info if available
-        is_agent_flag = user.groups.filter(name='agent').exists()
-        subscription_info = {
-            # Backwards-compatible keys
-            'is_agent': is_agent_flag,
-            'subscription_active': False,
-            'subscription_expires': None,
-            # Frontend-friendly keys
-            'is_active': False,
-            'trial_end_date': None,
+def _coerce_to_dict(value):
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except Exception:
+            return {}
+    return {}
+
+
+def _serialize_current_user(user):
+    profile = getattr(user, 'profile', None)
+    profile_data = None
+    if profile:
+        profile_data = {
+            'name': profile.name,
+            'phone_number': profile.phone_number,
+            'address': profile.address,
+            'image': profile.image.url if profile.image else None,
         }
-        if is_agent_flag:
-            agent_profile = AgentProfile.objects.filter(user=user).first()
-            if agent_profile:
-                subscription_info['subscription_active'] = bool(agent_profile.subscription_active)
-                subscription_info['subscription_expires'] = agent_profile.subscription_expires
-                # Map to frontend expected keys
-                subscription_info['is_active'] = bool(agent_profile.subscription_active)
-                subscription_info['trial_end_date'] = (
-                    agent_profile.subscription_expires.isoformat() if agent_profile.subscription_expires else None
-                )
-        
-        return Response({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'role': role,
-            'isAuthenticated': True,
-            'is_superuser': user.is_superuser,
-            # keep is_agent top-level for frontend compatibility
-            'is_agent': is_agent_flag,
-            'groups': list(user.groups.values_list('name', flat=True)),
-            'profile': profile_data,
-            'subscription': subscription_info,
-        })
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
+
+    role = get_user_role(user)
+    is_agent_flag = is_agent(user)
+    subscription_info = {
+        'is_agent': is_agent_flag,
+        'subscription_active': False,
+        'subscription_expires': None,
+        'is_active': False,
+        'trial_end_date': None,
+    }
+    agent_profile_data = None
+    agent_profile = AgentProfile.objects.filter(user=user).first() if is_agent_flag else None
+    if agent_profile:
+        subscription_info['subscription_active'] = bool(agent_profile.subscription_active)
+        subscription_info['subscription_expires'] = agent_profile.subscription_expires
+        subscription_info['is_active'] = bool(agent_profile.subscription_active)
+        subscription_info['trial_end_date'] = (
+            agent_profile.subscription_expires.isoformat() if agent_profile.subscription_expires else None
+        )
+        agent_profile_data = {
+            'id': agent_profile.id,
+            'agency_name': agent_profile.agency_name or None,
+            'phone': agent_profile.phone or None,
+            'verified': bool(agent_profile.verified),
+            'subscription_active': bool(agent_profile.subscription_active),
+            'subscription_expires': agent_profile.subscription_expires.isoformat() if agent_profile.subscription_expires else None,
+        }
+
+    user_summary = {
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+    }
+
+    response = {
+        **user_summary,
+        'role': role,
+        'isAuthenticated': True,
+        'is_superuser': user.is_superuser,
+        'is_agent': is_agent_flag,
+        'groups': list(user.groups.values_list('name', flat=True)),
+        'profile': profile_data,
+        'subscription': subscription_info,
+        'agent_profile': agent_profile_data,
+        'user': user_summary,
+    }
+    return response
 
 
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def update_user_profile(request):
-    """Update user profile"""
-    try:
-        user = request.user
-        profile = getattr(user, 'profile', None)
-        
-        if not profile:
-            return Response({'error': 'Profile not found'}, status=404)
+def _update_profile_payload(user, data, files):
+    user_payload = _coerce_to_dict(data.get('user'))
+    profile_payload = _coerce_to_dict(data.get('profile'))
+    agent_payload = _coerce_to_dict(data.get('agent_profile'))
 
-        data = request.data or {}
+    changed = False
+    if user_payload:
+        for field in ('first_name', 'last_name', 'email'):
+            value = user_payload.get(field)
+            if value is not None and getattr(user, field) != value:
+                setattr(user, field, value)
+                changed = True
+    else:
+        for field in ('first_name', 'last_name', 'email'):
+            value = data.get(field)
+            if value is not None and getattr(user, field) != value:
+                setattr(user, field, value)
+                changed = True
+    if changed:
+        user.save()
 
-        # Update profile fields
-        if 'name' in data:
-            profile.name = data.get('name')
-        if 'phone_number' in data:
-            profile.phone_number = data.get('phone_number')
-        if 'address' in data:
-            profile.address = data.get('address')
+    profile = getattr(user, 'profile', None)
+    if not profile:
+        profile = Profile.objects.create(user=user)
 
+    profile_changed = False
+    profile_name = None
+    if profile_payload:
+        profile_name = profile_payload.get('name')
+        phone_number = profile_payload.get('phone_number')
+        address = profile_payload.get('address')
+    else:
+        profile_name = data.get('profile_name') or data.get('name')
+        phone_number = data.get('phone_number')
+        address = data.get('address')
+
+    if profile_name is not None and profile.name != profile_name:
+        profile.name = profile_name
+        profile_changed = True
+    if phone_number is not None and profile.phone_number != phone_number:
+        profile.phone_number = phone_number
+        profile_changed = True
+    if address is not None and profile.address != address:
+        profile.address = address
+        profile_changed = True
+
+    image_file = (
+        files.get('profile.image')
+        or files.get('profile_image')
+        or files.get('image')
+    )
+    if image_file is not None:
+        profile.image = image_file
+        profile_changed = True
+
+    if profile_changed:
         profile.save()
 
-        return Response({'message': 'Profile updated successfully'})
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
+    if is_agent(user):
+        agent_profile = AgentProfile.objects.filter(user=user).first()
+        if not agent_profile:
+            agent_profile = AgentProfile.objects.create(user=user, profile=user.profile)
+
+        agent_changed = False
+        if agent_payload:
+            agency_name = agent_payload.get('agency_name')
+            phone = agent_payload.get('phone')
+        else:
+            agency_name = data.get('agency_name')
+            phone = data.get('agency_phone') or data.get('phone')
+
+        if agency_name is not None and agent_profile.agency_name != agency_name:
+            agent_profile.agency_name = agency_name
+            agent_changed = True
+        if phone is not None and agent_profile.phone != phone:
+            agent_profile.phone = phone
+            agent_changed = True
+
+        if agent_changed:
+            agent_profile.save()
+
+
+def _update_current_user_profile(request):
+    try:
+        with transaction.atomic():
+            _update_profile_payload(request.user, request.data, request.FILES)
+    except ValidationError as ve:
+        return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(_serialize_current_user(request.user))
+
+
+@api_view(['GET', 'PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    """Retrieve or update the authenticated user's profile in a single endpoint."""
+    if request.method == 'GET':
+        try:
+            return Response(_serialize_current_user(request.user))
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+    return _update_current_user_profile(request)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_user_profile(request):
+    """Legacy endpoint that now delegates to the consolidated /accounts/me/ handler."""
+    return _update_current_user_profile(request)
 
 
 def signup(request):
@@ -422,7 +574,24 @@ def activate(request, username):
     user = get_object_or_404(User, username=username)
     profile = user.profile
 
+    # Support both HTML form POST (web) and JSON POST (API)
     if request.method == 'POST':
+        # If JSON, expect {'code': 'XXXX'} and return JSON response
+        if (request.content_type and 'application/json' in request.content_type) or request.headers.get('Accept', '').startswith('application/json'):
+            try:
+                payload = json.loads(request.body.decode('utf-8'))
+            except Exception:
+                return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            code = payload.get('code')
+            if code and code == profile.code:
+                profile.code = ''
+                profile.save()
+                user.is_active = True
+                user.save()
+                return JsonResponse({'message': 'Account activated'})
+            return JsonResponse({'error': 'Invalid activation code'}, status=400)
+
+        # Fallback to HTML form handling
         form = ActivationForm(request.POST)
         if form.is_valid():
             code = form.cleaned_data['code']
@@ -449,12 +618,3 @@ def Profile(request):
     return render(request, 'account/profile.html',
                   {'profile': profile, 'propertys': properties, 'request': request})
 
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def generate_ollama3_text(request):
-    """Placeholder endpoint for GPT text generation (not implemented).
-
-    Kept for compatibility with existing URL routes. Returns HTTP 501.
-    """
-    return Response({'error': 'generate_ollama3_text is not implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)

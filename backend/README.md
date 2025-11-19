@@ -45,3 +45,29 @@ python manage.py check
 - `python manage.py test` runs the Django test suite (accounts/properties/communications tests live in each app).
 - Run `python backend/manage.py check` before deployment to ensure system checks (including social auth) pass.
 
+### Activation & Registration Notes
+- By default the project currently auto-activates newly-registered users for a smoother developer experience. The registration endpoint is:
+	- `POST /api/v1/accounts/auth/register/` — creates a user and (currently) sets `is_active=True`.
+- The legacy/manual activation endpoint still exists and supports API clients:
+	- `POST /api/v1/accounts/auth/<username>/activate/` with JSON `{ "code": "XXXX" }` will activate a user when codes are in use.
+
+### Continuous Integration
+- A GitHub Actions workflow was added at `.github/workflows/ci.yml` to run migrations and tests on push and pull requests to `master`.
+
+### Running tests locally (recommended)
+Create and activate a virtualenv, install requirements, then run migrations and tests:
+```bash
+cd /path/to/SmartDalali/backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py test
+```
+
+If you see a test discovery ImportError referencing a `tests` module in a subpackage, run the individual app tests to avoid discovery conflicts:
+```bash
+python manage.py test accounts tests_permissions properties.tests_serializers
+```
+

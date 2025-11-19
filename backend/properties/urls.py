@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     PropertyVisitListCreateView, PropertyVisitRetrieveUpdateDestroyView,
     PropertyListCreateView, PropertyRetrieveUpdateDestroyView,
-    PaymentViewSet, SupportTicketViewSet, stk_push, mpesa_callback, payment_status
+    PaymentViewSet, SupportTicketViewSet, stk_push, mpesa_callback,
+    payment_status, geocode_property_location
 )
 
 # Separate routers to avoid conflicts
@@ -25,6 +26,7 @@ urlpatterns = [
     path('payments/mpesa/callback/', mpesa_callback, name='mpesa_callback'),
     path('payments/status/<int:payment_id>/', payment_status, name='payment_status'),
     path('payments/', include(payment_router.urls)),
+    path('geocode/', geocode_property_location, name='property_geocode'),
     
     # Support endpoints
     path('support/', include(support_router.urls)),

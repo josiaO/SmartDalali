@@ -119,20 +119,22 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">User Management</h1>
-          <p className="text-muted-foreground">
-            Manage all platform users ({users.length} total)
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-b py-8 md:py-12">
+        <div className="px-4 md:p-8">
+          <div className="max-w-4xl">
+            <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+              User Management
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Manage all platform users, roles, and subscriptions
+            </p>
+          </div>
         </div>
-        <Button className="gap-2">
-          <UserPlus className="w-4 h-4" />
-          Add User
-        </Button>
       </div>
+
+      <div className="px-4 md:p-8 space-y-6">
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

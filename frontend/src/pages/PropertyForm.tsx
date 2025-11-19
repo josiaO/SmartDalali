@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useTransition } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, X, Plus, MapPin, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export default function PropertyForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
+  const [isPending, startTransition] = useTransition();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -144,7 +145,7 @@ export default function PropertyForm() {
     e.preventDefault();
     if (!user) {
       toast.error("You must be logged in to list a property.");
-      navigate('/login');
+      startTransition(() => navigate('/login'));
       return;
     }
 
@@ -200,7 +201,7 @@ export default function PropertyForm() {
         await propertiesService.createListing(payload);
         toast.success(isDraft ? "Property saved as draft" : "Property submitted for approval");
       }
-      navigate("/agent/listings"); // Redirect to agent dashboard or listings
+      startTransition(() => navigate("/agent/listings")); // Redirect to agent dashboard or listings
     } catch (err: any) {
       console.error("Submission error:", err.response?.data || err);
       toast.error(err.response?.data?.detail || "Failed to save property. Please check your inputs.");

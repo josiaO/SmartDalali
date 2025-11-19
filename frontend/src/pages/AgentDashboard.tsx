@@ -1,6 +1,6 @@
 import { useState, lazy, useEffect } from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
-import { Plus, TrendingUp, DollarSign, Calendar, Building2, Eye, BarChart3 } from "lucide-react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { Plus, TrendingUp, DollarSign, Calendar, Building2, Eye, BarChart3, MessageSquare, Clock, CheckCircle2, Target, Home, Settings, Mail, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -14,6 +14,9 @@ import { MpesaPaymentForm } from "@/components/MpesaPaymentForm";
 import { StripePaymentForm } from "@/components/StripePaymentForm";
 import propertiesService from "@/services/properties";
 import { Skeleton } from "@/components/ui/skeleton";
+import agentService from "@/services/agent";
+import { AgentProfile } from "@/pages/AgentProfile";
+import { AgentMessages } from "@/pages/AgentMessages";
 
 function AgentOverview() {
   const { user } = useAuth();
@@ -44,15 +47,34 @@ function AgentOverview() {
           ? propertyResponse.data
           : propertyResponse.data.results || [];
         setAgentProperties(list);
-        setTotalViews(list.reduce((sum: number, p: Property) => sum + (p.view_count || 0), 0));
-        // For inquiries and earnings, a separate agent stats endpoint would be ideal. Mocking for now.
-        setTotalInquiries(45); // Placeholder
-        setEarnings(125000); // Placeholder
+        const aggregatedViews = list.reduce((sum: number, p: Property) => sum + (p.view_count || 0), 0);
+        setTotalViews(aggregatedViews);
       } catch (err) {
         setPropertiesError("Failed to load agent properties.");
         console.error(err);
       } finally {
         setLoadingProperties(false);
+      }
+
+      // Fetch agent stats (views, inquiries, earnings)
+      try {
+        const statsResponse = await agentService.getStats();
+        const data = statsResponse.data;
+        if (typeof data.total_views === "number") {
+          setTotalViews(data.total_views);
+        }
+        if (typeof data.total_inquiries === "number") {
+          setTotalInquiries(data.total_inquiries);
+        } else {
+          setTotalInquiries(0);
+        }
+        if (typeof data.earnings === "number") {
+          setEarnings(data.earnings);
+        } else {
+          setEarnings(0);
+        }
+      } catch (err) {
+        console.error("Failed to load agent stats", err);
       }
 
       // Fetch subscription plans
@@ -116,32 +138,114 @@ function AgentOverview() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Agent Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user?.username}</p>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-primary/10 to-accent/10 border rounded-lg p-6 md:p-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Agent Dashboard</h1>
+            <p className="text-muted-foreground">Welcome back, <span className="font-semibold text-foreground">{user?.username || "Agent"}</span></p>
+          </div>
+          <Button className="gap-2" onClick={() => navigate("/properties/new")} size="lg">
+            <Plus className="w-5 h-5" />
+            Add Property
+          </Button>
         </div>
-        <Button className="gap-2" onClick={() => navigate("/agent/listings")}>
-          <Plus className="w-4 h-4" />
-          Add Property
-        </Button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.title} className={stat.color}>
+          <Card key={stat.title} className={`${stat.color} border hover:shadow-lg transition-all`}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <stat.icon className={`w-4 h-4 ${stat.iconColor}`} />
+              <div className="p-2 rounded-full bg-background/50">
+                <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Performance & Goals Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Monthly Goals */}
+        <Card className="bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-blue-500" />
+              Monthly Goals
+            </CardTitle>
+            <CardDescription>Your performance this month</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Listings Target</span>
+                <span className="text-sm text-muted-foreground">5/10</span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                <div className="bg-blue-500 h-full" style={{ width: '50%' }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Inquiries Target</span>
+                <span className="text-sm text-muted-foreground">35/50</span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                <div className="bg-green-500 h-full" style={{ width: '70%' }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium">Commission Target</span>
+                <span className="text-sm text-muted-foreground">80%</span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                <div className="bg-orange-500 h-full" style={{ width: '80%' }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats */}
+        <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-purple-500" />
+              Recent Activity
+            </CardTitle>
+            <CardDescription>Last 7 days performance</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between p-2 rounded bg-background/50">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-sm">Properties Listed</span>
+              </div>
+              <span className="font-semibold">3</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded bg-background/50">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-500" />
+                <span className="text-sm">New Inquiries</span>
+              </div>
+              <span className="font-semibold">12</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded bg-background/50">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-purple-500" />
+                <span className="text-sm">Property Views</span>
+              </div>
+              <span className="font-semibold">284</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Subscription Plans */}
@@ -316,6 +420,8 @@ export default function AgentDashboard() {
     <Routes>
       <Route index element={<AgentOverview />} />
       <Route path="listings" element={<AgentListings />} />
+      <Route path="messages" element={<AgentMessages />} />
+      <Route path="profile" element={<AgentProfile />} />
     </Routes>
   );
 }

@@ -12,6 +12,18 @@ const api = axios.create({
   },
 });
 
+// If an access token is already stored (e.g. user returning to the app), set
+// the default Authorization header immediately so early requests use it.
+try {
+  const existing = localStorage.getItem('access_token');
+  if (existing) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${existing}`;
+    console.log('api: default Authorization header set from localStorage');
+  }
+} catch (e) {
+  // localStorage may not be available in some environments; ignore failures
+}
+
 // Attach access token to every request if present
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('access_token');

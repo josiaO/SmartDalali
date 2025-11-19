@@ -22,8 +22,7 @@ export function Header() {
   // Compute a safe display name and avatar source with fallbacks because the
   // backend user object can have different shapes (username, profile.name,
   // or email). Avoid calling string methods on undefined.
-  const displayName =
-    user?.name || user?.username || user?.profile?.name || user?.email || "";
+  const displayName = user?.profile?.name || user?.username || user?.email || "";
   const avatarSrc = user?.avatarUrl || user?.profile?.image || undefined;
 
   return (
@@ -34,6 +33,20 @@ export function Header() {
 
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-auto">
+          {user && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                // Navigate to the user's dashboard according to role
+                const path = getDashboardRoute(user);
+                navigate(path);
+              }}
+              className="hidden md:inline-flex mr-2"
+            >
+              Dashboard
+            </Button>
+          )}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -74,7 +87,7 @@ export function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="glass-effect z-[100] w-56">
                 <div className="px-2 py-2 border-b">
-                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-sm font-medium">{displayName}</p>
                   <p className="text-xs text-muted-foreground">{user.email}</p>
                   <p className="text-xs text-muted-foreground capitalize mt-1">
                     Role: {user.role}

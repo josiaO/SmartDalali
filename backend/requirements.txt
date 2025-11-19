@@ -9,6 +9,8 @@ python-dotenv==1.0.0
 # Django REST Framework
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.3.0
+drf-spectacular==0.27.2
+django-filter==24.3
 
 # Django Allauth (Social Authentication)
 django-allauth==0.57.0
@@ -16,6 +18,18 @@ django-allauth==0.57.0
 # Django Channels (WebSocket support)
 channels==4.0.0
 channels-redis==4.1.0
+
+# Email / Notifications
+django-anymail[sendgrid]==11.1
+sentry-sdk==1.45.0
+
+# Caching / Background services
+django-redis==5.4.0
+
+# Object storage
+django-storages[boto3]==1.14.3
+boto3==1.35.34
+googlemaps==4.10.0
 
 # Image Processing
 Pillow==11.1.0
@@ -32,3 +46,10 @@ weasyprint==60.2
 # Utilities
 requests==2.32.3
 PyJWT==2.10.1
+
+# Testing / QA
+pytest==8.3.3
+pytest-django==4.8.0
+pytest-cov==5.0.0
+model-bakery==1.18.2
+requests-mock==1.11.0

@@ -20,7 +20,6 @@ auth_patterns = [
     path('auth/register/', views.register, name='register'),
     path('auth/signup/', views.signup, name='signup'),
     path('auth/routes/', views.get_user_routes, name='get_user_routes'),
-    path('auth/gpt/', views.generate_ollama3_text, name='generate_gpt'),
     path('auth/<str:username>/activate/', views.activate, name='activate'),
 ]
 

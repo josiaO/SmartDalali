@@ -26,6 +26,7 @@
 | `/api/v1/properties/payments/status/<payment_id>/` | GET | Poll payment status. |
 | `/api/v1/properties/payments/admin-list/` | GET | Admin-only payment overview. |
 | `/api/v1/properties/payments/<id>/retry/` | POST | Admin-only retry (marks pending). |
+| `/api/v1/properties/geocode/` | POST | Geocode an address/city to latitude/longitude. |
 | `/api/v1/properties/support/tickets/` | GET/POST | Support ticket CRUD. |
 | `/api/v1/properties/support/tickets/<id>/` | GET/PUT/DELETE | Manage a ticket. |
 | `/api/v1/properties/support/tickets/<id>/reply/` | POST | Add reply (user or staff). |

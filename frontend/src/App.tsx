@@ -13,6 +13,7 @@ import Properties from "./pages/Properties";
 import PropertyDetail from "./pages/PropertyDetail";
 import MapView from "./pages/MapView";
 import Login from "./pages/Login";
+import Activate from "./pages/Activate";
 import UserDashboard from "./pages/UserDashboard";
 import AgentDashboard from "./pages/AgentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -52,22 +53,11 @@ function ProtectedRoute({
 }
 
 function DashboardRedirect() {
-  const { user } = useAuth();
+  const { user, getDashboardRoute } = useAuth();
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
-  switch (user.role) {
-    case "superuser":
-      return <Navigate to="/admin" replace />;
-    case "agent":
-      return <Navigate to="/agent" replace />;
-    case "user":
-      return <Navigate to="/dashboard" replace />;
-    default:
-      return <Navigate to="/" replace />;
-  }
+  return <Navigate to={getDashboardRoute(user)} replace />;
 }
 
 function AppRoutes() {
@@ -90,6 +80,7 @@ function AppRoutes() {
                 path="/login" 
                 element={user ? <DashboardRedirect /> : <Login />} 
               />
+              <Route path="/activate" element={<Activate />} />
               <Route
                 path="/dashboard/*"
                 element={

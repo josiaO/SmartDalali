@@ -6,7 +6,7 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173,
     // Proxy API requests to the backend to avoid CORS during local development
     proxy: {
       // Forward any /api requests to the Django backend running on port 8000

@@ -54,6 +54,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):
         conversation = self.get_object()
+        # Ensure sender is a participant in the conversation
+        if request.user not in conversation.participants.all():
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         serializer = CreateMessageSerializer(
             data=request.data,
             context={'conversation': conversation, 'request': request}

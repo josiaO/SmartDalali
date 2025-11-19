@@ -45,6 +45,8 @@ export function AppSidebar() {
       userItems.push({ title: "My Dashboard", url: "/agent", icon: LayoutDashboard });
       managementItems.push(
         { title: "My Listings", url: "/agent/listings", icon: Building2 },
+        { title: "Messages", url: "/agent/messages", icon: MessageSquare },
+        { title: "Profile", url: "/agent/profile", icon: Settings },
         { title: "Add Property", url: "/properties/new", icon: Plus }
       );
     } else if (user?.role === "user") {

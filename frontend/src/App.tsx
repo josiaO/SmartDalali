@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { FirebaseAuthProvider } from "./contexts/FirebaseAuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -64,87 +65,96 @@ function AppRoutes() {
   const { user } = useAuth();
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <Header />
-          <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/properties" element={<Properties />} />
-              <Route path="/properties/:id" element={<PropertyDetail />} />
-              <Route path="/map" element={<MapView />} />
-              <Route path="/messages" element={<ProtectedRoute allowedRoles={['user', 'agent', 'superuser']}><Messages /></ProtectedRoute>} />
-              <Route 
-                path="/login" 
-                element={user ? <DashboardRedirect /> : <Login />} 
-              />
-              <Route path="/activate" element={<Activate />} />
-              <Route
-                path="/dashboard/*"
-                element={
-                  <ProtectedRoute allowedRoles={["user"]}>
-                    <UserDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/agent/*"
-                element={
-                  <ProtectedRoute allowedRoles={["agent"]}>
-                    <AgentDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/properties/new"
-                element={
-                  <ProtectedRoute allowedRoles={["agent"]}>
-                    <PropertyForm />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/properties/:id/edit"
-                element={
-                  <ProtectedRoute allowedRoles={["agent"]}>
-                    <PropertyForm />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/*"
-                element={
-                  <ProtectedRoute allowedRoles={["superuser"]}>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-        </div>
+    <div className="flex min-h-screen w-full">
+      <AppSidebar />
+      <div className="flex-1 flex flex-col">
+        <Header />
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/properties" element={<Properties />} />
+            <Route path="/properties/:id" element={<PropertyDetail />} />
+            <Route path="/map" element={<MapView />} />
+            <Route
+              path="/messages"
+              element={
+                <ProtectedRoute allowedRoles={["user", "agent", "superuser"]}>
+                  <Messages />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={user ? <DashboardRedirect /> : <Login />}
+            />
+            <Route path="/activate" element={<Activate />} />
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute allowedRoles={["user"]}>
+                  <UserDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/*"
+              element={
+                <ProtectedRoute allowedRoles={["agent"]}>
+                  <AgentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/properties/new"
+              element={
+                <ProtectedRoute allowedRoles={["agent"]}>
+                  <PropertyForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/properties/:id/edit"
+              element={
+                <ProtectedRoute allowedRoles={["agent"]}>
+                  <PropertyForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/*"
+              element={
+                <ProtectedRoute allowedRoles={["superuser"]}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </TooltipProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <FirebaseAuthProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <TooltipProvider>
+                <SidebarProvider>
+                  <Toaster />
+                  <Sonner />
+                  <AppRoutes />
+                </SidebarProvider>
+              </TooltipProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </FirebaseAuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

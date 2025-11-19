@@ -12,8 +12,8 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.db.models import Count
 
-from properties.models import Property, Payment, SupportTicket, Conversation, MessageNotification
-
+from properties.models import Property, Payment, SupportTicket
+from communications.models import Conversation, Message, MessageNotification, Notification
 User = get_user_model()
 
 

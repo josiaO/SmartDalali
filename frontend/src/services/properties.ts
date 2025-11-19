@@ -37,19 +37,19 @@ export const propertiesService = {
     api.get(`/properties/payments/status/${paymentId}/`),
   fetchSubscriptionPlans: () => api.get('/properties/payments/subscription/'),
 
-  // Support tickets
+    // Support tickets
   fetchTickets: () => api.get('/properties/support/tickets/'),
   fetchTicket: (id: number | string) => api.get(`/properties/support/tickets/${id}/`),
-  createTicket: (data: Record<string, unknown>) =>
+  createTicket: (data: any) =>
     api.post('/properties/support/tickets/', data),
-  replyToTicket: (id: number | string, data: Record<string, unknown>) =>
+  replyToTicket: (id: number | string, data: any) =>
     api.post(`/properties/support/tickets/${id}/reply/`, data),
-  assignTicket: (id: number | string, payload: Record<string, unknown>) =>
+  assignTicket: (id: number | string, payload: any) =>
     api.post(`/properties/support/tickets/${id}/assign/`, payload),
   closeTicket: (id: number | string) =>
     api.post(`/properties/support/tickets/${id}/close/`),
   ticketStats: () => api.get('/properties/support/tickets/stats/'),
-  fetchSupportTickets: (params?: Params) => api.get('/properties/tickets/', { params }),
+  fetchSupportTickets: (params?: Params) => api.get('/properties/support/tickets/', { params }),
 
   // Agent stats
   fetchAgentStats: () => api.get('/agents/stats/'),

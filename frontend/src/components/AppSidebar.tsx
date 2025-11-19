@@ -1,5 +1,5 @@
-import { Home, Building2, LayoutDashboard, Users, Settings, Map, Plus, Shield, MessageSquare, LogOut, ChevronDown } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Home, Building2, LayoutDashboard, Users, Settings, Shield, MessageSquare, LogOut, ChevronDown } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -20,18 +20,28 @@ import { useState } from "react";
 export function AppSidebar() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const location = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+      navigate('/login', { replace: true });
+    }
+  };
 
   const getNavItems = () => {
     const publicItems = [
       { title: "Home", url: "/", icon: Home, badge: null },
       { title: "Properties", url: "/properties", icon: Building2, badge: null },
-      { title: "Map View", url: "/map", icon: Map, badge: null },
     ];
 
     if (user) {
-      publicItems.push({ title: "Messages", url: "/messages", icon: MessageSquare, badge: "2" });
+      publicItems.push({ title: "Messages", url: "/messages", icon: MessageSquare, badge: null });
     }
 
     const userItems = [];
@@ -41,16 +51,14 @@ export function AppSidebar() {
       userItems.push({ title: "Admin Dashboard", url: "/admin", icon: Shield, badge: null });
       managementItems.push(
         { title: "Users Management", url: "/admin/users", icon: Users, badge: null },
-        { title: "All Properties", url: "/properties", icon: Building2, badge: null },
         { title: "Settings", url: "/admin/settings", icon: Settings, badge: null }
       );
     } else if (user?.role === "agent") {
       userItems.push({ title: "My Dashboard", url: "/agent", icon: LayoutDashboard, badge: null });
       managementItems.push(
-        { title: "My Listings", url: "/agent/listings", icon: Building2, badge: "12" },
-        { title: "Messages", url: "/agent/messages", icon: MessageSquare, badge: "3" },
-        { title: "Profile", url: "/agent/profile", icon: Settings, badge: null },
-        { title: "Add Property", url: "/properties/new", icon: Plus, badge: null }
+        { title: "My Listings", url: "/agent/listings", icon: Building2, badge: null },
+        { title: "Messages", url: "/agent/messages", icon: MessageSquare, badge: null },
+        { title: "Profile", url: "/agent/profile", icon: Settings, badge: null }
       );
     } else if (user?.role === "user") {
       userItems.push({ title: "My Dashboard", url: "/dashboard", icon: LayoutDashboard, badge: null });
@@ -202,12 +210,12 @@ export function AppSidebar() {
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
               <span className="text-sm font-semibold text-white">
-                {user.first_name?.charAt(0) || user.username?.charAt(0)}
+                {user.profile?.name?.charAt(0) || user.username?.charAt(0)}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-neutral-foreground1 truncate">
-                {user.first_name || user.username}
+                {user.profile?.name || user.username}
               </p>
               <p className="text-xs text-neutral-foreground3Rest truncate">{user.email}</p>
             </div>
@@ -221,7 +229,7 @@ export function AppSidebar() {
           {isUserMenuOpen && (
             <button
               onClick={() => {
-                logout();
+                handleLogout();
                 setIsUserMenuOpen(false);
               }}
               className="w-full mt-2 px-3 py-2 text-sm text-red-600 hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-2"

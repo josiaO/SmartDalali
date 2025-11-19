@@ -51,7 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(normalizeUser(data));
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          await logout();
+          // Silently clear tokens if profile fetch fails
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          try {
+            delete api.defaults.headers.common['Authorization'];
+          } catch (e) {}
         }
       }
       setIsLoading(false);

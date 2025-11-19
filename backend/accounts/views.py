@@ -281,6 +281,132 @@ def auth_logout(request):
         # Return 205 anyway since we cleared tokens on the frontend
         return Response(status=status.HTTP_205_RESET_CONTENT)
 
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def firebase_login(request):
+    """
+    Firebase authentication endpoint.
+    Receives Firebase ID token and exchanges it for Django JWT tokens.
+    Creates/updates user in database based on Firebase user data.
+    """
+    try:
+        firebase_token = request.data.get('firebase_token')
+        firebase_uid = request.data.get('firebase_uid')
+        email = request.data.get('email')
+        display_name = request.data.get('display_name')
+
+        if not firebase_token or not firebase_uid:
+            return Response(
+                {'error': 'firebase_token and firebase_uid are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verify Firebase token
+        try:
+            import firebase_admin
+            from firebase_admin import auth as firebase_auth
+
+            decoded_token = firebase_auth.verify_id_token(firebase_token)
+            
+            # Verify that the token's uid matches the provided uid
+            if decoded_token.get('uid') != firebase_uid:
+                return Response(
+                    {'error': 'Firebase token UID mismatch'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+        except firebase_admin.exceptions.FirebaseError as e:
+            logger.error(f'Firebase token verification failed: {str(e)}')
+            return Response(
+                {'error': 'Invalid Firebase token'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except Exception as e:
+            logger.error(f'Firebase verification error: {str(e)}')
+            return Response(
+                {'error': 'Firebase verification failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Create or get user
+        try:
+            with transaction.atomic():
+                # Use email as username if available, otherwise use firebase_uid
+                username = email.split('@')[0] if email else f'firebase_{firebase_uid[:10]}'
+                
+                # Ensure username is unique
+                base_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f'{base_username}_{counter}'
+                    counter += 1
+
+                # Get or create user
+                user, created = User.objects.get_or_create(
+                    email=email,
+                    defaults={
+                        'username': username,
+                        'first_name': display_name or '',
+                        'is_active': True,
+                    }
+                )
+
+                # Update user info if they already existed
+                if not created:
+                    if display_name and not user.first_name:
+                        user.first_name = display_name
+                        user.save()
+
+                # Ensure user has a profile
+                profile, _ = Profile.objects.get_or_create(user=user)
+                if display_name and not profile.name:
+                    profile.name = display_name
+                    profile.firebase_uid = firebase_uid
+                    profile.save()
+                elif not profile.firebase_uid:
+                    profile.firebase_uid = firebase_uid
+                    profile.save()
+
+        except Exception as e:
+            logger.error(f'User creation/update failed: {str(e)}')
+            return Response(
+                {'error': 'Failed to create/update user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # Generate JWT tokens
+        try:
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+
+            return Response({
+                'access': access_token,
+                'refresh': refresh_token,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f'Token generation failed: {str(e)}')
+            return Response(
+                {'error': 'Failed to generate tokens'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    except Exception as e:
+        logger.error(f'Firebase login endpoint error: {str(e)}')
+        return Response(
+            {'error': 'Authentication failed'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):

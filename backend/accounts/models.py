@@ -12,6 +12,7 @@ class Profile(models.Model):
     address = models.CharField(max_length=100, blank=True, null=True)
     image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
     code = models.CharField(max_length=8, default=generate_code)
+    firebase_uid = models.CharField(max_length=255, blank=True, null=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

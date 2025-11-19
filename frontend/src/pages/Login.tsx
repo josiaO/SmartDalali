@@ -11,6 +11,7 @@ import { Building2, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 import accountsService from "@/services/accounts";
+import { FirebaseLoginForm } from "@/components/FirebaseLogin";
 
 export default function Login() {
   // Login form
@@ -219,6 +220,17 @@ export default function Login() {
                     "Sign In"
                   )}
                 </Button>
+
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border/30"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-background text-muted-foreground text-xs font-medium">Or continue with</span>
+                  </div>
+                </div>
+
+                <FirebaseLoginForm />
               </form>
             </TabsContent>
             

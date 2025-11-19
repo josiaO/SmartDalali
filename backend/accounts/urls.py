@@ -21,6 +21,7 @@ auth_patterns = [
     path('auth/signup/', views.signup, name='signup'),
     path('auth/routes/', views.get_user_routes, name='get_user_routes'),
     path('auth/<str:username>/activate/', views.activate, name='activate'),
+    path('firebase-login/', views.firebase_login, name='firebase_login'),
 ]
 
 profile_patterns = [

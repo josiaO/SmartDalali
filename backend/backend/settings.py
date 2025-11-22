@@ -187,32 +187,41 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://rntij-197-35-101-73.a.free.pinggy.link',
-    # Add other domains as needed
-]
+# CSRF trusted origins - read from environment variable
+# Format: comma-separated list of URLs
+# Example: http://localhost:5173,https://app.smartdalali.com
+csrf_origins_env = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if csrf_origins_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
+else:
+    # Default development origins if not set
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ]
 
-# During development allow local frontend origins to be trusted for CSRF referer checks
-CSRF_TRUSTED_ORIGINS += [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-]
-
-# Development CORS settings - allow local frontend dev servers to access API
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:8000',
-    'http://127.0.0.1:8000',
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'http://localhost:8081',
-    'http://127.0.0.1:8081',
-]
+# CORS allowed origins - read from environment variable
+# Format: comma-separated list of URLs
+# Example: http://localhost:5173,https://app.smartdalali.com
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_origins_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+else:
+    # Default development origins if not set
+    CORS_ALLOWED_ORIGINS = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:8081',
+        'http://127.0.0.1:8081',
+    ]
 
 # Allow credentials (cookies) for session-authenticated endpoints
 CORS_ALLOW_CREDENTIALS = True
@@ -242,6 +251,25 @@ CORS_ALLOW_HEADERS = [
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 GOOGLE_MAPS_GEOCODE_TIMEOUT = int(os.getenv('GOOGLE_MAPS_GEOCODE_TIMEOUT', '5'))
 REDIS_URL = os.getenv('REDIS_URL')
+
+# M-Pesa Payment Integration (Daraja API)
+# Get credentials from: https://developer.safaricom.co.ke/
+DAR_AFFILIATE_CONSUMER_KEY = os.getenv('DAR_AFFILIATE_CONSUMER_KEY')
+DAR_AFFILIATE_CONSUMER_SECRET = os.getenv('DAR_AFFILIATE_CONSUMER_SECRET')
+DAR_SHORTCODE = os.getenv('DAR_SHORTCODE')  # Business Shortcode (Paybill/Till Number)
+DAR_PASSKEY = os.getenv('DAR_PASSKEY')  # Lipa Na M-Pesa Online Passkey
+MPESA_API_BASE = os.getenv('MPESA_API_BASE', 'https://sandbox.safaricom.co.ke')  # Use 'https://api.safaricom.co.ke' for production
+MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')  # Full URL for payment callbacks
+
+# Twilio SMS Integration
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
+
+# Stripe Payment Integration
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 
 # Frontend URL used in activation emails and links
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
@@ -283,13 +311,27 @@ ASGI_APPLICATION = 'backend.asgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        # SQLite is sufficient for non-GIS workloads. Swap for PostgreSQL in production.
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Support both SQLite (development) and PostgreSQL (production) via environment variables
+db_engine = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
+if db_engine == 'django.db.backends.postgresql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'smartdalali'),
+            'USER': os.getenv('DB_USER', 'smartdalali_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
     }
-}
+else:
+    # Default to SQLite for development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Cache configuration
 if REDIS_URL:

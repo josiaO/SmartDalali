@@ -17,15 +17,19 @@ export interface Property {
   description: string;
   price: number;
   type: "House" | "Apartment" | "Office" | "Land" | "Villa" | "Shop" | "Warehouse";
+  property_type?: string; // Alternative field name
   rooms: number;
   bedrooms: number;
   bathrooms: number;
   area: number;
   city: string;
   address: string; // Corrected from 'adress' in backend
-  location: string; // PointField in backend, represented as string "POINT(lng lat)"
+  adress?: string; // Backend field name (typo)
+  location?: string; // PointField in backend, represented as string "POINT(lng lat)"
   latitude: number | null;
   longitude: number | null;
+  google_place_id?: string | null;
+  maps_url?: string | null;
   is_published: boolean;
   is_paid: boolean;
   featured_until: string | null;
@@ -33,6 +37,9 @@ export interface Property {
   owner: number; // User ID
   created_at: string;
   updated_at: string;
+  year_built?: string | null;
+  parking?: boolean;
+  status: "active" | "inactive" | "sold" | "rented";
   MediaProperty: MediaProperty[];
   Features_Property: Features[];
   agent: {
@@ -40,7 +47,11 @@ export interface Property {
     username: string;
     name: string | null;
     phone: string | null;
+    email?: string | null;
+  };
+  agent_profile?: {
+    verified: boolean;
+    subscription_active: boolean;
   };
   main_image_url: string | null;
-  status: "active" | "inactive" | "sold" | "rented";
 }

@@ -19,9 +19,36 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // OmniRealty Design System Primary colors
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          50: "#EBF5FF",
+          100: "#D7EBFF",
+          200: "#AED7FF",
+          300: "#7AC0FF",
+          400: "#4DA8FF",
+          500: "#1A73E8", // main
+          600: "#175FCC",
+          700: "#124C99",
+          800: "#0E3A66",
+          900: "#0A2640",
+          DEFAULT: "#1A73E8",
+          foreground: "#FFFFFF",
+        },
+        // Accent green
+        accent: {
+          50: "#E6FFF7",
+          100: "#CCFEEE",
+          200: "#99FDDC",
+          300: "#66FEC8",
+          400: "#33FFB4",
+          500: "#34D399", // main
+          DEFAULT: "#34D399",
+          foreground: "#FFFFFF",
+        },
+        // Surface & background
+        surface: {
+          DEFAULT: "#FFFFFF",
+          muted: "#F7FAFC",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -34,10 +61,6 @@ export default {
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -62,6 +85,11 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "1rem",
+        "2xl": "1.5rem",
+      },
+      boxShadow: {
+        soft: "0 6px 18px rgba(10, 10, 10, 0.06)",
       },
       keyframes: {
         "accordion-down": {

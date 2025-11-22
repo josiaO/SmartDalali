@@ -9,14 +9,20 @@ class IsAgent(BasePermission):
         user = request.user
         if not user or user.is_anonymous:
             return False
-        return is_agent(user) or is_admin(user)
+        try:
+            return user.profile.role in ['agent', 'admin'] or user.is_superuser
+        except:
+            return False
 
 
 class IsAdmin(BasePermission):
-    """Allow access only to superusers."""
+    """Allow access only to superusers or admin role."""
 
     def has_permission(self, request, view):
         user = request.user
         if not user or user.is_anonymous:
             return False
-        return is_admin(user)
+        try:
+            return user.profile.role == 'admin' or user.is_superuser
+        except:
+            return False

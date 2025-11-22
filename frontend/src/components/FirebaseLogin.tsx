@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFirebaseAuth } from "@/contexts/FirebaseAuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface FirebaseLoginButtonProps {
   provider: "google" | "facebook";
@@ -15,6 +15,88 @@ interface FirebaseLoginButtonProps {
   disabled?: boolean;
 }
 
+/**
+ * Small helper that extracts device capability.
+ */
+const isMobileDevice = () =>
+  /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent);
+
+/**
+ * Shared provider metadata
+ */
+const PROVIDER_META = {
+  google: {
+    label: "Google",
+    icon: "G",
+  },
+  facebook: {
+    label: "Facebook",
+    icon: "f",
+  },
+} as const;
+
+/**
+ * Handles all Firebase → Backend → Profile logic.
+ */
+async function completeAuthFlow({
+  provider,
+  signInWithGoogle,
+  signInWithFacebook,
+  linkWithBackend,
+  setTokensAndFetchProfile,
+  navigate,
+  toast,
+}: any) {
+  const useRedirect = isMobileDevice();
+
+  // Trigger provider sign-in
+  const result =
+    provider === "google"
+      ? await signInWithGoogle(useRedirect)
+      : await signInWithFacebook(useRedirect);
+
+  // Popup mode returns result immediately
+  if (result && typeof result === "object" && "user" in result) {
+    const firebaseToken = await result.user.getIdToken();
+    const backend = await linkWithBackend(firebaseToken);
+
+    if (
+      backend &&
+      typeof backend === "object" &&
+      "access" in backend &&
+      "refresh" in backend
+    ) {
+      const user = await setTokensAndFetchProfile?.(
+        backend.access,
+        backend.refresh
+      );
+
+      toast({
+        title: "Success",
+        description: `Logged in with ${provider}!`,
+      });
+
+      if (user?.role === "agent") return navigate("/agent", { replace: true });
+      if (user?.role === "superuser")
+        return navigate("/admin", { replace: true });
+
+      return navigate("/dashboard", { replace: true });
+    }
+  }
+
+  // Redirect mode
+  if (useRedirect) {
+    toast({
+      title: "Redirecting...",
+      description: "Complete authentication in the opened window.",
+    });
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             LOGIN BUTTON COMPONENT                          */
+/* -------------------------------------------------------------------------- */
+
 export function FirebaseLoginButton({
   provider,
   variant = "outline",
@@ -23,114 +105,67 @@ export function FirebaseLoginButton({
   fullWidth = false,
   disabled = false,
 }: FirebaseLoginButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signInWithGoogle, signInWithFacebook, linkWithBackend } = useFirebaseAuth();
+  const { signInWithGoogle, signInWithFacebook, linkWithBackend } =
+    useFirebaseAuth();
   const { setTokensAndFetchProfile } = useAuth();
 
-  const handleFirebaseLogin = async () => {
+  const handleLogin = useCallback(async () => {
     try {
-      setIsLoading(true);
-
-      // Determine if we should use redirect (for mobile) or popup
-      const useRedirect = /mobile|android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-      let result;
-      if (provider === "google") {
-        result = await signInWithGoogle(useRedirect);
-      } else if (provider === "facebook") {
-        result = await signInWithFacebook(useRedirect);
-      }
-
-      // If using popup, we have immediate result
-      if (result && typeof result === "object" && "user" in result) {
-        const firebaseResult = result as { user: { getIdToken: () => Promise<string> } };
-        const firebaseToken = await firebaseResult.user.getIdToken();
-
-        // Link with backend
-        const backendResponse = (await linkWithBackend(firebaseToken)) as unknown;
-
-        // Initialize user session with backend tokens
-        if (
-          typeof backendResponse === "object" &&
-          backendResponse !== null &&
-          "access" in backendResponse &&
-          "refresh" in backendResponse
-        ) {
-          const user = await setTokensAndFetchProfile?.(
-            (backendResponse as Record<string, unknown>).access as string,
-            (backendResponse as Record<string, unknown>).refresh as string
-          );
-
-          toast({
-            title: "Success",
-            description: `Logged in with ${provider} successfully!`,
-          });
-
-          // Navigate to dashboard
-          if (user?.role === "agent") {
-            navigate("/agent", { replace: true });
-          } else if (user?.role === "superuser") {
-            navigate("/admin", { replace: true });
-          } else {
-            navigate("/dashboard", { replace: true });
-          }
-        }
-      } else if (useRedirect) {
-        // If using redirect, the redirect result will be handled by FirebaseAuthContext
-        toast({
-          title: "Redirecting",
-          description: "Please complete the authentication in the opened window...",
-        });
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : `Failed to log in with ${provider}`;
-      console.error(`${provider} login error:`, error);
+      setLoading(true);
+      await completeAuthFlow({
+        provider,
+        signInWithGoogle,
+        signInWithFacebook,
+        linkWithBackend,
+        setTokensAndFetchProfile,
+        navigate,
+        toast,
+      });
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: errorMessage,
+        description: err?.message || `Failed to authenticate with ${provider}`,
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, [
+    provider,
+    navigate,
+    toast,
+    signInWithGoogle,
+    signInWithFacebook,
+    linkWithBackend,
+    setTokensAndFetchProfile,
+  ]);
 
-  const providerConfig = {
-    google: {
-      label: "Google",
-      icon: "🔍",
-      bgColor: "bg-white hover:bg-gray-50 border-gray-300",
-      textColor: "text-gray-700",
-    },
-    facebook: {
-      label: "Facebook",
-      icon: "f",
-      bgColor: "bg-blue-600 hover:bg-blue-700",
-      textColor: "text-white",
-    },
-  };
-
-  const config = providerConfig[provider];
+  const meta = PROVIDER_META[provider];
 
   return (
     <Button
-      onClick={handleFirebaseLogin}
-      disabled={isLoading || disabled}
+      onClick={handleLogin}
+      disabled={loading || disabled}
       variant={variant}
       size={size}
-      className={`gap-2 ${fullWidth ? "w-full" : ""} ${className}`}
+      className={`flex items-center gap-2 ${fullWidth ? "w-full" : ""} ${className}`}
     >
-      {isLoading ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        <span className="text-base">{config.icon}</span>
+        <span className="text-base">{meta.icon}</span>
       )}
-      {isLoading ? "Signing in..." : `Sign in with ${config.label}`}
+      {loading ? "Signing in..." : `Sign in with ${meta.label}`}
     </Button>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*                             LOGIN FORM COMPONENT                            */
+/* -------------------------------------------------------------------------- */
 
 interface FirebaseLoginFormProps {
   onSuccess?: (user: unknown) => void;
@@ -138,82 +173,45 @@ interface FirebaseLoginFormProps {
 }
 
 export function FirebaseLoginForm({ onSuccess, onError }: FirebaseLoginFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { firebaseUser, signInWithGoogle, signInWithFacebook, linkWithBackend } = useFirebaseAuth();
+  const { signInWithGoogle, signInWithFacebook, linkWithBackend } =
+    useFirebaseAuth();
   const { setTokensAndFetchProfile } = useAuth();
 
-  const handleLogin = async (provider: "google" | "facebook") => {
+  const login = async (provider: "google" | "facebook") => {
     try {
-      setIsLoading(true);
-      const useRedirect = /mobile|android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      setLoading(true);
 
-      let result;
-      if (provider === "google") {
-        result = await signInWithGoogle(useRedirect);
-      } else {
-        result = await signInWithFacebook(useRedirect);
-      }
+      const user = await completeAuthFlow({
+        provider,
+        signInWithGoogle,
+        signInWithFacebook,
+        linkWithBackend,
+        setTokensAndFetchProfile,
+        navigate,
+        toast,
+      });
 
-      if (result && typeof result === "object" && "user" in result) {
-        const firebaseResult = result as { user: { getIdToken: () => Promise<string> } };
-        const firebaseToken = await firebaseResult.user.getIdToken();
-        const backendResponse = (await linkWithBackend(firebaseToken)) as unknown;
-
-        if (
-          typeof backendResponse === "object" &&
-          backendResponse !== null &&
-          "access" in backendResponse &&
-          "refresh" in backendResponse
-        ) {
-          const user = await setTokensAndFetchProfile?.(
-            (backendResponse as Record<string, unknown>).access as string,
-            (backendResponse as Record<string, unknown>).refresh as string
-          );
-
-          toast({
-            title: "Success",
-            description: "Logged in successfully!",
-          });
-
-          onSuccess?.(user);
-          if (user?.role === "agent") {
-            navigate("/agent", { replace: true });
-          } else if (user?.role === "superuser") {
-            navigate("/admin", { replace: true });
-          } else {
-            navigate("/dashboard", { replace: true });
-          }
-        }
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Login failed";
-      console.error("Login error:", error);
-      const err = new Error(errorMessage);
-      onError?.(err);
+      if (user) onSuccess?.(user);
+    } catch (err: any) {
+      const e = new Error(err?.message || "Login failed");
+      onError?.(e);
       toast({
         title: "Error",
-        description: errorMessage,
+        description: e.message,
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
     <div className="space-y-3">
-      <FirebaseLoginButton
-        provider="google"
-        fullWidth
-        disabled={isLoading}
-      />
-      <FirebaseLoginButton
-        provider="facebook"
-        fullWidth
-        disabled={isLoading}
-      />
+      <FirebaseLoginButton provider="google" fullWidth disabled={loading} />
+      <FirebaseLoginButton provider="facebook" fullWidth disabled={loading} />
     </div>
   );
 }

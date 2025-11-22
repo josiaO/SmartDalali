@@ -13,8 +13,7 @@ import Home from "./pages/Home";
 import Properties from "./pages/Properties";
 import PropertyDetail from "./pages/PropertyDetail";
 import MapView from "./pages/MapView";
-import Login from "./pages/Login";
-import Activate from "./pages/Activate";
+import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
 import AgentDashboard from "./pages/AgentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -85,9 +84,9 @@ function AppRoutes() {
             />
             <Route
               path="/login"
-              element={user ? <DashboardRedirect /> : <Login />}
+              element={user ? <DashboardRedirect /> : <Auth />}
             />
-            <Route path="/activate" element={<Activate />} />
+            <Route path="/auth" element={user ? <DashboardRedirect /> : <Auth />} />
             <Route
               path="/dashboard/*"
               element={

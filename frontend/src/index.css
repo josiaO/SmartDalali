@@ -8,8 +8,8 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Microsoft Edge inspired color palette */
-    --background: 220 20% 97%;
+    /* OMNIREALTY color palette - aligned with blueprint */
+    --background: 0 0% 100%;
     --foreground: 220 10% 15%;
 
     --card: 0 0% 100%;
@@ -18,7 +18,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 10% 15%;
 
-    --primary: 210 100% 50%;
+    /* Primary: Google Blue #1A73E8 */
+    --primary: 217 89% 51%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 15% 94%;

@@ -14,7 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 export function Header() {
-  const { user, logout } = useAuth();
+  const { user, logout, getDashboardRoute } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
@@ -23,7 +23,7 @@ export function Header() {
   // backend user object can have different shapes (username, profile.name,
   // or email). Avoid calling string methods on undefined.
   const displayName = user?.profile?.name || user?.username || user?.email || "";
-  const avatarSrc = user?.avatarUrl || user?.profile?.image || undefined;
+  const avatarSrc = user?.profile?.image || undefined;
 
   return (
     <header className="sticky top-0 z-50 w-full glass-effect border-b border-border/50">
@@ -47,9 +47,9 @@ export function Header() {
               Dashboard
             </Button>
           )}
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleTheme}
             className="w-9 h-9 rounded-full hover:bg-accent/20 transition-all"
           >
@@ -107,8 +107,8 @@ export function Header() {
             </DropdownMenu>
           ) : (
             <Link to="/login">
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="rounded-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
               >
                 {t("nav.login")}

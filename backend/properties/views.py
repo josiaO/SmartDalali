@@ -5,8 +5,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import MethodNotAllowed
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.utils import timezone
+import time
 from django.db.models import Q, Count, Sum
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
@@ -247,8 +249,18 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def stk_push(request, property_id):
-    """Initiate M-Pesa STK push payment."""
+    """
+    Initiate M-Pesa STK push payment.
+    
+    Uses Safaricom's official Daraja API for secure payment processing.
+    All security relies on Safaricom's endpoints and authentication.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Validate property_id to prevent SQL injection
     try:
         property_id = int(property_id)
@@ -267,83 +279,201 @@ def stk_push(request, property_id):
         amount = float(amount)
         if amount <= 0:
             return Response({'error': 'amount must be positive'}, status=status.HTTP_400_BAD_REQUEST)
+        if amount < 1:
+            return Response({'error': 'minimum amount is KES 1'}, status=status.HTTP_400_BAD_REQUEST)
     except (ValueError, TypeError):
         return Response({'error': 'Invalid amount format'}, status=status.HTTP_400_BAD_REQUEST)
     
-    callback_url = request.build_absolute_uri('/api/properties/payments/mpesa/callback/')
-
-    # Import Mpesa client lazily to avoid import-time errors when django_daraja is not installed
+    # Build callback URL - use settings if available, otherwise build from request
+    from django.conf import settings as django_settings
+    if django_settings.MPESA_CALLBACK_URL:
+        callback_url = django_settings.MPESA_CALLBACK_URL
+    else:
+        callback_url = request.build_absolute_uri('/api/v1/properties/payments/mpesa/callback/')
+    
     try:
-        from django_daraja.mpesa.core import MpesaClient
-    except Exception as e:
-        return Response({'error': 'Mpesa client not available', 'details': str(e)}, status=501)
-
-    try:
-        from django.conf import settings
-        mpesa_client = MpesaClient(settings.DAR_AFFILIATE_CONSUMER_KEY, settings.DAR_AFFILIATE_CONSUMER_SECRET)
-        response = mpesa_client.stk_push(
-            amount=amount,
+        from utils.mpesa_daraja import get_mpesa_service, MpesaDarajaError
+        
+        mpesa_service = get_mpesa_service()
+        
+        # Generate unique account reference
+        account_reference = f"PROP-{property_obj.id}-{request.user.id}-{int(time.time())}"
+        transaction_desc = f"Payment for property listing: {property_obj.title[:30]}"
+        
+        # Initiate STK Push via Safaricom
+        response = mpesa_service.initiate_stk_push(
             phone_number=phone,
-            account_reference=f"Property-{property_obj.id}",
-            transaction_desc=f"Pay for property {property_obj.id}",
-            callback_url=callback_url,
-            business_shortcode=settings.DAR_SHORTCODE,
-            passkey=settings.DAR_PASSKEY
+            amount=amount,
+            account_reference=account_reference,
+            transaction_description=transaction_desc,
+            callback_url=callback_url
+        )
+        
+        checkout_request_id = response.get('CheckoutRequestID')
+        
+        if not checkout_request_id:
+            logger.error("No CheckoutRequestID in STK Push response")
+            return Response(
+                {'error': 'Failed to initiate payment. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        # Create payment record
+        payment = Payment.objects.create(
+            user=request.user,
+            property=property_obj,
+            method='mpesa',
+            amount=amount,
+            transaction_id=checkout_request_id,  # Store CheckoutRequestID
+            status='pending',
+            raw_payload=response
+        )
+        
+        logger.info(f"STK Push initiated: Payment ID {payment.id}, CheckoutRequestID: {checkout_request_id}")
+        
+        return Response({
+            'success': True,
+            'message': response.get('CustomerMessage', 'Payment request sent. Please check your phone.'),
+            'checkout_request_id': checkout_request_id,
+            'payment_id': payment.id,
+            'status': 'pending'
+        })
+        
+    except MpesaDarajaError as e:
+        logger.error(f"M-Pesa Daraja error: {str(e)}")
+        return Response(
+            {'error': f'Payment initiation failed: {str(e)}'},
+            status=status.HTTP_502_BAD_GATEWAY
         )
     except Exception as e:
-        return Response({'error': 'Failed to send STK push', 'details': str(e)}, status=502)
-
-    Payment.objects.create(
-        user=request.user,
-        property=property_obj,
-        method='mpesa',
-        amount=amount,
-        status='pending',
-        raw_payload=response
-    )
-    return Response(response)
+        logger.error(f"Unexpected error during STK Push: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'An unexpected error occurred. Please try again later.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @csrf_exempt
+@require_http_methods(["POST"])
 def mpesa_callback(request):
-    """Handle M-Pesa callback."""
+    """
+    Handle M-Pesa payment callback from Safaricom.
+    
+    This endpoint is called by Safaricom's servers to notify us of payment status.
+    Security is enforced by validating the payload structure as per Safaricom documentation.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         payload = json.loads(request.body.decode('utf-8'))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({'status': 'invalid_payload'}, status=400)
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.warning(f"Invalid callback payload format: {e}")
+        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Invalid payload format'}, status=400)
     
-    # TODO: verify payload structure per Daraja docs
-    # Find payment and update status
-    transaction_id = payload.get('Body', {}).get('stkCallback', {}).get('CheckoutRequestID')
-    result_code = payload.get('Body', {}).get('stkCallback', {}).get('ResultCode')
-    
-    if transaction_id:
-        payment = Payment.objects.filter(transaction_id=transaction_id).first()
-        if payment:
-            payment.status = 'completed' if result_code == 0 else 'cancelled'
-            payment.raw_payload = payload
+    try:
+        from utils.mpesa_daraja import get_mpesa_service
+        
+        mpesa_service = get_mpesa_service()
+        
+        # Validate callback payload structure
+        if not mpesa_service.validate_callback_payload(payload):
+            logger.warning("Invalid callback payload structure")
+            return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Invalid payload structure'}, status=400)
+        
+        # Extract callback data
+        callback_data = mpesa_service.extract_callback_data(payload)
+        
+        if not callback_data:
+            logger.warning("Failed to extract callback data")
+            return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Failed to process callback'}, status=400)
+        
+        checkout_request_id = callback_data.get('CheckoutRequestID')
+        result_code = int(callback_data.get('ResultCode', -1))
+        result_desc = callback_data.get('ResultDesc', '')
+        
+        if not checkout_request_id:
+            logger.warning("Callback missing CheckoutRequestID")
+            return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Missing CheckoutRequestID'}, status=400)
+        
+        # Find payment by CheckoutRequestID
+        try:
+            payment = Payment.objects.get(transaction_id=checkout_request_id)
+        except Payment.DoesNotExist:
+            logger.warning(f"Payment not found for CheckoutRequestID: {checkout_request_id}")
+            # Still return success to Safaricom to prevent retries
+            return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Callback received'})
+        
+        # Update payment status based on result code
+        # ResultCode 0 = Success, any other code = Failed/Cancelled
+        if result_code == 0:
+            payment.status = 'completed'
+            logger.info(f"Payment completed: Payment ID {payment.id}, CheckoutRequestID: {checkout_request_id}")
+            
+            # Store receipt number and transaction details
+            payment.raw_payload = {
+                **payment.raw_payload,
+                'callback': callback_data,
+                'mpesa_receipt_number': callback_data.get('MpesaReceiptNumber'),
+                'transaction_date': callback_data.get('TransactionDate'),
+            }
             payment.save()
-            # If successful, activate agent subscription
-            if result_code == 0 and payment.property:
-                agent_profile = AgentProfile.objects.filter(user=payment.property.owner).first()
-                if agent_profile:
-                    agent_profile.subscription_active = True
-                    # Set expiry to 1 month from now (or extend if already active)
-                    now = timezone.now()
-                    if agent_profile.subscription_expires and agent_profile.subscription_expires > now:
-                        import datetime
-                        agent_profile.subscription_expires += datetime.timedelta(days=30)
-                    else:
-                        import datetime
-                        agent_profile.subscription_expires = now + datetime.timedelta(days=30)
-                    agent_profile.save()
-    return JsonResponse({'status': 'received'})
+            
+            # Activate agent subscription if this is for a property payment
+            if payment.property:
+                try:
+                    agent_profile = AgentProfile.objects.filter(user=payment.property.owner).first()
+                    if agent_profile:
+                        agent_profile.subscription_active = True
+                        # Set or extend subscription expiry
+                        now = timezone.now()
+                        if agent_profile.subscription_expires and agent_profile.subscription_expires > now:
+                            # Extend existing subscription
+                            from datetime import timedelta
+                            agent_profile.subscription_expires += timedelta(days=30)
+                        else:
+                            # Set new subscription expiry
+                            from datetime import timedelta
+                            agent_profile.subscription_expires = now + timedelta(days=30)
+                        agent_profile.save()
+                        logger.info(f"Agent subscription activated: Agent ID {agent_profile.id}")
+                except Exception as e:
+                    logger.error(f"Failed to activate agent subscription: {e}", exc_info=True)
+            
+            # Return success to Safaricom
+            return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Callback processed successfully'})
+        else:
+            # Payment failed or was cancelled
+            payment.status = 'cancelled'
+            payment.raw_payload = {
+                **payment.raw_payload,
+                'callback': callback_data,
+                'error': result_desc
+            }
+            payment.save()
+            logger.info(f"Payment cancelled/failed: Payment ID {payment.id}, Reason: {result_desc}")
+            
+            # Still return success to Safaricom to acknowledge receipt
+            return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Callback processed'})
+            
+    except Exception as e:
+        logger.error(f"Error processing M-Pesa callback: {e}", exc_info=True)
+        # Return error to Safaricom so they can retry
+        return JsonResponse({'ResultCode': 1, 'ResultDesc': f'Error: {str(e)}'}, status=500)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def payment_status(request, payment_id):
-    """Return payment status so frontend can poll for completion."""
+    """
+    Return payment status so frontend can poll for completion.
+    
+    If payment is still pending and query_safaricom=true, queries Safaricom
+    for the latest status.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Validate payment_id to prevent SQL injection
     try:
         payment_id = int(payment_id)
@@ -356,10 +486,54 @@ def payment_status(request, payment_id):
     if not request.user.is_superuser and payment.user != request.user:
         return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
     
+    # Optionally query Safaricom for latest status if payment is still pending
+    query_safaricom = request.GET.get('query_safaricom', 'false').lower() in ('true', '1', 'yes')
+    
+    if query_safaricom and payment.status == 'pending' and payment.method == 'mpesa' and payment.transaction_id:
+        try:
+            from utils.mpesa_daraja import get_mpesa_service, MpesaDarajaError
+            
+            mpesa_service = get_mpesa_service()
+            status_response = mpesa_service.query_payment_status(payment.transaction_id)
+            
+            # Update payment if status has changed
+            result_code = status_response.get('ResultCode')
+            if result_code == 0:
+                # Payment completed
+                payment.status = 'completed'
+                payment.raw_payload = {
+                    **payment.raw_payload,
+                    'status_query': status_response
+                }
+                payment.save()
+                logger.info(f"Payment status updated via query: Payment ID {payment.id}")
+            elif result_code in [1032, 1037]:  # Request cancelled/failed
+                payment.status = 'cancelled'
+                payment.raw_payload = {
+                    **payment.raw_payload,
+                    'status_query': status_response
+                }
+                payment.save()
+                logger.info(f"Payment cancelled via query: Payment ID {payment.id}")
+            
+        except MpesaDarajaError as e:
+            logger.warning(f"Failed to query payment status from Safaricom: {e}")
+            # Continue with current status
+        except Exception as e:
+            logger.error(f"Error querying payment status: {e}", exc_info=True)
+            # Continue with current status
+    
+    # Extract M-Pesa receipt number if available
+    mpesa_receipt = None
+    if payment.raw_payload and isinstance(payment.raw_payload, dict):
+        callback_data = payment.raw_payload.get('callback', {})
+        mpesa_receipt = callback_data.get('MpesaReceiptNumber')
+    
     data = {
         'id': payment.id,
         'status': payment.status,
         'transaction_id': payment.transaction_id,
+        'mpesa_receipt_number': mpesa_receipt,
         'amount': str(payment.amount),
         'method': payment.method,
         'property_id': payment.property.id if payment.property else None,

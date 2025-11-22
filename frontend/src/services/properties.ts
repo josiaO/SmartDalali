@@ -33,8 +33,8 @@ export const propertiesService = {
     api.post(`/properties/payments/${id}/retry/`),
   requestMpesaStk: (propertyId: number | string, payload: Record<string, unknown>) =>
     api.post(`/properties/payments/mpesa/stk/${propertyId}/`, payload),
-  paymentStatus: (paymentId: number | string) =>
-    api.get(`/properties/payments/status/${paymentId}/`),
+  paymentStatus: (paymentId: number | string, params?: Record<string, unknown>) =>
+    api.get(`/properties/payments/status/${paymentId}/`, { params }),
   fetchSubscriptionPlans: () => api.get('/properties/payments/subscription/'),
 
     // Support tickets
@@ -53,6 +53,10 @@ export const propertiesService = {
 
   // Agent stats
   fetchAgentStats: () => api.get('/agents/stats/'),
+
+  // Geocoding
+  geocodeLocation: (address: string, city?: string) =>
+    api.post('/properties/geocode/', { address, city }),
 };
 
 export default propertiesService;

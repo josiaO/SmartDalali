@@ -47,8 +47,11 @@ class UserSerializer(serializers.ModelSerializer):
             return None
     
     def get_role(self, obj):
-        # Use centralized role helper
-        return get_user_role(obj)
+        # Return role from profile if available, otherwise default to user
+        try:
+            return obj.profile.role
+        except:
+            return 'user'
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
@@ -80,3 +83,64 @@ class AgentProfileSerializer(serializers.ModelSerializer):
     def get_property_count(self, obj):
         from properties.models import Property
         return Property.objects.filter(owner=obj.user).count()
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
+    is_agent = serializers.BooleanField(default=False, write_only=True)
+    email = serializers.EmailField(required=True)
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password', 'password_confirm', 'is_agent']
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError({"password": "Passwords do not match."})
+        
+        if User.objects.filter(email=data['email']).exists():
+            raise serializers.ValidationError({"email": "Email already exists."})
+            
+        return data
+
+    def create(self, validated_data):
+        is_agent = validated_data.pop('is_agent', False)
+        validated_data.pop('password_confirm')
+        
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password']
+        )
+        
+        # Auto-activate for now (or keep inactive if email verification is strict)
+        user.is_active = True 
+        user.save()
+        
+        # Profile is created by signal, but we can update role here if needed
+        # However, signal handles role assignment based on groups usually.
+        # Let's explicitly handle agent group assignment here.
+        
+        if is_agent:
+            from django.contrib.auth.models import Group
+            agent_group, _ = Group.objects.get_or_create(name='agent')
+            user.groups.add(agent_group)
+            # AgentProfile creation is also handled in views or signals usually, 
+            # but we can ensure it here to be safe or rely on the signal.
+            # The existing signal in models.py checks for group 'agent'.
+            
+            # We need to save user again or trigger the signal logic if it depends on groups being present *during* creation?
+            # Actually, the signal 'create_or_update_profile' runs on post_save.
+            # If we add group AFTER create_user, the signal ran already with no group.
+            # So we might need to update the profile role manually or save user again.
+            
+            profile = user.profile
+            profile.role = 'agent'
+            profile.save()
+            
+            try:
+                AgentProfile.objects.get_or_create(user=user, profile=profile)
+            except Exception:
+                pass
+        
+        return user

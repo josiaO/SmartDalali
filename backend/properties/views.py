@@ -113,13 +113,15 @@ class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 class FeatureViewSet(viewsets.ModelViewSet):
     queryset = Feature.objects.all()
     serializer_class = FeatureSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow anyone to read features
     pagination_class = None  # Disable pagination for admin endpoints
 
     def get_permissions(self):
+        # Only admins can create/update/delete features
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAdmin()]
-        return [IsAuthenticated()]
+        # Anyone can list/retrieve features (needed for app initialization)
+        return [permissions.AllowAny()]
 
 
 class SubscriptionPlanViewSet(viewsets.ModelViewSet):
@@ -1187,10 +1189,19 @@ def public_stats(request):
     Get public statistics for the homepage.
     """
     from accounts.models import User
+    from django.contrib.auth.models import Group
     
     properties_count = Property.objects.filter(is_published=True, archived_at__isnull=True).count()
-    agents_count = User.objects.filter(role='agent', is_active=True).count()
-    users_count = User.objects.filter(role='user', is_active=True).count()
+    
+    # Count agents by checking the 'agent' group
+    try:
+        agent_group = Group.objects.get(name='agent')
+        agents_count = User.objects.filter(groups=agent_group, is_active=True).count()
+    except Group.DoesNotExist:
+        agents_count = 0
+    
+    # Count all active users
+    users_count = User.objects.filter(is_active=True).count()
     
     # Calculate satisfaction rate (mock logic or based on reviews)
     # For now, let's use a static high value or calculate from ratings if available

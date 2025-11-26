@@ -190,7 +190,8 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
               <div className="flex items-center gap-2">
                 <Phone className="h-5 w-5 text-primary" />
-                <span>+255 123 456 789</span>
+                <span>+255 629 077 544,</span>
+                <span>+255 685 855 338</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-primary" />

@@ -32,6 +32,7 @@ profile_patterns = [
     path('profile/update/', views.update_user_profile, name='update_user_profile'),
     path('profile/change-password/', views.change_password, name='change_password'),
     path('profile/delete/', views.delete_account, name='delete_account'),
+    path('profile/upgrade-to-agent/', views.upgrade_to_agent, name='upgrade_to_agent'),
 ]
 
 urlpatterns = [

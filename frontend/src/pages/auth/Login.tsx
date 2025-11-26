@@ -10,8 +10,10 @@ import { signInWithPopup } from 'firebase/auth';
 import { firebaseLogin, getUserRole, login as apiLogin } from '@/api/auth';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -89,7 +91,15 @@ export default function Login() {
       await handleLoginSuccess(access, refresh);
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.response?.data?.error || 'Failed to login');
+      const errorMessage = error.response?.data?.error || error.response?.data?.detail;
+
+      if (error.response?.status === 401) {
+        toast.error(errorMessage || t('auth.invalid_credentials'));
+      } else if (error.response?.status === 404 || errorMessage?.toLowerCase().includes('not found')) {
+        toast.error(t('auth.account_not_found'));
+      } else {
+        toast.error(errorMessage || t('auth.login_failed'));
+      }
     } finally {
       setLoading(false);
     }

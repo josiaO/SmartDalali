@@ -257,7 +257,25 @@ class MyTokenObtainPairView(TokenObtainPairView):
             serializer.is_valid(raise_exception=True)
         except Exception as e:
             logger.error('TokenObtain: serializer validation failed: %s', str(e))
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Check if user exists to provide better error message
+            from django.contrib.auth.models import User
+            from django.db import models
+            username_or_email = data.get('username') or data.get('email')
+            user_exists = User.objects.filter(
+                models.Q(username=username_or_email) | models.Q(email=username_or_email)
+            ).exists()
+            
+            if not user_exists:
+                return Response(
+                    {'error': 'No account found with this email. Please sign up first.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            else:
+                return Response(
+                    {'error': 'Invalid email or password'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
         # Log which user's token is being issued
         try:
@@ -905,3 +923,46 @@ def delete_account(request):
         return Response({'message': 'Account deleted successfully'})
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upgrade_to_agent(request):
+    """
+    Upgrade a regular user to an agent.
+    """
+    user = request.user
+    
+    # Check if user is already an agent
+    from django.contrib.auth.models import Group
+    agent_group, _ = Group.objects.get_or_create(name='agent')
+    
+    if agent_group in user.groups.all():
+        return Response({'error': 'User is already an agent'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Add user to agent group
+    user.groups.add(agent_group)
+    
+    # Create AgentProfile if it doesn't exist
+    from properties.models import AgentProfile
+    agent_profile, created = AgentProfile.objects.get_or_create(
+        user=user,
+        defaults={
+            'profile': user.profile,
+            'agency_name': request.data.get('agency_name', ''),
+            'phone': request.data.get('phone', user.profile.phone_number or ''),
+        }
+    )
+    
+    if not created:
+        # Update existing profile with new data
+        if request.data.get('agency_name'):
+            agent_profile.agency_name = request.data.get('agency_name')
+        if request.data.get('phone'):
+            agent_profile.phone = request.data.get('phone')
+        agent_profile.save()
+    
+    return Response({
+        'message': 'Successfully upgraded to agent account',
+        'agent_profile_id': agent_profile.id
+    })

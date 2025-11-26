@@ -451,7 +451,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [ BASE_DIR / "static" ]
-STATIC_ROOT = "static_root"
+STATIC_ROOT = BASE_DIR / "static_root"
 
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
 if AWS_STORAGE_BUCKET_NAME:
@@ -470,7 +470,7 @@ if AWS_STORAGE_BUCKET_NAME:
     MEDIA_ROOT = None
 else:
     MEDIA_URL = '/media/'
-    MEDIA_ROOT = "media_root"
+    MEDIA_ROOT = BASE_DIR / "media_root"
 
 
 # Default primary key field type

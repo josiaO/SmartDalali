@@ -55,7 +55,7 @@ function getDashboardRouteForRole(role: UserRole): string {
     case 'admin':
       return '/admin';
     case 'agent':
-      return '/agent';
+      return '/agent/dashboard';
     case 'user':
     default:
       return '/dashboard';

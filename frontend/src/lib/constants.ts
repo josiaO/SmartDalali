@@ -38,7 +38,7 @@ export const ROUTES = {
   LOGIN: '/auth/login',
   SIGNUP: '/auth/signup',
   DASHBOARD: '/dashboard',
-  AGENT_DASHBOARD: '/dashboard/agent',
+  AGENT_DASHBOARD: '/agent/dashboard',
   SUPPORT: '/support',
   SUPPORT_TICKET: '/support/:id',
   COMMUNICATIONS: '/communications',

@@ -6,7 +6,8 @@ from .views import (
     PaymentViewSet, SupportTicketViewSet, stk_push, mpesa_callback,
     payment_status, geocode_property_location, agent_stats,
     FeatureViewSet, SubscriptionPlanViewSet, AgentRatingViewSet,
-    toggle_property_like, track_property_view
+    toggle_property_like, track_property_view, liked_properties, viewed_properties,
+    public_stats
 )
 from .agent_profile_view import agent_public_profile
 from .analytics import admin_stats, user_growth, property_stats
@@ -61,9 +62,12 @@ urlpatterns = [
     # Analytics endpoints (admin only)
     path('analytics/admin-stats/', admin_stats, name='admin_stats'),
     path('analytics/user-growth/', user_growth, name='user_growth'),
-    path('analytics/property-stats/', property_stats, name='property_stats'),
+    path('analytics/property-stats/', property_stats, name='property-stats'),
+    path('public-stats/', public_stats, name='public-stats'),
     
     # Property interactions
     path('<int:property_id>/like/', toggle_property_like, name='toggle_property_like'),
     path('<int:property_id>/track-view/', track_property_view, name='track_property_view'),
+    path('liked/', liked_properties, name='liked_properties'),
+    path('viewed/', viewed_properties, name='viewed_properties'),
 ]

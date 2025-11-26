@@ -44,7 +44,7 @@ export function DashboardSidebar() {
   const menuItems: NavItem[] = [
     {
       title: t('sidebar.dashboard'),
-      href: user?.role === 'admin' ? '/admin' : user?.role === 'agent' ? '/agent' : '/dashboard',
+      href: user?.role === 'admin' ? '/admin' : user?.role === 'agent' ? '/agent/dashboard' : '/dashboard',
       icon: LayoutDashboard,
       roles: ['admin', 'agent', 'user'],
     },
@@ -76,7 +76,7 @@ export function DashboardSidebar() {
     },
     {
       title: t('sidebar.profile'),
-      href: '/agent/profile',
+      href: user?.id ? `/agents/${user.id}` : '#',
       icon: User,
       roles: ['agent'],
     },
@@ -90,7 +90,7 @@ export function DashboardSidebar() {
     // Shared items
     {
       title: t('sidebar.messages'),
-      href: user?.role === 'agent' ? '/agent/messages' : '/communications',
+      href: '/communication',
       icon: MessageSquare,
       roles: ['admin', 'agent', 'user'],
       disabled: user?.role === 'user',
@@ -100,6 +100,12 @@ export function DashboardSidebar() {
       title: t('sidebar.support'),
       href: '/support',
       icon: Headphones,
+      roles: ['admin', 'agent', 'user'],
+    },
+    {
+      title: t('sidebar.settings'),
+      href: '/profile',
+      icon: Settings,
       roles: ['admin', 'agent', 'user'],
     },
   ];

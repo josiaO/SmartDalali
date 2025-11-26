@@ -1180,3 +1180,46 @@ def track_property_view(request, property_id):
         })
     except Property.DoesNotExist:
         return Response({'error': 'Property not found'}, status=status.HTTP_404_NOT_FOUND)
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_stats(request):
+    """
+    Get public statistics for the homepage.
+    """
+    from accounts.models import User
+    
+    properties_count = Property.objects.filter(is_published=True, archived_at__isnull=True).count()
+    agents_count = User.objects.filter(role='agent', is_active=True).count()
+    users_count = User.objects.filter(role='user', is_active=True).count()
+    
+    # Calculate satisfaction rate (mock logic or based on reviews)
+    # For now, let's use a static high value or calculate from ratings if available
+    satisfaction_rate = 98  # Mock value
+    
+    return Response({
+        'properties': properties_count,
+        'agents': agents_count,
+        'users': users_count,
+        'satisfaction': satisfaction_rate
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def liked_properties(request):
+    """Get properties liked by the current user."""
+    from .models import PropertyLike
+    liked_ids = PropertyLike.objects.filter(user=request.user).values_list('property_id', flat=True)
+    properties = Property.objects.filter(id__in=liked_ids).order_by('-created_at')
+    serializer = SerializerProperty(properties, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def viewed_properties(request):
+    """Get properties viewed by the current user."""
+    from .models import PropertyView
+    viewed_ids = PropertyView.objects.filter(viewer=request.user).values_list('property_id', flat=True)
+    properties = Property.objects.filter(id__in=viewed_ids).order_by('-created_at')
+    serializer = SerializerProperty(properties, many=True, context={'request': request})
+    return Response(serializer.data)

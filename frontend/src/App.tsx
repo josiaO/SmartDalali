@@ -21,8 +21,10 @@ import Details from "@/pages/properties/Details";
 import CreateProperty from "@/pages/properties/CreateProperty";
 import EditProperty from "@/pages/properties/EditProperty";
 import UserDashboard from "@/pages/dashboard/UserDashboard";
+import AgentDashboard from '@/pages/agent/AgentDashboard';
 import AgentPublicProfile from "@/pages/agent/AgentPublicProfile";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
+import Profile from "@/pages/profile/Profile";
 
 import Tickets from "@/pages/support/Tickets";
 import CreateTicket from "@/pages/support/CreateTicket";
@@ -53,8 +55,8 @@ const App = () => (
 
                 {/* Auth Routes (Guest only) */}
                 <Route element={<GuestGuard><PublicLayout /></GuestGuard>}>
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<Register />} />
+                  <Route path="/auth/login" element={<Login />} />
+                  <Route path="/auth/signup" element={<Register />} />
                 </Route>
 
                 {/* User Routes (Authenticated) */}
@@ -64,6 +66,7 @@ const App = () => (
                   <Route path="/support/create" element={<CreateTicket />} />
                   <Route path="/support/:id" element={<TicketDetail />} />
                   <Route path="/communication" element={<Conversations />} />
+                  <Route path="/profile" element={<Profile />} />
                 </Route>
 
                 {/* Agent Routes (Agent role only) */}
@@ -72,7 +75,7 @@ const App = () => (
                     <AgentLayout />
                   </RoleGuard>
                 }>
-                  <Route path="/agent/dashboard" element={<UserDashboard />} />
+                  <Route path="/agent/dashboard" element={<AgentDashboard />} />
                   <Route path="/agent/properties" element={<Browse />} />
                   <Route path="/properties/create" element={<CreateProperty />} />
                   <Route path="/properties/:id/edit" element={<EditProperty />} />

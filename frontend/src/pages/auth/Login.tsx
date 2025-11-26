@@ -43,7 +43,7 @@ export default function Login() {
       if (role === 'admin') {
         navigate('/admin', { replace: true });
       } else if (role === 'agent') {
-        navigate('/agent', { replace: true });
+        navigate('/agent/dashboard', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }

@@ -61,6 +61,26 @@ export const getAgentProperties = async () => {
   return response.data;
 };
 
+export const getLikedProperties = async () => {
+  const response = await api.get<Property[]>('/api/v1/properties/liked/');
+  return response.data;
+};
+
+export const getViewedProperties = async () => {
+  const response = await api.get<Property[]>('/api/v1/properties/viewed/');
+  return response.data;
+};
+
+export const getPublicStats = async () => {
+  const response = await api.get('/api/v1/properties/public-stats/');
+  return response.data;
+};
+
+export const getAgentStats = async () => {
+  const response = await api.get('/api/v1/properties/agent-stats/');
+  return response.data;
+};
+
 export async function fetchProperty(id: string) {
   const response = await api.get<Property>(`/api/v1/properties/${id}/`);
   return response.data;

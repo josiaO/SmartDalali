@@ -209,3 +209,28 @@ export async function firebaseLogin(idToken: string, email?: string | null, disp
   });
   return response.data;
 }
+
+export async function updateProfile(formData: FormData) {
+  const response = await api.patch<UserProfile>('/api/v1/accounts/me/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+}
+
+export async function changePassword(oldPassword: string, newPassword: string, confirmPassword: string) {
+  const response = await api.post('/api/v1/accounts/profile/change-password/', {
+    old_password: oldPassword,
+    new_password: newPassword,
+    confirm_password: confirmPassword,
+  });
+  return response.data;
+}
+
+export async function deleteAccount(password?: string) {
+  const response = await api.delete('/api/v1/accounts/profile/delete/', {
+    data: { password }
+  });
+  return response.data;
+}

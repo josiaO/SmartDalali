@@ -30,6 +30,8 @@ profile_patterns = [
     path('me/', views.user_profile, name='me'),
     path('profile/', views.user_profile, name='user_profile'),
     path('profile/update/', views.update_user_profile, name='update_user_profile'),
+    path('profile/change-password/', views.change_password, name='change_password'),
+    path('profile/delete/', views.delete_account, name='delete_account'),
 ]
 
 urlpatterns = [

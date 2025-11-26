@@ -17,8 +17,16 @@ import {
   Mail,
 } from 'lucide-react';
 
+import { useQuery } from '@tanstack/react-query';
+import { getPublicStats } from '@/api/properties';
+
 export default function Home() {
   const { t } = useTranslation();
+
+  const { data: publicStats } = useQuery({
+    queryKey: ['public-stats'],
+    queryFn: getPublicStats,
+  });
 
   const features = [
     { icon: Shield, title: t('home.features.verified.title'), description: t('home.features.verified.description'), color: 'primary' },
@@ -30,10 +38,10 @@ export default function Home() {
   ];
 
   const stats = [
-    { value: '1000+', label: t('home.stats.properties') },
-    { value: '500+', label: t('home.stats.agents') },
-    { value: '5000+', label: t('home.stats.users') },
-    { value: '98%', label: t('home.stats.satisfaction') },
+    { value: publicStats?.properties ? `${publicStats.properties}+` : '0+', label: t('home.stats.properties') },
+    { value: publicStats?.agents ? `${publicStats.agents}+` : '0+', label: t('home.stats.agents') },
+    { value: publicStats?.users ? `${publicStats.users}+` : '0+', label: t('home.stats.users') },
+    { value: publicStats?.satisfaction ? `${publicStats.satisfaction}%` : '0%', label: t('home.stats.satisfaction') },
   ];
 
   return (

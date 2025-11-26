@@ -855,3 +855,53 @@ class PasswordResetConfirmView(APIView):
         else:
             return Response({'error': 'Invalid link or expired token'}, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """
+    Change password for authenticated user.
+    """
+    user = request.user
+    data = request.data
+    
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+    confirm_password = data.get('confirm_password')
+    
+    if not old_password or not new_password:
+        return Response({'error': 'Old and new passwords are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if not user.check_password(old_password):
+        return Response({'error': 'Invalid old password'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if new_password != confirm_password:
+        return Response({'error': 'New passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    # Validate password complexity if needed
+    if len(new_password) < 8:
+        return Response({'error': 'Password must be at least 8 characters long'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    user.set_password(new_password)
+    user.save()
+    
+    return Response({'message': 'Password changed successfully'})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """
+    Delete authenticated user's account.
+    """
+    user = request.user
+    # Optional: Require password confirmation before deletion
+    password = request.data.get('password')
+    if password:
+        if not user.check_password(password):
+             return Response({'error': 'Invalid password'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user.delete()
+        return Response({'message': 'Account deleted successfully'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

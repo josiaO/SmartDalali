@@ -43,6 +43,7 @@ i18n
                         support: 'Support',
                         list_property: 'List Property',
                         soon: 'Soon',
+                        settings: 'Settings',
                     },
                     // Hero Section
                     hero: {
@@ -153,6 +154,9 @@ i18n
                         no: 'No',
                         optional: 'Optional',
                         required: 'Required',
+                        save_changes: 'Save Changes',
+                        address: 'Address',
+                        no_data: 'No data available',
                     },
                     // Property
                     property: {
@@ -234,6 +238,17 @@ i18n
                         this_month: 'This month',
                         this_week: 'This week',
                         new_messages: 'New messages',
+                        my_dashboard: 'My Dashboard',
+                        manage_desc: 'Manage your saved properties and support tickets',
+                        saved_properties: 'Saved Properties',
+                        saved_desc: "Properties you've saved",
+                        property_views: 'Property Views',
+                        viewed_desc: "Properties you've viewed",
+                        open_tickets: 'Open support requests',
+                        quick_actions: 'Quick Actions',
+                        recent_activity: 'Recent Activity',
+                        viewed_recently: 'Viewed recently',
+                        no_activity: 'No recent activity',
                     },
                     // Auth
                     auth: {
@@ -374,6 +389,33 @@ i18n
                         error_occurred: 'An error occurred',
                         try_again: 'Please try again',
                     },
+                    // Profile
+                    profile: {
+                        title: 'Profile Settings',
+                        general: 'General',
+                        security: 'Security',
+                        danger_zone: 'Danger Zone',
+                        personal_info: 'Personal Information',
+                        personal_info_desc: 'Update your personal details and contact information.',
+                        profile_picture: 'Profile Picture',
+                        change_password: 'Change Password',
+                        change_password_desc: 'Ensure your account is using a long, random password to stay secure.',
+                        current_password: 'Current Password',
+                        new_password: 'New Password',
+                        confirm_password: 'Confirm New Password',
+                        update_password: 'Update Password',
+                        delete_account: 'Delete Account',
+                        delete_account_desc: 'Permanently remove your account and all of its contents.',
+                        delete_warning: 'Once you delete your account, there is no going back. Please be certain.',
+                        delete_account_button: 'Delete Account',
+                        delete_confirm: 'Are you sure you want to delete your account? This action cannot be undone.',
+                        update_success: 'Profile updated successfully',
+                        update_error: 'Failed to update profile',
+                        password_success: 'Password changed successfully',
+                        password_error: 'Failed to change password',
+                        delete_success: 'Account deleted successfully',
+                        delete_error: 'Failed to delete account',
+                    },
                 },
             },
             sw: {
@@ -480,6 +522,7 @@ i18n
                     support: 'Msaada',
                     list_property: 'Tangaza Mali',
                     soon: 'Hivi Karibuni',
+                    settings: 'Mipangilio',
                 },
                 // Hero Section
                 hero: {
@@ -518,6 +561,9 @@ i18n
                     actions: 'Vitendo',
                     all: 'Zote',
                     search: 'Tafuta',
+                    save_changes: 'Hifadhi Mabadiliko',
+                    address: 'Anwani',
+                    no_data: 'Hakuna data inayopatikana',
                 },
                 // Property
                 property: {
@@ -590,6 +636,17 @@ i18n
                     this_month: 'Mwezi huu',
                     this_week: 'Wiki hii',
                     new_messages: 'Ujumbe mpya',
+                    my_dashboard: 'Dashibodi Yangu',
+                    manage_desc: 'Dhibiti mali zako zilizohifadhiwa na tiketi za msaada',
+                    saved_properties: 'Mali Zilizohifadhiwa',
+                    saved_desc: 'Mali ulizohifadhi',
+                    property_views: 'Maoni ya Mali',
+                    viewed_desc: 'Mali ulizotazama',
+                    open_tickets: 'Maombi ya msaada yaliyo wazi',
+                    quick_actions: 'Vitendo vya Haraka',
+                    recent_activity: 'Shughuli za Hivi Karibuni',
+                    viewed_recently: 'Imetazamwa hivi karibuni',
+                    no_activity: 'Hakuna shughuli za hivi karibuni',
                 },
                 // Auth
                 auth: {
@@ -733,7 +790,7 @@ i18n
                 },
             },
         },
-    
+
 
     });
 export default i18n;

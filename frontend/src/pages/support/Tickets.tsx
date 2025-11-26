@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Headphones, Plus, Trash2, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { fetchTickets, createTicket, deleteTicket, type Ticket } from '@/api/support';
+import { getSupportTickets, createSupportTicket, closeTicket, type SupportTicket as Ticket } from '@/api/support';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -32,7 +32,7 @@ export default function Tickets() {
 
   async function loadTickets() {
     try {
-      const data = await fetchTickets();
+      const data = await getSupportTickets();
       const results = Array.isArray(data) ? data : (data as any).results || [];
       setTickets(results);
     } catch (error) {
@@ -50,7 +50,12 @@ export default function Tickets() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await createTicket(formData);
+      await createSupportTicket({
+        title: formData.subject,
+        description: formData.description,
+        priority: formData.priority,
+        category: 'other'
+      });
       toast({
         title: 'Success',
         description: 'Ticket created successfully',
@@ -70,7 +75,7 @@ export default function Tickets() {
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this ticket?')) return;
     try {
-      await deleteTicket(id);
+      await closeTicket(id);
       toast({
         title: 'Success',
         description: 'Ticket deleted successfully',
@@ -236,14 +241,14 @@ export default function Tickets() {
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-lg">{ticket.subject}</h3>
+                      <h3 className="font-semibold text-lg">{ticket.title}</h3>
                       {getStatusBadge(ticket.status)}
                       <span className={`text-xs font-medium uppercase ${getPriorityColor(ticket.priority)}`}>
                         {ticket.priority} Priority
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Created by {ticket.created_by.first_name} {ticket.created_by.last_name} on {format(new Date(ticket.created_at), 'PPP')}
+                      Created by {ticket.user_name} on {format(new Date(ticket.created_at), 'PPP')}
                     </p>
                     <p className="mt-2 text-sm">{ticket.description}</p>
                   </div>

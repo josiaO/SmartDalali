@@ -2,5 +2,10 @@
     "editor.formatOnType": true,
     "diffEditor.codeLens": true,
     "editor.inlineSuggest.edits.showCollapsed": true,
-    "editor.inlineSuggest.experimental.showOnSuggestConflict": "always"
+    "editor.inlineSuggest.experimental.showOnSuggestConflict": "always",
+    "python.testing.pytestArgs": [
+        "backend"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

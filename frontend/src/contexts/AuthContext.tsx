@@ -5,7 +5,9 @@ import { getCurrentUser, logout as apiLogout, UserProfile } from '@/api/auth';
 import { fetchFeatures, type Feature } from '@/api/subscriptions';
 
 export type UserRole = 'admin' | 'agent' | 'user';
-
+interface FeaturesResponse {
+  results: Feature[];
+}
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
@@ -39,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function loadAllFeatures() {
     try {
       const featuresData = await fetchFeatures();
-      const results = Array.isArray(featuresData) ? featuresData : (featuresData as any).results || [];
+      const results = Array.isArray(featuresData) ? featuresData : (featuresData as FeaturesResponse).results || [];
       setAllFeatures(results);
     } catch (error) {
       console.error('Failed to load features:', error);

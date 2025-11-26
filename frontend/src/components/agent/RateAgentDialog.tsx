@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createAgentRating } from '@/api/admin';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Star } from 'lucide-react';
+import { ApiError } from '@/api/support';
 
 interface RateAgentDialogProps {
     agentId: number;
@@ -41,14 +42,14 @@ export function RateAgentDialog({ agentId, agentName, propertyId, propertyTitle,
             setReview('');
             setRating(5);
         },
-        onError: (error: any) => {
+        onError: (error: ApiError) => {
             toast.error(error.response?.data?.error || 'Failed to submit rating');
         },
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        const data: any = { agent: agentId, rating };
+        const data: { agent: number; rating: number; review?: string; property?: number } = { agent: agentId, rating };
         if (review) data.review = review;
         if (propertyId) data.property = propertyId;
         mutation.mutate(data);

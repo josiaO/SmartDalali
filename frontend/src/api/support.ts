@@ -9,7 +9,14 @@ export interface TicketReply {
   is_admin_reply: boolean;
   created_at: string;
 }
-
+export interface ApiError {
+  response?: {
+    data?: {
+      [key: string]: any; 
+    };
+  };
+  message: string;
+}
 export interface SupportTicket {
   id: string | number; // Backend uses UUID which comes as string
   ticket_number: string;
@@ -44,8 +51,9 @@ export const getSupportTickets = async () => {
     const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/');
     console.log('Support tickets response:', response.data);
     return response.data;
-  } catch (error: any) {
-    console.error('Error fetching support tickets:', error.response?.data || error.message);
+  } catch (error:unknown) {
+    const apiError = error as ApiError
+    console.error('Error fetching support tickets:', apiError.response?.data || apiError.message);
     throw error;
   }
 };
@@ -55,8 +63,9 @@ export const getSupportTicket = async (id: string) => {
     const response = await api.get<SupportTicket>(`/api/v1/properties/support/tickets/${id}/`);
     console.log('Support ticket detail response:', response.data);
     return response.data;
-  } catch (error: any) {
-    console.error('Error fetching support ticket:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    const apiError = error as ApiError
+    console.error('Error fetching support ticket:', apiError.response?.data || apiError.message);
     throw error;
   }
 };
@@ -67,8 +76,9 @@ export const createSupportTicket = async (data: CreateTicketData) => {
     const response = await api.post<SupportTicket>('/api/v1/properties/support/tickets/', data);
     console.log('Support ticket created:', response.data);
     return response.data;
-  } catch (error: any) {
-    console.error('Error creating support ticket:', error.response?.data || error.message);
+  } catch (error: unknown) {
+    const apiError = error as ApiError
+    console.error('Error creating support ticket:', apiError.response?.data || apiError.message);
     throw error;
   }
 };
@@ -95,3 +105,4 @@ export const getSupportStats = async () => {
   const response = await api.get('/api/v1/properties/support/tickets/stats/');
   return response.data;
 };
+

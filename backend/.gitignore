@@ -17,7 +17,13 @@ db.sqlite3.bak
 # Media uploads
 media_root/
 property_images/
+*.jpg
 property_videos/
+*.mp4
+profile_images/
+*.jpg
+test_data/
+
 
 # Environment settings
 .env

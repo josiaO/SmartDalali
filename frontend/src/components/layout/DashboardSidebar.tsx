@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, ElementType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -27,7 +27,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 interface NavItem {
   title: string;
   href: string;
-  icon: any;
+  icon: ElementType;
   disabled?: boolean;
   badge?: string;
   roles?: ('admin' | 'agent' | 'user')[];
@@ -106,7 +106,7 @@ export function DashboardSidebar() {
 
   // Filter menu items based on user role
   const visibleItems = menuItems.filter(item =>
-    !item.roles || item.roles.includes(user?.role as any)
+    !item.roles || (user?.role && item.roles.includes(user.role))
   );
 
   const SidebarContent = ({ onItemClick }: { onItemClick?: () => void }) => (

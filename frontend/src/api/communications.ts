@@ -1,8 +1,9 @@
+import { UserProfile } from './auth';
 import api from '@/lib/axios';
 
 export interface Conversation {
   id: number;
-  participants: any[];
+  participants: UserProfile[];
   last_message?: Message;
   created_at: string;
   updated_at: string;

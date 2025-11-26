@@ -9,3 +9,4 @@ media_root/
 *.jpg
 
 .env
+.md

@@ -22,20 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
 .env
-
-# Vite dev cache
-.vite/
-
-# TypeScript
-*.tsbuildinfo
-
-# Coverage
-coverage/
-
-# Local env files
-.env.local
-.env.*.local
-
-# Keep example env tracked
-!/.env.example

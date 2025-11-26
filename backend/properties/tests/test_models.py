@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from properties.models import (
     AgentProfile,
-    Features,
+    PropertyFeature,
     MediaProperty,
     Payment,
     Property,
@@ -47,9 +47,9 @@ def test_media_property_relationship(property_obj, image_file):
     assert property_obj.MediaProperty.count() == 1
 
 
-def test_features_relationship(property_obj):
-    feature = Features.objects.create(property=property_obj, features="Pool")
-    assert feature in property_obj.Features_Property.all()
+def test_property_feature_relationship(property_obj):
+    feature = PropertyFeature.objects.create(property=property_obj, features="Pool")
+    assert feature in property_obj.property_features.all()
 
 
 def test_property_visit_default_status_and_ordering(property_obj, user):

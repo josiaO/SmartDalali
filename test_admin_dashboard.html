@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Admin Dashboard Test Suite</h1>
+
+        <div class="test-section">
+            <h2>Step 1: Login</h2>
+            <button onclick="testLogin()">Test Login</button>
+            <div id="login-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 2: Test Users Endpoint</h2>
+            <button onclick="testUsers()">Test Users API</button>
+            <div id="users-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 3: Test Features Endpoint</h2>
+            <button onclick="testFeatures()">Test Features API</button>
+            <div id="features-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 4: Test Plans Endpoint</h2>
+            <button onclick="testPlans()">Test Plans API</button>
+            <div id="plans-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 5: Open Admin Dashboard</h2>
+            <button onclick="window.open('http://localhost:8080/admin', '_blank')">Open Dashboard</button>
+            <p class="info">After all tests pass, click this to open the admin dashboard</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+
+        async function testLogin() {
+            const statusDiv = document.getElementById('login-status');
+            statusDiv.innerHTML = '<div class="status info">Testing login...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/v1/accounts/auth/token/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@test.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (!response.ok) throw new Error(`Login failed: ${response.status}`);
+
+                const data = await response.json();
+                localStorage.setItem('access_token', data.access);
+                localStorage.setItem('refresh_token', data.refresh);
+
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        <strong>✅ Login Successful!</strong><br>
+                        Token stored in localStorage
+                    </div>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Login Failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function testUsers() {
+            const statusDiv = document.getElementById('users-status');
+            const token = localStorage.getItem('access_token');
+
+            if (!token) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please login first!</div>';
+                return;
+            }
+
+            statusDiv.innerHTML = '<div class="status info">Testing users endpoint...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/v1/accounts/users/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error(`Failed: ${response.status} ${response.statusText}`);
+
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        <strong>✅ Users Endpoint Working!</strong><br>
+                        Found ${data.length} users<br><br>
+                        <pre>${JSON.stringify(data.slice(0, 2), null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Users Endpoint Failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function testFeatures() {
+            const statusDiv = document.getElementById('features-status');
+            const token = localStorage.getItem('access_token');
+
+            if (!token) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please login first!</div>';
+                return;
+            }
+
+            statusDiv.innerHTML = '<div class="status info">Testing features endpoint...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/v1/properties/features/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error(`Failed: ${response.status} ${response.statusText}`);
+
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        <strong>✅ Features Endpoint Working!</strong><br>
+                        Found ${data.length} features<br><br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Features Endpoint Failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function testPlans() {
+            const statusDiv = document.getElementById('plans-status');
+            const token = localStorage.getItem('access_token');
+
+            if (!token) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please login first!</div>';
+                return;
+            }
+
+            statusDiv.innerHTML = '<div class="status info">Testing plans endpoint...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/v1/properties/features/plans/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error(`Failed: ${response.status} ${response.statusText}`);
+
+                const data = await response.json();
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        <strong>✅ Plans Endpoint Working!</strong><br>
+                        Found ${data.length} plans<br><br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Plans Endpoint Failed</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+
+</html>

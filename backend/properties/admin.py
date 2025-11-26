@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
-    AgentProfile, Property, MediaProperty, Features, PropertyVisit,
-    Payment, SupportTicket, TicketReply
+    AgentProfile, Property, MediaProperty, PropertyFeature, PropertyVisit,
+    Payment, SupportTicket, TicketReply, PropertyLike, Feature,
+    SubscriptionPlan, AgentRating
 )
 
 @admin.register(AgentProfile)
@@ -46,8 +47,8 @@ class PropertyInline(admin.ModelAdmin):
     inlines = [MediaPropertyTabularInline]
 
 
-@admin.register(Features)
-class FeaturesAdmin(admin.ModelAdmin):
+@admin.register(PropertyFeature)
+class PropertyFeatureAdmin(admin.ModelAdmin):
     list_display = ('features', 'property')
     search_fields = ('features',)
 
@@ -111,3 +112,36 @@ class TicketReplyAdmin(admin.ModelAdmin):
     list_filter = ['is_admin_reply', 'created_at']
     search_fields = ['ticket__ticket_number', 'user__username', 'message']
     readonly_fields = ['created_at']
+
+
+@admin.register(PropertyLike)
+class PropertyLikeAdmin(admin.ModelAdmin):
+    list_display = ['property', 'user', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['property__title', 'user__username']
+    readonly_fields = ['created_at']
+
+
+@admin.register(Feature)
+class FeatureAdmin(admin.ModelAdmin):
+    list_display = ['name', 'code', 'is_active', 'created_at']
+    list_filter = ['is_active']
+    search_fields = ['name', 'code']
+    readonly_fields = ['created_at']
+
+
+@admin.register(SubscriptionPlan)
+class SubscriptionPlanAdmin(admin.ModelAdmin):
+    list_display = ['name', 'price', 'duration_days', 'is_active', 'created_at']
+    list_filter = ['is_active']
+    search_fields = ['name']
+    readonly_fields = ['created_at', 'updated_at']
+    filter_horizontal = ['features']
+
+
+@admin.register(AgentRating)
+class AgentRatingAdmin(admin.ModelAdmin):
+    list_display = ['agent', 'user', 'rating', 'property', 'created_at']
+    list_filter = ['rating', 'created_at']
+    search_fields = ['agent__username', 'user__username', 'property__title']
+    readonly_fields = ['created_at', 'updated_at']

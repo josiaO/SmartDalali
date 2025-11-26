@@ -1,0 +1,11 @@
+# Ignore all documentation files
+docs/
+*.md
+*.pdf
+*.docx
+.txt
+
+media_root/
+*.jpg
+
+.env

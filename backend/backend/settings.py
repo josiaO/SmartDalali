@@ -36,8 +36,17 @@ if SENTRY_DSN:
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# Read SECRET_KEY from environment; fallback to a dev key if not provided.
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dhfn74p*yyq0djgdi73&prs88^h903a3a$1s_z4u*-vh@!n+hf')
+# Read SECRET_KEY from environment; REQUIRED in production, fallback only for development.
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if os.getenv('DJANGO_ENV') == 'production':
+        raise ValueError(
+            "SECRET_KEY environment variable is required in production. "
+            "Generate one with: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
+        )
+    # Development fallback only
+    SECRET_KEY = 'django-insecure-dhfn74p*yyq0djgdi73&prs88^h903a3a$1s_z4u*-vh@!n+hf'
+    print("WARNING: Using default SECRET_KEY. Set SECRET_KEY environment variable for production!")
 
 # DEBUG should be False in production. Control via environment variable.
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('1', 'true', 'yes')
@@ -45,14 +54,29 @@ DEBUG = os.getenv('DEBUG', 'True').lower() in ('1', 'true', 'yes')
 # Hosts allowed to serve the app. In production set this explicitly.
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',') if os.getenv('ALLOWED_HOSTS') else ['*']
 
+# Validate production settings
+if os.getenv('DJANGO_ENV') == 'production':
+    if DEBUG:
+        raise ValueError("DEBUG must be False in production. Set DEBUG=False in environment.")
+    if '*' in ALLOWED_HOSTS:
+        raise ValueError("ALLOWED_HOSTS must be explicitly set in production. Do not use '*'.")
+
 # Security-sensitive settings that should be set for production. These default to
 # development-friendly values (False/0) but can be overridden via environment.
-SESSION_COOKIE_SECURE = True  # Always secure when SameSite=None
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = not DEBUG  # Only secure in production
+CSRF_COOKIE_SECURE = not DEBUG  # Only secure in production
 SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() in ('1', 'true', 'yes')
 SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('1', 'true', 'yes')
 SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False').lower() in ('1', 'true', 'yes')
+
+# Additional security headers
+SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME type sniffing
+SECURE_BROWSER_XSS_FILTER = True  # Enable browser XSS filter
+X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+
+# Proxy SSL header for HTTPS behind reverse proxy (e.g., nginx, load balancer)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Cookie settings
 SESSION_COOKIE_SAMESITE = 'Lax'  # Changed from None for security
@@ -60,6 +84,9 @@ CSRF_COOKIE_SAMESITE = 'Lax'  # Changed from None for security
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie instead of session
+SESSION_COOKIE_AGE = 86400  # 24 hours (in seconds)
+SESSION_SAVE_EVERY_REQUEST = False  # Only save session if modified
+
 
 
 # Application definition
@@ -153,7 +180,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 10,
+    'PAGE_SIZE': 100,  # Increased from 10 to show more items by default
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle'
@@ -278,6 +305,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -401,10 +429,14 @@ else:
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
 LANGUAGES = [
-    ('en-us', 'English'),
-    ('sw-tz', 'Swahili'),
+    ('en', 'English'),
+    ('sw', 'Kiswahili'),
+]
+
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
 ]
 
 TIME_ZONE = 'UTC'
@@ -445,6 +477,50 @@ else:
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# SIMPLE_JWT settings
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": os.getenv("JWT_AUDIENCE", "smartdalali:web"), # Use os.getenv for flexibility
+    "ISSUER": os.getenv("JWT_ISSUER", "smartdalali"),         # Use os.getenv for flexibility
+    "JWK_URL": None,
+    "LEEWAY": int(os.getenv("JWT_LEEWAY_SECONDS", "10")),     # Use os.getenv for flexibility
+
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
+
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
+
+    "JTI_CLAIM": "jti",
+
+    # These are for sliding tokens, not standard access/refresh.
+    # Keep default or adjust if sliding tokens are intended.
+    "SLIDING_TOKEN_REFRESH_EXP_CLAIM": "refresh_exp",
+    "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
+    "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
+
+    "TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
+    "TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSerializer",
+    "TOKEN_VERIFY_SERIALIZER": "rest_framework_simplejwt.serializers.TokenVerifySerializer",
+    "TOKEN_BLACKLIST_SERIALIZER": "rest_framework_simplejwt.serializers.TokenBlacklistSerializer",
+    "TOKEN_TYPE_PAIR_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
+    "TOKEN_CLAIM_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
+}
 
 
 

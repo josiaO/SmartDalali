@@ -1,26 +1,58 @@
 from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
-from datetime import timezone
+from django.utils import timezone
 from django.core.validators import FileExtensionValidator
+from django.utils.translation import gettext_lazy as _
 import uuid
 
 PROPERTY_TYPES = (
-        ('House', 'House'),
-        ('Apartment', 'Apartment'),
-        ('Office', 'Office'),
-        ('Land', 'Land'),
-        ('Villa', 'Villa'),
-        ('Shop', 'Shop'),
-        ('Warehouse', 'Warehouse')
+        ('House', _('House')),
+        ('Apartment', _('Apartment')),
+        ('Office', _('Office')),
+        ('Land', _('Land')),
+        ('Villa', _('Villa')),
+        ('Shop', _('Shop')),
+        ('Warehouse', _('Warehouse'))
 )
 
 STATUS_CHOICES = (
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-        ('sold', 'Sold'),
-        ('rented', 'Rented'),
+        ('active', _('Active')),
+        ('inactive', _('Inactive')),
+        ('sold', _('Sold')),
+        ('rented', _('Rented')),
 )
+
+
+class Feature(models.Model):
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, unique=True, help_text="Unique code used in code checks e.g. 'create_listing'")
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, help_text="Global toggle for this feature")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        app_label = 'properties'
+
+
+class SubscriptionPlan(models.Model):
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    duration_days = models.PositiveIntegerField(default=30)
+    description = models.TextField()
+    features = models.ManyToManyField(Feature, blank=True, related_name='plans')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.price})"
+    
+    class Meta:
+        app_label = 'properties'
 
 
 class AgentProfile(models.Model):
@@ -31,6 +63,7 @@ class AgentProfile(models.Model):
     verified = models.BooleanField(default=False)
     subscription_active = models.BooleanField(default=False)
     subscription_expires = models.DateTimeField(blank=True, null=True)
+    current_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name='subscribers')
 
     def __str__(self):
         return self.user.username
@@ -72,13 +105,44 @@ class Property(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Archiving (for sold/rented properties)
+    archived_at = models.DateTimeField(null=True, blank=True, help_text="When property was archived")
+    auto_archive_days = models.IntegerField(default=7, help_text="Days before auto-archiving sold/rented properties")
 
     def get_lat_lng(self):
         """Return persisted latitude and longitude, if available."""
         if self.latitude is not None and self.longitude is not None:
             return str(self.latitude), str(self.longitude)
         return None, None
-
+    
+    def should_be_archived(self):
+        """Check if property should be auto-archived based on status and time."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        if self.archived_at:
+            return False  # Already archived
+        
+        if self.status not in ['sold', 'rented']:
+            return False  # Only archive sold/rented properties
+        
+        # Check if property has been in sold/rented status for auto_archive_days
+        days_since_update = (timezone.now() - self.updated_at).days
+        return days_since_update >= self.auto_archive_days
+    
+    def archive(self):
+        """Archive this property."""
+        from django.utils import timezone
+        if not self.archived_at:
+            self.archived_at = timezone.now()
+            self.save(update_fields=['archived_at'])
+    
+    def unarchive(self):
+        """Unarchive this property."""
+        if self.archived_at:
+            self.archived_at = None
+            self.save(update_fields=['archived_at'])
 
     def __str__(self):
         return self.title
@@ -89,17 +153,16 @@ class Property(models.Model):
 class MediaProperty(models.Model):
     property = models.ForeignKey(Property, related_name="MediaProperty", on_delete=models.CASCADE, null=True, blank=True)
     Images = models.ImageField(upload_to='property_images/', null=True, blank=False)
-    videos = models.FileField(upload_to='property_videos', null=True, blank=False)
-    caption = models.TextField(max_length=100, blank=True, 
-                               validators = [FileExtensionValidator(allowed_extensions=['mp4', 'mov', 'avi', 'webm'])]
-                               )
-
+    videos = models.FileField(upload_to='property_videos', null=True, blank=True,
+                              validators=[FileExtensionValidator(allowed_extensions=['mp4', 'mov', 'avi', 'webm'])]
+                              )
+    caption = models.TextField(max_length=100, blank=True)
     class Meta:
         app_label = 'properties'
         
-class Features(models.Model):
+class PropertyFeature(models.Model):
     features = models.CharField(max_length=100)
-    property = models.ForeignKey(Property,related_name="Features_Property", on_delete=models.SET_NULL, null=True, blank=True)
+    property = models.ForeignKey(Property,related_name="property_features", on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
         app_label = 'properties'
@@ -122,9 +185,15 @@ class PropertyVisit(models.Model):
     def __str__(self):
         return f"Visit to {self.property.title} by {self.visitor.username} on {self.scheduled_time}"
 
+class PropertyView(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='unique_views')
+    viewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='property_views')
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
+        unique_together = ('property', 'viewer')
         app_label = 'properties'
-        ordering = ['scheduled_time']
+        ordering = ['-viewed_at']
 
 
 # Models from payments app
@@ -166,27 +235,27 @@ class Payment(models.Model):
 # Models from support app
 class SupportTicket(models.Model):
     PRIORITY_CHOICES = (
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
-        ('urgent', 'Urgent'),
+        ('low', _('Low')),
+        ('medium', _('Medium')),
+        ('high', _('High')),
+        ('urgent', _('Urgent')),
     )
     
     STATUS_CHOICES = (
-        ('open', 'Open'),
-        ('in_progress', 'In Progress'),
-        ('resolved', 'Resolved'),
-        ('closed', 'Closed'),
+        ('open', _('Open')),
+        ('in_progress', _('In Progress')),
+        ('resolved', _('Resolved')),
+        ('closed', _('Closed')),
     )
     
     CATEGORY_CHOICES = (
-        ('account', 'Account Issues'),
-        ('property', 'Property Listing'),
-        ('payment', 'Payment & Billing'),
-        ('technical', 'Technical Support'),
-        ('report', 'Report a Problem'),
-        ('feature', 'Feature Request'),
-        ('other', 'Other'),
+        ('account', _('Account Issues')),
+        ('property', _('Property Listing')),
+        ('payment', _('Payment & Billing')),
+        ('technical', _('Technical Support')),
+        ('report', _('Report a Problem')),
+        ('feature', _('Feature Request')),
+        ('other', _('Other')),
     )
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -230,3 +299,66 @@ class TicketReply(models.Model):
     
     def __str__(self):
         return f"Reply to {self.ticket.ticket_number} by {self.user.username}"
+
+
+class AgentRating(models.Model):
+    """Agent ratings and reviews from users."""
+    agent = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='received_ratings',
+        help_text="The agent being rated"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='given_ratings',
+        help_text="The user giving the rating"
+    )
+    rating = models.IntegerField(
+        help_text="Rating from 1 to 5 stars"
+    )
+    review = models.TextField(blank=True, null=True, help_text="Optional review text")
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='agent_ratings',
+        help_text="Property this rating is related to (optional)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        app_label = 'properties'
+        # Ensure one rating per user per agent
+        unique_together = ['agent', 'user']
+    
+    def __str__(self):
+        return f"{self.user.username} rated {self.agent.username}: {self.rating}/5"
+    
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.rating < 1 or self.rating > 5:
+            raise ValidationError('Rating must be between 1 and 5')
+        if self.agent == self.user:
+            raise ValidationError('Users cannot rate themselves')
+
+
+class PropertyLike(models.Model):
+    """
+    Track user likes/favorites for properties
+    """
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='liked_properties')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'properties'
+        unique_together = ('property', 'user')  # Prevent duplicate likes
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.property.title}"

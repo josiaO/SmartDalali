@@ -1,38 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchSubscriptionPlans } from '@/api/payments';
-import { FEATURES } from '@/lib/constants';
-import { useUI } from '@/contexts/UIContext';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { fetchPayments, fetchSubscriptionPlans, initiateMpesaPayment } from '@/api/payments';
 
 export function usePayments() {
-    const { showPaymentsDisabled } = useUI();
+  return useQuery({
+    queryKey: ['payments'],
+    queryFn: fetchPayments,
+  });
+}
 
-    // Fetch subscription plans (returns mock data if disabled)
-    const {
-        data: plans = [],
-        isLoading,
-        error,
-    } = useQuery({
-        queryKey: ['subscription-plans'],
-        queryFn: fetchSubscriptionPlans,
-    });
+export function useSubscriptionPlans() {
+  return useQuery({
+    queryKey: ['subscription-plans'],
+    queryFn: fetchSubscriptionPlans,
+  });
+}
 
-    /**
-     * Attempt to initiate payment (will show disabled message)
-     */
-    const initiatePayment = async (planId: number, phoneNumber: string) => {
-        if (!FEATURES.PAYMENTS_ENABLED) {
-            showPaymentsDisabled();
-            return null;
-        }
-        // This won't be reached in launch mode
-        return null;
-    };
-
-    return {
-        plans,
-        isLoading,
-        error,
-        initiatePayment,
-        isPaymentsEnabled: FEATURES.PAYMENTS_ENABLED,
-    };
+export function useInitiateMpesaPayment() {
+  return useMutation({
+    mutationFn: ({ propertyId, phoneNumber }: { propertyId: number; phoneNumber: string }) =>
+      initiateMpesaPayment(propertyId, phoneNumber),
+  });
 }

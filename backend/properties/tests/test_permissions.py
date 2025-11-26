@@ -7,10 +7,13 @@ from accounts.permissions import IsAdmin, IsAgent
 pytestmark = pytest.mark.django_db
 
 
-def test_is_admin_allows_only_superuser(admin_user, user):
+def test_is_admin_allows_admin_and_staff(admin_user, staff_user, user):
     factory = APIRequestFactory()
     request = factory.get("/")
     request.user = admin_user
+    assert IsAdmin().has_permission(request, None)
+
+    request.user = staff_user
     assert IsAdmin().has_permission(request, None)
 
     request.user = user

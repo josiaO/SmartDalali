@@ -1,20 +1,30 @@
-import { AppSidebar } from "@/components/AppSidebar";
-import { Header } from "@/components/Header";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, Navigate } from 'react-router-dom';
+import { DashboardSidebar } from '@/components/layout/DashboardSidebar';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function DashboardLayout() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
     return (
-        <SidebarProvider>
-            <div className="flex min-h-screen w-full">
-                <AppSidebar />
-                <div className="flex-1 flex flex-col">
-                    <Header />
-                    <main className="flex-1 p-6">
-                        <Outlet />
-                    </main>
-                </div>
-            </div>
-        </SidebarProvider>
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      <DashboardSidebar />
+      <main className="flex-1 overflow-y-auto">
+        <div className="container mx-auto p-8">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
 }

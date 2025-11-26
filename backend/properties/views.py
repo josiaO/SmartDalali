@@ -17,12 +17,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from utils.google_maps import geocode_address, build_maps_url
 
 from .models import (
-    PropertyVisit, Property, Payment, SupportTicket, TicketReply, AgentProfile
+    PropertyVisit, Property, Payment, SupportTicket, TicketReply, AgentProfile,
+    Feature, SubscriptionPlan, AgentRating
 )
 from .serializers import (
     PropertyVisitSerializer, SerializerProperty, PaymentSerializer,
     SubscriptionPaymentSerializer, SupportTicketSerializer,
-    CreateSupportTicketSerializer, TicketReplySerializer
+    CreateSupportTicketSerializer, TicketReplySerializer,
+    FeatureSerializer, SubscriptionPlanSerializer,
+    AgentRatingSerializer, CreateAgentRatingSerializer
 )
 from accounts.permissions import IsAdmin
 
@@ -39,7 +42,33 @@ class PropertyListCreateView(generics.ListCreateAPIView):
         'status': ['exact'],
         'is_published': ['exact'],
         'price': ['exact', 'gte', 'lte'],
+        'owner': ['exact'],
     }
+
+    def get_queryset(self):
+        """Filter properties based on user role and archived status."""
+        user = self.request.user
+        owner_filter = self.request.query_params.get('owner')
+        
+        # Admins see all properties including archived
+        if user.is_authenticated and user.is_superuser:
+            return Property.objects.all().order_by('-created_at')
+        
+        # If owner filter is explicitly set, show only that owner's properties (for agent dashboard)
+        if owner_filter:
+            try:
+                owner_id = int(owner_filter)
+                # Only allow agents to filter their own properties, or admins to filter any
+                if user.is_authenticated and (user.is_superuser or user.id == owner_id):
+                    return Property.objects.filter(owner_id=owner_id).order_by('-created_at')
+            except (ValueError, TypeError):
+                pass
+        
+        # Default: show all non-archived, published properties (public browse)
+        return Property.objects.filter(
+            archived_at__isnull=True,
+            is_published=True
+        ).order_by('-created_at')
 
     def get_permissions(self):
         # Allow GET for everyone
@@ -81,6 +110,206 @@ class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
 
 
+class FeatureViewSet(viewsets.ModelViewSet):
+    queryset = Feature.objects.all()
+    serializer_class = FeatureSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None  # Disable pagination for admin endpoints
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+
+
+class SubscriptionPlanViewSet(viewsets.ModelViewSet):
+    queryset = SubscriptionPlan.objects.filter(is_active=True)
+    serializer_class = SubscriptionPlanSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None  # Disable pagination for admin endpoints
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return SubscriptionPlan.objects.all()
+        return SubscriptionPlan.objects.filter(is_active=True)
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'assign_to_agent', 'remove_from_agent']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+    
+    @action(detail=True, methods=['post'])
+    def assign_to_agent(self, request, pk=None):
+        """Assign this subscription plan to an agent (admin only)"""
+        plan = self.get_object()
+        agent_id = request.data.get('agent_id')
+        
+        if not agent_id:
+            return Response(
+                {'error': 'agent_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            agent_id = int(agent_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid agent_id format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the agent user
+        from django.contrib.auth.models import User
+        try:
+            agent_user = User.objects.get(id=agent_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Agent not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verify user is an agent
+        if not agent_user.groups.filter(name='agent').exists():
+            return Response(
+                {'error': 'User is not an agent'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get or create agent profile
+        agent_profile, created = AgentProfile.objects.get_or_create(
+            user=agent_user,
+            defaults={'profile': agent_user.profile}
+        )
+        
+        # Assign plan
+        agent_profile.current_plan = plan
+        agent_profile.subscription_active = True
+        
+        # Set expiry based on plan duration
+        from datetime import timedelta
+        agent_profile.subscription_expires = timezone.now() + timedelta(days=plan.duration_days)
+        agent_profile.save()
+        
+        return Response({
+            'message': f'Plan "{plan.name}" assigned to agent {agent_user.username}',
+            'agent': {
+                'id': agent_user.id,
+                'username': agent_user.username,
+                'email': agent_user.email,
+            },
+            'subscription': {
+                'plan': plan.name,
+                'expires_at': agent_profile.subscription_expires.isoformat(),
+                'features': [f.code for f in plan.features.all()]
+            }
+        })
+    
+    @action(detail=True, methods=['post'])
+    def remove_from_agent(self, request, pk=None):
+        """Remove subscription plan from an agent (admin only)"""
+        plan = self.get_object()
+        agent_id = request.data.get('agent_id')
+        
+        if not agent_id:
+            return Response(
+                {'error': 'agent_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            agent_id = int(agent_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid agent_id format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from django.contrib.auth.models import User
+        try:
+            agent_user = User.objects.get(id=agent_id)
+            agent_profile = agent_user.agentprofile
+        except (User.DoesNotExist, AgentProfile.DoesNotExist):
+            return Response(
+                {'error': 'Agent profile not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Remove plan
+        agent_profile.current_plan = None
+        agent_profile.subscription_active = False
+        agent_profile.subscription_expires = None
+        agent_profile.save()
+        
+        return Response({
+            'message': f'Subscription removed from agent {agent_user.username}'
+        })
+    
+    @action(detail=True, methods=['get'])
+    def subscribers(self, request, pk=None):
+        """Get list of agents subscribed to this plan (admin only)"""
+        plan = self.get_object()
+        
+        subscribers = AgentProfile.objects.filter(
+            current_plan=plan,
+            subscription_active=True
+        ).select_related('user', 'user__profile')
+        
+        data = [{
+            'id': sub.user.id,
+            'username': sub.user.username,
+            'email': sub.user.email,
+            'agency_name': sub.agency_name,
+            'subscription_expires': sub.subscription_expires.isoformat() if sub.subscription_expires else None,
+            'verified': sub.verified,
+        } for sub in subscribers]
+        
+        return Response({
+            'plan': plan.name,
+            'total_subscribers': len(data),
+            'subscribers': data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get subscription plan statistics (admin only)"""
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        plans = SubscriptionPlan.objects.all()
+        stats = []
+        
+        for plan in plans:
+            active_subs = AgentProfile.objects.filter(
+                current_plan=plan,
+                subscription_active=True
+            ).count()
+            
+            total_subs = AgentProfile.objects.filter(
+                current_plan=plan
+            ).count()
+            
+            stats.append({
+                'id': plan.id,
+                'name': plan.name,
+                'price': str(plan.price),
+                'duration_days': plan.duration_days,
+                'is_active': plan.is_active,
+                'active_subscribers': active_subs,
+                'total_subscribers': total_subs,
+                'features_count': plan.features.count(),
+            })
+        
+        return Response({
+            'total_plans': plans.count(),
+            'active_plans': plans.filter(is_active=True).count(),
+            'plans': stats
+        })
+
+
+
 class PropertyVisitListCreateView(generics.ListCreateAPIView):
     queryset = PropertyVisit.objects.all()
     serializer_class = PropertyVisitSerializer
@@ -95,6 +324,10 @@ class PropertyVisitListCreateView(generics.ListCreateAPIView):
             return PropertyVisit.objects.filter(Q(property__owner=user) | Q(visitor=user))
         # Regular users only see their own visits
         return PropertyVisit.objects.filter(visitor=user)
+    
+    def perform_create(self, serializer):
+        """Automatically set the visitor to the current user"""
+        serializer.save(visitor=self.request.user)
 
 
 class PropertyVisitRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -107,7 +340,7 @@ class PropertyVisitRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIVi
 class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PaymentSerializer
-    http_method_names = ['get', 'head', 'options']
+    http_method_names = ['get', 'head', 'options', 'post']
 
     def get_queryset(self):
         """Filter payments based on user role."""
@@ -247,8 +480,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
         return Response({"status": "Payment retry initiated"})
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def stk_push(request, property_id):
@@ -587,11 +818,67 @@ def agent_stats(request):
         status='completed'
     ).aggregate(total=Sum('amount'))['total'] or 0
 
+    # Get recent viewers (visits)
+    recent_visits = PropertyVisit.objects.filter(
+        property__owner=user
+    ).select_related('visitor', 'property').order_by('-created_at')[:5]
+    
+    recent_viewers = [{
+        'id': visit.id,
+        'visitor_name': f"{visit.visitor.first_name} {visit.visitor.last_name}" if visit.visitor.first_name else visit.visitor.username,
+        'visitor_email': visit.visitor.email,
+        'property_title': visit.property.title,
+        'date': visit.created_at,
+        'status': visit.status
+    } for visit in recent_visits]
+
+    # Get recent reviews
+    recent_ratings = AgentRating.objects.filter(
+        agent=user
+    ).select_related('user', 'property').order_by('-created_at')[:5]
+
+    recent_reviews = [{
+        'id': rating.id,
+        'reviewer_name': f"{rating.user.first_name} {rating.user.last_name}" if rating.user.first_name else rating.user.username,
+        'rating': rating.rating,
+        'comment': rating.review,
+        'property_title': rating.property.title if rating.property else None,
+        'date': rating.created_at
+    } for rating in recent_ratings]
+
+    # Get most viewed properties (agent's properties)
+    most_viewed = agent_properties.order_by('-view_count')[:5]
+    most_viewed_data = [{
+        'id': prop.id,
+        'title': prop.title,
+        'view_count': prop.view_count,
+        'price': float(prop.price),
+        'image': prop.MediaProperty.first().Images.url if prop.MediaProperty.exists() and prop.MediaProperty.first().Images else None
+    } for prop in most_viewed]
+
+    # Get most liked properties (agent's properties)
+    from django.db.models import Count
+    most_liked = agent_properties.annotate(
+        like_count=Count('likes')
+    ).order_by('-like_count')[:5]
+    
+    most_liked_data = [{
+        'id': prop.id,
+        'title': prop.title,
+        'like_count': prop.like_count,
+        'price': float(prop.price),
+        'image': prop.MediaProperty.first().Images.url if prop.MediaProperty.exists() and prop.MediaProperty.first().Images else None
+    } for prop in most_liked]
+
     return Response({
         'total_listings': total_listings,
         'total_views': total_views,
         'total_inquiries': total_inquiries,
         'earnings': float(total_earnings),
+        'recent_viewers': recent_viewers,
+        'recent_reviews': recent_reviews,
+        'most_viewed': most_viewed_data,
+        'most_liked': most_liked_data,
     })
 
 
@@ -684,10 +971,12 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
-        if not (request.user.is_superuser or request.user.is_staff):
+        ticket = self.get_object()
+        
+        # Allow ticket owner or admin to close
+        if not (ticket.user == request.user or request.user.is_superuser or request.user.is_staff):
             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        ticket = self.get_object()
         ticket.status = 'closed'
         ticket.closed_at = timezone.now()
         ticket.save()
@@ -711,3 +1000,183 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
         
         return Response(stats)
 
+
+class AgentRatingViewSet(viewsets.ModelViewSet):
+    """ViewSet for agent ratings and reviews."""
+    serializer_class = AgentRatingSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or user.is_staff:
+            # Admin can see all ratings
+            return AgentRating.objects.all().select_related('agent', 'user', 'property')
+        else:
+            # Users can see ratings they gave or received
+            return AgentRating.objects.filter(
+                Q(user=user) | Q(agent=user)
+            ).select_related('agent', 'user', 'property')
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreateAgentRatingSerializer
+        return AgentRatingSerializer
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def agent_stats(self, request):
+        """Get rating statistics for a specific agent."""
+        agent_id = request.query_params.get('agent_id')
+        
+        if not agent_id:
+            return Response(
+                {'error': 'agent_id parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            agent_id = int(agent_id)
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'Invalid agent_id format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from django.contrib.auth.models import User
+        try:
+            agent = User.objects.get(id=agent_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Agent not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get all ratings for this agent
+        ratings = AgentRating.objects.filter(agent=agent)
+        total_ratings = ratings.count()
+        
+        if total_ratings == 0:
+            return Response({
+                'agent_id': agent_id,
+                'agent_name': agent.username,
+                'total_ratings': 0,
+                'average_rating': 0,
+                'rating_distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+            })
+        
+        # Calculate average rating
+        from django.db.models import Avg
+        avg_rating = ratings.aggregate(avg=Avg('rating'))['avg']
+        
+        # Get rating distribution
+        rating_dist = ratings.values('rating').annotate(count=Count('id'))
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for item in rating_dist:
+            distribution[item['rating']] = item['count']
+        
+        return Response({
+            'agent_id': agent_id,
+            'agent_name': agent.username,
+            'total_ratings': total_ratings,
+            'average_rating': round(avg_rating, 2) if avg_rating else 0,
+            'rating_distribution': distribution
+        })
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAdmin])
+    def stats(self, request):
+        """Get overall rating statistics (admin only)."""
+        from django.db.models import Avg
+        from django.contrib.auth.models import User
+        
+        total_ratings = AgentRating.objects.count()
+        avg_rating = AgentRating.objects.aggregate(avg=Avg('rating'))['avg']
+        
+        # Get top rated agents
+        agents_with_ratings = User.objects.filter(
+            received_ratings__isnull=False
+        ).annotate(
+            avg_rating=Avg('received_ratings__rating'),
+            rating_count=Count('received_ratings')
+        ).order_by('-avg_rating')[:10]
+        
+        top_agents = [{
+            'id': agent.id,
+            'username': agent.username,
+            'email': agent.email,
+            'average_rating': round(agent.avg_rating, 2) if agent.avg_rating else 0,
+            'total_ratings': agent.rating_count
+        } for agent in agents_with_ratings]
+        
+        return Response({
+            'total_ratings': total_ratings,
+            'average_rating': round(avg_rating, 2) if avg_rating else 0,
+            'top_rated_agents': top_agents
+        })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_property_like(request, property_id):
+    """
+    Toggle like status for a property.
+    If user has liked it, unlike it. If not liked, like it.
+    """
+    try:
+        property_obj = Property.objects.get(id=property_id)
+    except Property.DoesNotExist:
+        return Response({'error': 'Property not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    from .models import PropertyLike
+    
+    # Check if user has already liked this property
+    existing_like = PropertyLike.objects.filter(property=property_obj, user=request.user).first()
+    
+    if existing_like:
+        # Unlike - delete the like
+        existing_like.delete()
+        return Response({
+            'liked': False,
+            'like_count': property_obj.likes.count(),
+            'message': 'Property unliked'
+        })
+    else:
+        # Like - create new like
+        PropertyLike.objects.create(property=property_obj, user=request.user)
+        return Response({
+            'liked': True,
+            'like_count': property_obj.likes.count(),
+            'message': 'Property liked'
+        })
+
+
+@api_view(['POST'])
+def track_property_view(request, property_id):
+    """
+    Increment view count for a property.
+    For authenticated users, only count unique views.
+    For anonymous users, count every view (or implement session-based tracking if needed).
+    """
+    try:
+        property_obj = Property.objects.get(id=property_id)
+        
+        if request.user.is_authenticated:
+            from .models import PropertyView
+            # Check if user has already viewed this property
+            if not PropertyView.objects.filter(property=property_obj, viewer=request.user).exists():
+                PropertyView.objects.create(property=property_obj, viewer=request.user)
+                property_obj.view_count += 1
+                property_obj.save(update_fields=['view_count'])
+        else:
+            # For anonymous users, we just increment for now
+            # Ideally we would use session or IP tracking here
+            property_obj.view_count += 1
+            property_obj.save(update_fields=['view_count'])
+        
+        return Response({
+            'view_count': property_obj.view_count,
+            'message': 'View tracked'
+        })
+    except Property.DoesNotExist:
+        return Response({'error': 'Property not found'}, status=status.HTTP_404_NOT_FOUND)

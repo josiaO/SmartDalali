@@ -1,74 +1,51 @@
-import api from '@/lib/api';
-import { API_ENDPOINTS, FEATURES } from '@/lib/constants';
+import api from '@/lib/axios';
 
 export interface Conversation {
-    id: number;
-    participants: User[];
-    last_message?: Message;
-    unread_count: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface User {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-    profile_picture?: string;
+  id: number;
+  participants: any[];
+  last_message?: Message;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Message {
-    id: number;
-    conversation: number;
-    sender: User;
-    content: string;
-    created_at: string;
-    read: boolean;
+  id: number;
+  conversation: number;
+  sender: number;
+  content: string;
+  created_at: string;
+  read: boolean;
 }
 
-/**
- * Fetch all conversations (DISABLED IN LAUNCH MODE)
- * Returns empty array if messaging is disabled
- */
+export interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
 export async function fetchConversations(): Promise<Conversation[]> {
-    if (!FEATURES.MESSAGING_ENABLED) {
-        // Return empty array for disabled feature
-        return [];
-    }
-
-    const response = await api.get(API_ENDPOINTS.COMMUNICATIONS.CONVERSATIONS);
-    return response.data;
+  const res = await api.get('/api/v1/communications/conversations/');
+  return res.data;
 }
 
-/**
- * Fetch messages for a conversation (DISABLED IN LAUNCH MODE)
- * Returns empty array if messaging is disabled
- */
-export async function fetchMessages(conversationId: string): Promise<Message[]> {
-    if (!FEATURES.MESSAGING_ENABLED) {
-        // Return empty array for disabled feature
-        return [];
-    }
-
-    const response = await api.get(API_ENDPOINTS.COMMUNICATIONS.MESSAGES(conversationId));
-    return response.data;
+export async function fetchMessages(conversationId: number): Promise<Message[]> {
+  const res = await api.get('/api/v1/communications/messages/', {
+    params: { conversation: conversationId }
+  });
+  return res.data;
 }
 
-/**
- * Send a message (DISABLED IN LAUNCH MODE)
- * Throws error if messaging is disabled
- */
-export async function sendMessage(
-    conversationId: string,
-    content: string
-): Promise<Message> {
-    if (!FEATURES.MESSAGING_ENABLED) {
-        throw new Error('Messaging is currently disabled');
-    }
+export async function sendMessage(conversationId: number, content: string): Promise<Message> {
+  const res = await api.post('/api/v1/communications/messages/', {
+    conversation: conversationId,
+    content
+  });
+  return res.data;
+}
 
-    const response = await api.post(API_ENDPOINTS.COMMUNICATIONS.MESSAGES(conversationId), {
-        content,
-    });
-    return response.data;
+export async function fetchNotifications(): Promise<Notification[]> {
+  const res = await api.get('/api/v1/communications/notifications/');
+  return res.data;
 }

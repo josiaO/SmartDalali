@@ -40,18 +40,21 @@ class UserSerializer(serializers.ModelSerializer):
                 'agency_name': agent_profile.agency_name,
                 'phone': agent_profile.phone,
                 'verified': agent_profile.verified,
+                'verified': agent_profile.verified,
                 'subscription_active': agent_profile.subscription_active,
-                'subscription_expires': agent_profile.subscription_expires
+                'subscription_expires': agent_profile.subscription_expires,
+                'current_plan': {
+                    'id': agent_profile.current_plan.id,
+                    'name': agent_profile.current_plan.name,
+                    'features': [f.code for f in agent_profile.current_plan.features.all()]
+                } if agent_profile.current_plan else None
             }
         except:
             return None
     
     def get_role(self, obj):
-        # Return role from profile if available, otherwise default to user
-        try:
-            return obj.profile.role
-        except:
-            return 'user'
+        # Use centralized role determination logic
+        return get_user_role(obj)
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
@@ -75,10 +78,20 @@ class AgentProfileSerializer(serializers.ModelSerializer):
         model = AgentProfile
         fields = [
             'id', 'user', 'user_email', 'user_username', 'agency_name', 'phone',
-            'verified', 'subscription_active', 'subscription_expires',
+            'verified', 'subscription_active', 'subscription_expires', 'current_plan',
             'first_name', 'last_name', 'property_count'
         ]
         read_only_fields = ['id', 'user', 'user_email', 'user_username', 'first_name', 'last_name']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.current_plan:
+            representation['current_plan'] = {
+                'id': instance.current_plan.id,
+                'name': instance.current_plan.name,
+                'features': [f.code for f in instance.current_plan.features.all()]
+            }
+        return representation
     
     def get_property_count(self, obj):
         from properties.models import Property

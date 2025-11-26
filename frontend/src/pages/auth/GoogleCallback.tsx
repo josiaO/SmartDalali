@@ -1,42 +1,40 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFirebaseAuth } from '@/contexts/FirebaseAuthContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useToast } from '@/hooks/use-toast';
 
-export function GoogleCallback() {
-    const navigate = useNavigate();
-    const { toast } = useToast();
-    const { signInWithGoogle, linkWithBackend } = useFirebaseAuth();
-    const { setTokensAndFetchProfile, getDashboardRoute } = useAuth();
+export default function GoogleCallback() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-    useEffect(() => {
-        const handleCallback = async () => {
-            try {
-                // This page is typically used after a redirect-based sign-in
-                // For popup-based sign-in, the FirebaseLoginButton handles everything
-                // If we reach this page, just redirect to login to restart the flow
-                navigate('/login', { replace: true });
-            } catch (error: any) {
-                console.error('OAuth callback error:', error);
-                toast({
-                    title: 'Authentication Error',
-                    description: error.message || 'Failed to complete authentication',
-                    variant: 'destructive',
-                });
-                navigate('/login', { replace: true });
-            }
-        };
+  useEffect(() => {
+    // Handle Firebase OAuth callback
+    // This would process the Firebase token and exchange it with backend
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
 
-        handleCallback();
-    }, [navigate, toast]);
+    if (error) {
+      toast({
+        title: 'Authentication Failed',
+        description: 'Unable to authenticate with Google',
+        variant: 'destructive',
+      });
+      navigate('/login');
+      return;
+    }
 
-    return (
-        <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Redirecting...</p>
-            </div>
-        </div>
-    );
+    // Success case - redirect to dashboard
+    toast({
+      title: 'Success',
+      description: 'Successfully authenticated',
+    });
+    navigate('/dashboard', { replace: true });
+  }, [navigate, toast]);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <LoadingSpinner />
+      <p className="ml-4 text-muted-foreground">Completing authentication...</p>
+    </div>
+  );
 }

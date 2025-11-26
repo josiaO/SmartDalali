@@ -22,6 +22,8 @@ auth_patterns = [
     path('auth/routes/', views.get_user_routes, name='get_user_routes'),
     path('auth/<str:username>/activate/', views.activate, name='activate'),
     path('firebase-login/', views.firebase_login, name='firebase_login'),
+    path('auth/password-reset/', views.PasswordResetView.as_view(), name='password_reset'),
+    path('auth/password-reset/confirm/', views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 ]
 
 profile_patterns = [

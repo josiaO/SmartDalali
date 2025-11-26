@@ -1,3 +1,10 @@
-// Re-export the existing useAuth from AuthContext
-// The AuthContext already has all the functionality we need
-export { useAuth } from '@/contexts/AuthContext';
+import { useContext } from 'react';
+import { AuthContext } from '@/contexts/AuthContext';
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}

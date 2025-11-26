@@ -1,75 +1,97 @@
-import api from '@/lib/api';
-import { API_ENDPOINTS } from '@/lib/constants';
-
-export interface Ticket {
-    id: number;
-    subject: string;
-    description: string;
-    status: 'open' | 'in_progress' | 'resolved' | 'closed';
-    priority: 'low' | 'medium' | 'high';
-    created_by: User;
-    assigned_to?: User;
-    created_at: string;
-    updated_at: string;
-    replies?: TicketReply[];
-}
-
-export interface User {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-}
+import api from '@/lib/axios';
 
 export interface TicketReply {
-    id: number;
-    ticket: number;
-    message: string;
-    created_by: User;
-    created_at: string;
+  id: number;
+  user: number;
+  user_name: string;
+  user_role: 'admin' | 'agent' | 'user';
+  message: string;
+  is_admin_reply: boolean;
+  created_at: string;
+}
+
+export interface SupportTicket {
+  id: string | number; // Backend uses UUID which comes as string
+  ticket_number: string;
+  user: number;
+  user_name: string;
+  user_email: string;
+  title: string;
+  description: string;
+  category: 'account' | 'property' | 'payment' | 'technical' | 'report' | 'feature' | 'other';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  assigned_to: number | null;
+  assigned_to_name: string | null;
+  admin_reply: string | null;
+  user_reply: string | null;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  replies: TicketReply[];
+  reply_count: number;
 }
 
 export interface CreateTicketData {
-    subject: string;
-    description: string;
-    priority?: 'low' | 'medium' | 'high';
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
 }
 
-export interface ReplyToTicketData {
-    message: string;
-}
-
-/**
- * Fetch all support tickets for the current user
- */
-export async function fetchTickets(): Promise<Ticket[]> {
-    const response = await api.get(API_ENDPOINTS.SUPPORT.TICKETS);
+export const getSupportTickets = async () => {
+  try {
+    const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/');
+    console.log('Support tickets response:', response.data);
     return response.data;
-}
+  } catch (error: any) {
+    console.error('Error fetching support tickets:', error.response?.data || error.message);
+    throw error;
+  }
+};
 
-/**
- * Fetch single ticket by ID
- */
-export async function fetchTicket(id: string): Promise<Ticket> {
-    const response = await api.get(API_ENDPOINTS.SUPPORT.TICKET_DETAIL(id));
+export const getSupportTicket = async (id: string) => {
+  try {
+    const response = await api.get<SupportTicket>(`/api/v1/properties/support/tickets/${id}/`);
+    console.log('Support ticket detail response:', response.data);
     return response.data;
-}
+  } catch (error: any) {
+    console.error('Error fetching support ticket:', error.response?.data || error.message);
+    throw error;
+  }
+};
 
-/**
- * Create a new support ticket
- */
-export async function createTicket(data: CreateTicketData): Promise<Ticket> {
-    const response = await api.post(API_ENDPOINTS.SUPPORT.TICKETS, data);
+export const createSupportTicket = async (data: CreateTicketData) => {
+  try {
+    console.log('Creating support ticket with data:', data);
+    const response = await api.post<SupportTicket>('/api/v1/properties/support/tickets/', data);
+    console.log('Support ticket created:', response.data);
     return response.data;
-}
+  } catch (error: any) {
+    console.error('Error creating support ticket:', error.response?.data || error.message);
+    throw error;
+  }
+};
 
-/**
- * Reply to a support ticket
- */
-export async function replyToTicket(
-    id: string,
-    data: ReplyToTicketData
-): Promise<TicketReply> {
-    const response = await api.post(API_ENDPOINTS.SUPPORT.REPLY(id), data);
-    return response.data;
-}
+export const replyToTicket = async (id: string, message: string) => {
+  const response = await api.post<TicketReply>(`/api/v1/properties/support/tickets/${id}/reply/`, { message });
+  return response.data;
+};
+
+export const closeTicket = async (id: string) => {
+  const response = await api.post(`/api/v1/properties/support/tickets/${id}/close/`);
+  return response.data;
+};
+
+// Admin only
+export const getAllSupportTickets = async () => {
+  // The backend endpoint filters based on user role, so this is the same endpoint.
+  // Admins see all, users see theirs.
+  const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/');
+  return response.data;
+};
+
+export const getSupportStats = async () => {
+  const response = await api.get('/api/v1/properties/support/tickets/stats/');
+  return response.data;
+};

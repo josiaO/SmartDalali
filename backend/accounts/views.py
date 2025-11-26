@@ -21,6 +21,11 @@ from properties.models import AgentProfile, Property
 from .serializers import UserSerializer, UserProfileSerializer, AgentProfileSerializer
 from .forms import SignupForm, ActivationForm
 from .roles import get_user_role, is_agent
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from rest_framework.views import APIView
 
 
 class UserManagementViewSet(viewsets.ReadOnlyModelViewSet):
@@ -214,12 +219,26 @@ class MyTokenObtainPairView(TokenObtainPairView):
             from django.contrib.auth import get_user_model
             UserModel = get_user_model()
             try:
-                u = UserModel.objects.get(email__iexact=data.get('email'))
+                # Use exact email match (case-insensitive but exact)
+                email_input = data.get('email', '').strip()
+                u = UserModel.objects.get(email__iexact=email_input)
                 data['username'] = u.get_username()
                 # Log resolved username for debugging login/token issues
                 try:
-                    logger.info('TokenObtain: resolved email=%s to username=%s id=%s', data.get('email'), data['username'], u.id)
+                    logger.info('TokenObtain: resolved email=%s to username=%s id=%s', email_input, data['username'], u.id)
                 except Exception:
+                    pass
+            except UserModel.MultipleObjectsReturned:
+                # Critical: Multiple users with same email (should not happen but handle it)
+                logger.error('TokenObtain: Multiple users found for email=%s', email_input)
+                # Try to get the exact match (case-sensitive)
+                try:
+                    u = UserModel.objects.get(email=email_input)
+                    data['username'] = u.get_username()
+                    logger.warning('TokenObtain: Using exact match for email=%s, username=%s id=%s', email_input, data['username'], u.id)
+                except Exception:
+                    # If still fails, leave username absent so serializer returns error
+                    logger.error('TokenObtain: Could not resolve duplicate email=%s', email_input)
                     pass
             except UserModel.DoesNotExist:
                 # leave username absent so the serializer will return the usual error
@@ -604,10 +623,12 @@ def _update_profile_payload(user, data, files):
         profile.address = address
         profile_changed = True
 
+    # Handle profile image upload - support both 'image' and 'profile_picture' field names
     image_file = (
         files.get('profile.image')
         or files.get('profile_image')
         or files.get('image')
+        or files.get('profile_picture')  # Frontend sends this
     )
     if image_file is not None:
         profile.image = image_file
@@ -756,4 +777,81 @@ def profile_view(request):
     properties = Property.objects.filter(owner=user_pk)
     return render(request, 'account/profile.html',
                   {'profile': profile, 'propertys': properties, 'request': request})
+
+
+class PasswordResetView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = None # We use Django form directly for simplicity and security
+        form = PasswordResetForm(request.data)
+        if form.is_valid():
+            # opts = {
+            #     'use_https': request.is_secure(),
+            #     'token_generator': default_token_generator,
+            #     'from_email': settings.DEFAULT_FROM_EMAIL,
+            #     'email_template_name': 'registration/password_reset_email.html',
+            #     'subject_template_name': 'registration/password_reset_subject.txt',
+            # }
+            # We need to customize the email content to point to frontend URL
+            # Standard form.save() sends email with a link to backend view usually if not customized.
+            # We want to send a link to the frontend: FRONTEND_URL/reset-password/<uid>/<token>
+            
+            email = form.cleaned_data["email"]
+            users = form.get_users(email)
+            if users:
+                for user in users:
+                    uid = urlsafe_base64_encode(force_bytes(user.pk))
+                    token = default_token_generator.make_token(user)
+                    
+                    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                    reset_link = f"{frontend_url}/reset-password/{uid}/{token}"
+                    
+                    subject = "Password Reset Request"
+                    message = f"Click the link below to reset your password:\n{reset_link}\n\nIf you didn't request this, please ignore this email."
+                    
+                    try:
+                        send_mail(
+                            subject,
+                            message,
+                            settings.DEFAULT_FROM_EMAIL,
+                            [user.email],
+                            fail_silently=False,
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send password reset email to {user.email}: {e}")
+                        return Response({'error': 'Failed to send email'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                        
+            return Response({'message': 'Password reset email sent if account exists.'})
+        else:
+            return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        password = request.data.get('new_password')
+        re_password = request.data.get('re_new_password')
+
+        if not all([uidb64, token, password, re_password]):
+            return Response({'error': 'All fields are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if password != re_password:
+            return Response({'error': 'Passwords do not match'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user is not None and default_token_generator.check_token(user, token):
+            user.set_password(password)
+            user.save()
+            return Response({'message': 'Password has been reset successfully.'})
+        else:
+            return Response({'error': 'Invalid link or expired token'}, status=status.HTTP_400_BAD_REQUEST)
 

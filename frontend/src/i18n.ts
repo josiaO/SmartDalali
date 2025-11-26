@@ -1,0 +1,739 @@
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+
+i18n
+    .use(LanguageDetector)
+    .use(initReactI18next)
+    .init({
+        fallbackLng: 'en',
+        debug: false,
+        interpolation: {
+            escapeValue: false,
+        },
+        detection: {
+            order: ['localStorage', 'navigator'],
+            caches: ['localStorage'],
+        },
+        resources: {
+            en: {
+                translation: {
+                    // Navigation
+                    nav: {
+                        home: 'Home',
+                        properties: 'Properties',
+                        agents: 'Agents',
+                        about: 'About',
+                        contact: 'Contact',
+                        login: 'Login',
+                        signup: 'Sign Up',
+                        dashboard: 'Dashboard',
+                        logout: 'Logout',
+                    },
+                    // Sidebar
+                    sidebar: {
+                        dashboard: 'Dashboard',
+                        all_properties: 'All Properties',
+                        users: 'Users',
+                        features: 'Features',
+                        my_properties: 'My Properties',
+                        profile: 'Profile',
+                        browse_properties: 'Browse Properties',
+                        messages: 'Messages',
+                        support: 'Support',
+                        list_property: 'List Property',
+                        soon: 'Soon',
+                    },
+                    // Hero Section
+                    hero: {
+                        title: 'Find Your Dream Property',
+                        subtitle: 'Discover the best properties in Tanzania',
+                        searchPlaceholder: 'Search by location, property type...',
+                        search: 'Search',
+                    },
+                    // Home Page
+                    home: {
+                        hero: {
+                            badge: 'Tanzania\'s Leading Property Platform',
+                            title: 'Welcome to',
+                            subtitle: 'Discover your perfect property in Tanzania. Browse thousands of verified listings from trusted agents across the country.',
+                            browse: 'Browse Properties',
+                            getStarted: 'Get Started'
+                        },
+                        stats: {
+                            properties: 'Properties Listed',
+                            agents: 'Verified Agents',
+                            users: 'Happy Users',
+                            satisfaction: 'Satisfaction Rate'
+                        },
+                        about: {
+                            title: 'About SmartDalali',
+                            description: 'SmartDalali is Tanzania\'s premier property marketplace, connecting buyers, sellers, and renters with verified agents and quality properties across the country.',
+                            point1: 'Verified property listings with detailed information and photos',
+                            point2: 'Connect with professional and certified real estate agents',
+                            point3: 'Advanced search and filtering to find your perfect match'
+                        },
+                        features: {
+                            title: 'Why Choose SmartDalali',
+                            subtitle: 'We provide the best service for finding and listing properties in Tanzania',
+                            verified: {
+                                title: 'Verified Listings',
+                                description: 'All properties are verified and authenticated by our team for your safety'
+                            },
+                            search: {
+                                title: 'Smart Search',
+                                description: 'Advanced search filters to find exactly what you need quickly'
+                            },
+                            insights: {
+                                title: 'Market Insights',
+                                description: 'Get real-time market data and property trends in Tanzania'
+                            },
+                            agents: {
+                                title: 'Professional Agents',
+                                description: 'Connect with verified and experienced real estate professionals'
+                            },
+                            locations: {
+                                title: 'Prime Locations',
+                                description: 'Properties in all major cities and regions across Tanzania'
+                            },
+                            support: {
+                                title: '24/7 Support',
+                                description: 'Our dedicated team is here to help you every step of the way'
+                            }
+                        },
+                        howItWorks: {
+                            title: 'How It Works',
+                            subtitle: 'Find your dream property in three simple steps',
+                            step1: {
+                                title: 'Search Properties',
+                                description: 'Browse our extensive database of verified properties across Tanzania'
+                            },
+                            step2: {
+                                title: 'Connect with Agents',
+                                description: 'Get in touch with professional agents to schedule viewings'
+                            },
+                            step3: {
+                                title: 'Secure Your Property',
+                                description: 'Complete the process with confidence and move into your new home'
+                            }
+                        },
+                        cta: {
+                            title: 'Ready to Find Your Dream Property?',
+                            subtitle: 'Join thousands of Tanzanians who have found their perfect homes through SmartDalali',
+                            signup: 'Create Free Account',
+                            explore: 'Explore Properties'
+                        },
+                        contact: {
+                            title: 'Need Help? Contact Us'
+                        }
+                    },
+                    // Common
+                    common: {
+                        loading: 'Loading...',
+                        error: 'Error',
+                        success: 'Success',
+                        step: 'Step',
+                        of: 'of',
+                        review: 'Review',
+                        uploaded: 'uploaded',
+                        locating: 'Locating...',
+                        publishing: 'Publishing...',
+                        save: 'Save',
+                        cancel: 'Cancel',
+                        delete: 'Delete',
+                        edit: 'Edit',
+                        view: 'View',
+                        back: 'Back',
+                        next: 'Next',
+                        previous: 'Previous',
+                        submit: 'Submit',
+                        close: 'Close',
+                        confirm: 'Confirm',
+                        yes: 'Yes',
+                        no: 'No',
+                        optional: 'Optional',
+                        required: 'Required',
+                    },
+                    // Property
+                    property: {
+                        title: 'Property',
+                        properties: 'Properties',
+                        price: 'Price',
+                        location: 'Location',
+                        basic_info: 'Basic Information',
+                        details: 'Property Details',
+                        media: 'Photos & Videos',
+                        ready_to_publish: 'Ready to publish',
+                        publish_listing: 'Publish Listing',
+                        total_rooms: 'Total Rooms',
+                        square_feet: 'Square Feet',
+                        auto_locate_coordinates: 'Auto-locate Coordinates',
+                        latitude: 'Latitude',
+                        longitude: 'Longitude',
+                        city_placeholder: 'e.g., Dar es Salaam',
+                        address_placeholder: 'e.g., Masaki Peninsula',
+                        bedrooms: 'Bedrooms',
+                        bathrooms: 'Bathrooms',
+                        rooms: 'Rooms',
+                        area: 'Area',
+                        type: 'Type',
+                        status: 'Status',
+                        description: 'Description',
+                        features: 'Features',
+                        contact_agent: 'Contact Agent',
+                        schedule_visit: 'Schedule Visit',
+                        book_visit: 'Book a Visit',
+                        for_sale: 'For Sale',
+                        for_rent: 'For Rent',
+                        sold: 'Sold',
+                        rented: 'Rented',
+                        add_property: 'Add Property',
+                        edit_property: 'Edit Property',
+                        delete_property: 'Delete Property',
+                        property_details: 'Property Details',
+                        parking: 'Parking',
+                        year_built: 'Year Built',
+                        address: 'Address',
+                        city: 'City',
+                        images: 'Images',
+                        videos: 'Videos',
+                        upload_images: 'Upload Images',
+                        upload_videos: 'Upload Videos',
+                        map_view: 'Map View',
+                    },
+                    // Agent
+                    agent: {
+                        profile: 'Agent Profile',
+                        properties: 'Properties',
+                        contact: 'Contact',
+                        email: 'Email',
+                        phone: 'Phone',
+                        about: 'About',
+                        rate_agent: 'Rate Agent',
+                        reviews: 'Reviews',
+                        rating: 'Rating',
+                    },
+                    // Dashboard
+                    dashboard: {
+                        overview: 'Overview',
+                        my_properties: 'My Properties',
+                        messages: 'Messages',
+                        settings: 'Settings',
+                        analytics: 'Analytics',
+                        total_listings: 'Total Listings',
+                        total_views: 'Total Views',
+                        inquiries: 'Inquiries',
+                        earnings: 'Earnings',
+                        recent_properties: 'Recent Properties',
+                        recent_viewers: 'Recent Viewers',
+                        recent_reviews: 'Recent Reviews',
+                        subscription_plans: 'Subscription Plans',
+                        choose_plan: 'Choose Plan',
+                        active_listings: 'Active Listings',
+                        visits_scheduled: 'Visits Scheduled',
+                        this_month: 'This month',
+                        this_week: 'This week',
+                        new_messages: 'New messages',
+                    },
+                    // Auth
+                    auth: {
+                        login: 'Login',
+                        signup: 'Sign Up',
+                        logout: 'Logout',
+                        email: 'Email',
+                        password: 'Password',
+                        confirm_password: 'Confirm Password',
+                        first_name: 'First Name',
+                        last_name: 'Last Name',
+                        phone: 'Phone Number',
+                        forgot_password: 'Forgot Password?',
+                        reset_password: 'Reset Password',
+                        remember_me: 'Remember me',
+                        no_account: "Don't have an account?",
+                        have_account: 'Already have an account?',
+                        sign_in: 'Sign In',
+                        create_account: 'Create Account',
+                        welcome_back: 'Welcome Back',
+                        get_started: 'Get Started',
+                    },
+                    // Forms
+                    form: {
+                        title: 'Title',
+                        title_placeholder: 'Property name',
+                        description: 'Description',
+                        description_placeholder: 'Describe this property...',
+                        price: 'Price',
+                        upload_images_max: 'Upload images (max {{count}})',
+                        upload_videos_max: 'Upload videos (max {{count}})',
+                        fill_city_address: 'Please enter city and address',
+                        select: 'Select',
+                        select_type: 'Select Type',
+                        select_status: 'Select Status',
+                        enter_value: 'Enter value',
+                        choose_file: 'Choose file',
+                        drag_drop: 'Drag and drop or click to upload',
+                        max_files: 'Maximum {{count}} files',
+                        notes: 'Notes',
+                        date: 'Date',
+                        time: 'Time',
+                        pick_date: 'Pick a date',
+                    },
+                    // Messages
+                    messages: {
+                        no_messages: 'No messages yet',
+                        type_message: 'Type a message...',
+                        send: 'Send',
+                        conversations: 'Conversations',
+                        new_conversation: 'New Conversation',
+                    },
+                    // Support
+                    support: {
+                        title: 'Support Center',
+                        subtitle: 'Get help with your account or properties',
+                        contact_support: 'Contact Support',
+                        create_ticket: 'Create Ticket',
+                        create_ticket_desc: 'Submit a new support request',
+                        create_first_ticket: 'Create your first ticket',
+                        my_tickets: 'My Tickets',
+                        tickets_description: 'View and manage your support tickets',
+                        ticket_details: 'Ticket Details',
+                        ticket_not_found: 'Ticket not found',
+                        no_tickets: 'No tickets found',
+                        no_tickets_desc: 'You haven\'t created any support tickets yet.',
+                        ticket_number: 'Ticket #',
+                        ticket_id: 'Ticket ID',
+                        subject: 'Subject',
+                        subject_placeholder: 'Brief summary of the issue',
+                        description: 'Description',
+                        description_placeholder: 'Detailed explanation of your issue...',
+                        category: 'Category',
+                        select_category: 'Select a category',
+                        priority: 'Priority',
+                        select_priority: 'Select priority',
+                        status: 'Status',
+                        filter_status: 'Filter by status',
+                        assigned_to: 'Assigned To',
+                        unassigned: 'Unassigned',
+                        last_updated: 'Last Updated',
+                        created: 'Created',
+                        user: 'User',
+                        conversation: 'Conversation',
+                        reply: 'Reply',
+                        reply_placeholder: 'Type your reply here...',
+                        send_reply: 'Send Reply',
+                        close_ticket: 'Close Ticket',
+                        ticket_closed: 'Ticket closed successfully',
+                        reply_sent: 'Reply sent successfully',
+                        ticket_created: 'Ticket created successfully',
+                        support_team: 'Support Team',
+                        no_replies: 'No replies yet.',
+                        categories: {
+                            account: 'Account',
+                            property: 'Property',
+                            payment: 'Payment',
+                            technical: 'Technical',
+                            report: 'Report',
+                            feature: 'Feature Request',
+                            other: 'Other',
+                        },
+                        priority_levels: {
+                            low: 'Low',
+                            medium: 'Medium',
+                            high: 'High',
+                            urgent: 'Urgent',
+                        },
+                        status_types: {
+                            open: 'Open',
+                            in_progress: 'In Progress',
+                            resolved: 'Resolved',
+                            closed: 'Closed',
+                        },
+                    },
+                    // Admin
+                    admin: {
+                        admin_panel: 'Admin Panel',
+                        manage_users: 'Manage Users',
+                        manage_properties: 'Manage Properties',
+                        manage_features: 'Manage Features',
+                        support_tickets: 'Support Tickets',
+                        manage_tickets_desc: 'View and manage all user support tickets',
+                        statistics: 'Statistics',
+                        total_users: 'Total Users',
+                        total_properties: 'Total Properties',
+                        total_agents: 'Total Agents',
+                    },
+                    // Notifications
+                    notifications: {
+                        property_created: 'Property created successfully',
+                        property_updated: 'Property updated successfully',
+                        property_deleted: 'Property deleted successfully',
+                        visit_scheduled: 'Visit scheduled successfully',
+                        message_sent: 'Message sent successfully',
+                        login_success: 'Login successful',
+                        logout_success: 'Logout successful',
+                        error_occurred: 'An error occurred',
+                        try_again: 'Please try again',
+                    },
+                },
+            },
+            sw: {
+                translation: {
+                    home: {
+                        hero: {
+                            badge: "Jukwaa la Mali la Tanzania",
+                            title: "Karibu",
+                            subtitle: "Gundua mali yako bora nchini Tanzania. Tazama maelfu ya orodha zilizo sahihi kutoka kwa mawakala wa kuaminika.",
+                            browse: "Tazama Mali",
+                            getStarted: "Anza"
+                        },
+                        stats: {
+                            properties: "Mali Zilizotolewa",
+                            agents: "Wakala Waliothibitishwa",
+                            users: "Watumiaji Wafarijika",
+                            satisfaction: "Kiwango cha Kuridhika"
+                        },
+                        about: {
+                            title: "Kuhusu SmartDalali",
+                            description: "SmartDalali ni soko la mali la Tanzania linalounganisha wanunuzi, wauzaji, na wapangaji na mawakala walio sahihi na mali za ubora kote nchini.",
+                            point1: "Orodha za mali zilizo sahihi na maelezo kamili",
+                            point2: "Ungana na mawakala ya kitaalamu na walio thibitishwa",
+                            point3: "Utafutaji wa hali ya juu na vichujio kupata mechi kamili"
+                        },
+                        features: {
+                            title: "Kwa Nini SmartDalali",
+                            subtitle: "Huduma bora ya kutafuta na kuorodhesha mali nchini Tanzania",
+                            verified: {
+                                title: "Orodha Zilizothibitishwa",
+                                description: "Mali zote zimehakikishwa na timu yetu kwa usalama wako"
+                            },
+                            search: {
+                                title: "Utafutaji Smart",
+                                description: "Vichujio vya utafutaji vya hali ya juu kupata kile unachohitaji haraka"
+                            },
+                            insights: {
+                                title: "Taarifa za Soko",
+                                description: "Pata data za soko za wakati halisi na mwenendo wa mali nchini Tanzania"
+                            },
+                            agents: {
+                                title: "Wakala Wataalamu",
+                                description: "Ungana na mawakala walio thibitishwa na wenye uzoefu wa mali"
+                            },
+                            locations: {
+                                title: "Maeneo ya Kipaumbele",
+                                description: "Mali katika miji mikuu na maeneo yote nchini Tanzania"
+                            },
+                            support: {
+                                title: "Msaada 24/7",
+                                description: "Timu yetu ya msaada iko hapa kukusaidia kila hatua"
+                            }
+                        },
+                        howItWorks: {
+                            title: "Jinsi Inavyofanya Kazi",
+                            subtitle: "Pata mali yako ya ndoto katika hatua tatu rahisi",
+                            step1: {
+                                title: "Tafuta Mali",
+                                description: "Tazama hifadhidata yetu kubwa ya mali zilizo sahihi nchini Tanzania"
+                            },
+                            step2: {
+                                title: "Ungana na Wakala",
+                                description: "Wasiliana na mawakala wa kitaalamu kupanga ziara"
+                            },
+                            step3: {
+                                title: "Thibitisha Mali",
+                                description: "Fanya mchakato kwa ujasiri na uhamie kwenye nyumba yako mpya"
+                            }
+                        },
+                        cta: {
+                            title: "Uko tayari kupata mali yako ya ndoto?",
+                            subtitle: "Jiunge na maelfu ya Watanzania walio kupata nyumba zao kamili kupitia SmartDalali",
+
+                            signup: "Jisajili Bure",
+                            explore: "Gundua Mali"
+                        },
+                        contact: {
+                            title: "Unahitaji Msaada? Wasiliana Nasi"
+                        }
+                    }
+                },
+                // Navigation
+                nav: {
+                    home: 'Nyumbani',
+                    properties: 'Mali',
+                    agents: 'Madalali',
+                    about: 'Kuhusu',
+                    contact: 'Wasiliana',
+                    login: 'Ingia',
+                    signup: 'Jisajili',
+                    dashboard: 'Dashibodi',
+                    logout: 'Toka',
+                },
+                // Sidebar
+                sidebar: {
+                    dashboard: 'Dashibodi',
+                    all_properties: 'Mali Zote',
+                    users: 'Watumiaji',
+                    features: 'Vipengele',
+                    my_properties: 'Mali Zangu',
+                    profile: 'Wasifu',
+                    browse_properties: 'Tazama Mali',
+                    messages: 'Ujumbe',
+                    support: 'Msaada',
+                    list_property: 'Tangaza Mali',
+                    soon: 'Hivi Karibuni',
+                },
+                // Hero Section
+                hero: {
+                    title: 'Tafuta Mali Yako ya Ndoto',
+                    subtitle: 'Gundua mali bora Tanzania',
+                    searchPlaceholder: 'Tafuta kwa eneo, aina ya mali...',
+                    search: 'Tafuta',
+                },
+                // Common
+                common: {
+                    loading: 'Inapakia...',
+                    error: 'Kosa',
+                    success: 'Mafanikio',
+                    step: 'Hatua',
+                    of: 'ya',
+                    review: 'Kagua',
+                    uploaded: 'Imepakiwa',
+                    locating: 'Inatafuta mahali...',
+                    publishing: 'Inachapisha...',
+                    save: 'Hifadhi',
+                    cancel: 'Ghairi',
+                    delete: 'Futa',
+                    edit: 'Hariri',
+                    view: 'Tazama',
+                    back: 'Rudi',
+                    next: 'Ifuatayo',
+                    previous: 'Iliyotangulia',
+                    submit: 'Wasilisha',
+                    close: 'Funga',
+                    confirm: 'Thibitisha',
+                    yes: 'Ndiyo',
+                    no: 'Hapana',
+                    optional: 'Si Lazima',
+                    required: 'Inahitajika',
+                    submitting: 'Inawasilisha...',
+                    actions: 'Vitendo',
+                    all: 'Zote',
+                    search: 'Tafuta',
+                },
+                // Property
+                property: {
+                    title: 'Mali',
+                    properties: 'Mali',
+                    price: 'Bei',
+                    location: 'Mahali',
+                    basic_info: 'Taarifa za Msingi',
+                    details: 'Maelezo',
+                    media: 'Picha na Video',
+                    bedrooms: 'Vyumba vya Kulala',
+                    bathrooms: 'Vyumba vya Kuogea',
+                    rooms: 'Vyumba',
+                    area: 'Eneo',
+                    type: 'Aina',
+                    status: 'Hali',
+                    description: 'Maelezo',
+                    features: 'Vipengele',
+                    contact_agent: 'Wasiliana na Dalali',
+                    schedule_visit: 'Panga Ziara',
+                    book_visit: 'Panga Ziara',
+                    for_sale: 'Inauzwa',
+                    for_rent: 'Inakodishwa',
+                    sold: 'Imeuzwa',
+                    rented: 'Imekodishwa',
+                    add_property: 'Ongeza Mali',
+                    edit_property: 'Hariri Mali',
+                    delete_property: 'Futa Mali',
+                    property_details: 'Maelezo ya Mali',
+                    parking: 'Maegesho',
+                    year_built: 'Mwaka wa Ujenzi',
+                    address: 'Anwani',
+                    city: 'Jiji',
+                    images: 'Picha',
+                    videos: 'Video',
+                    upload_images: 'Pakia Picha',
+                    upload_videos: 'Pakia Video',
+                    map_view: 'Ramani',
+                },
+                // Agent
+                agent: {
+                    profile: 'Wasifu wa Dalali',
+                    properties: 'Mali',
+                    contact: 'Wasiliana',
+                    email: 'Barua Pepe',
+                    phone: 'Simu',
+                    about: 'Kuhusu',
+                    rate_agent: 'Kadiria Dalali',
+                    reviews: 'Maoni',
+                    rating: 'Ukadiriaji',
+                },
+                // Dashboard
+                dashboard: {
+                    overview: 'Muhtasari',
+                    my_properties: 'Mali Zangu',
+                    messages: 'Ujumbe',
+                    settings: 'Mipangilio',
+                    analytics: 'Takwimu',
+                    total_listings: 'Jumla ya Matangazo',
+                    total_views: 'Jumla ya Maoni',
+                    inquiries: 'Maswali',
+                    earnings: 'Mapato',
+                    recent_properties: 'Mali za Hivi Karibuni',
+                    recent_viewers: 'Watembeaji wa Hivi Karibuni',
+                    recent_reviews: 'Maoni ya Hivi Karibuni',
+                    subscription_plans: 'Mipango ya Usajili',
+                    choose_plan: 'Chagua Mpango',
+                    active_listings: 'Matangazo Hai',
+                    visits_scheduled: 'Ziara Zilizopangwa',
+                    this_month: 'Mwezi huu',
+                    this_week: 'Wiki hii',
+                    new_messages: 'Ujumbe mpya',
+                },
+                // Auth
+                auth: {
+                    login: 'Ingia',
+                    signup: 'Jisajili',
+                    logout: 'Toka',
+                    email: 'Barua Pepe',
+                    password: 'Neno la Siri',
+                    confirm_password: 'Thibitisha Neno la Siri',
+                    first_name: 'Jina la Kwanza',
+                    last_name: 'Jina la Mwisho',
+                    phone: 'Nambari ya Simu',
+                    forgot_password: 'Umesahau Neno la Siri?',
+                    reset_password: 'Weka Upya Neno la Siri',
+                    remember_me: 'Nikumbuke',
+                    no_account: 'Huna akaunti?',
+                    have_account: 'Tayari una akaunti?',
+                    sign_in: 'Ingia',
+                    create_account: 'Fungua Akaunti',
+                    welcome_back: 'Karibu Tena',
+                    get_started: 'Anza',
+                },
+                // Forms
+                form: {
+                    title: 'Kichwa',
+                    title_placeholder: 'Jina la mali',
+                    description: 'Maelezo',
+                    description_placeholder: 'Eleza kuhusu mali hii...',
+                    price: 'Bei',
+                    upload_images_max: 'Pakia picha (hadi {{count}})',
+                    upload_videos_max: 'Pakia video (hadi {{count}})',
+                    fill_city_address: 'Tafadhali ingiza jiji na anwani',
+                    select: 'Chagua',
+                    select_type: 'Chagua Aina',
+                    select_status: 'Chagua Hali',
+                    enter_value: 'Ingiza thamani',
+                    choose_file: 'Chagua faili',
+                    drag_drop: 'Buruta na udondoshe au bofya kupakia',
+                    max_files: 'Upeo wa faili {{count}}',
+                    notes: 'Maelezo',
+                    date: 'Tarehe',
+                    time: 'Muda',
+                    pick_date: 'Chagua tarehe',
+                    fill_all_required: 'Tafadhali jaza sehemu zote zinazohitajika',
+                },
+                // Messages
+                messages: {
+                    no_messages: 'Hakuna ujumbe bado',
+                    type_message: 'Andika ujumbe...',
+                    send: 'Tuma',
+                    conversations: 'Mazungumzo',
+                    new_conversation: 'Mazungumzo Mapya',
+                },
+                // Support
+                support: {
+                    title: 'Kituo cha Msaada',
+                    subtitle: 'Pata msaada kwa akaunti yako au mali',
+                    contact_support: 'Wasiliana na Msaada',
+                    create_ticket: 'Fungua Tiketi',
+                    create_ticket_desc: 'Wasilisha ombi jipya la msaada',
+                    create_first_ticket: 'Fungua tiketi yako ya kwanza',
+                    my_tickets: 'Tiketi Zangu',
+                    tickets_description: 'Angalia na dhibiti tiketi zako za msaada',
+                    ticket_details: 'Maelezo ya Tiketi',
+                    ticket_not_found: 'Tiketi haikupatikana',
+                    no_tickets: 'Hakuna tiketi zilizopatikana',
+                    no_tickets_desc: 'Hujafungua tiketi yoyote ya msaada bado.',
+                    ticket_number: 'Tiketi #',
+                    ticket_id: 'Nambari ya Tiketi',
+                    subject: 'Mada',
+                    subject_placeholder: 'Muhtasari mfupi wa suala',
+                    description: 'Maelezo',
+                    description_placeholder: 'Maelezo ya kina ya suala lako...',
+                    category: 'Jamii',
+                    select_category: 'Chagua jamii',
+                    priority: 'Kipaumbele',
+                    select_priority: 'Chagua kipaumbele',
+                    status: 'Hali',
+                    filter_status: 'Chuja kwa hali',
+                    assigned_to: 'Imepangiwa kwa',
+                    unassigned: 'Haijapangiwa',
+                    last_updated: 'Ilisasishwa Mwisho',
+                    created: 'Iliundwa',
+                    user: 'Mtumiaji',
+                    conversation: 'Mazungumzo',
+                    reply: 'Jibu',
+                    reply_placeholder: 'Andika jibu lako hapa...',
+                    send_reply: 'Tuma Jibu',
+                    close_ticket: 'Funga Tiketi',
+                    ticket_closed: 'Tiketi imefungwa kwa mafanikio',
+                    reply_sent: 'Jibu limetumwa kwa mafanikio',
+                    ticket_created: 'Tiketi imeundwa kwa mafanikio',
+                    support_team: 'Timu ya Msaada',
+                    no_replies: 'Hakuna majibu bado.',
+                    categories: {
+                        account: 'Akaunti',
+                        property: 'Mali',
+                        payment: 'Malipo',
+                        technical: 'Kiufundi',
+                        report: 'Ripoti',
+                        feature: 'Ombi la Kipengele',
+                        other: 'Mengineyo',
+                    },
+                    priority_levels: {
+                        low: 'Chini',
+                        medium: 'Kati',
+                        high: 'Juu',
+                        urgent: 'Haraka',
+                    },
+                    status_types: {
+                        open: 'Wazi',
+                        in_progress: 'Inashughulikiwa',
+                        resolved: 'Imetatuliwa',
+                        closed: 'Imefungwa',
+                    },
+                },
+                // Admin
+                admin: {
+                    admin_panel: 'Paneli ya Msimamizi',
+                    manage_users: 'Simamia Watumiaji',
+                    manage_properties: 'Simamia Mali',
+                    manage_features: 'Simamia Vipengele',
+                    support_tickets: 'Tiketi za Msaada',
+                    manage_tickets_desc: 'Angalia na dhibiti tiketi zote za msaada za watumiaji',
+                    statistics: 'Takwimu',
+                    total_users: 'Jumla ya Watumiaji',
+                    total_properties: 'Jumla ya Mali',
+                    total_agents: 'Jumla ya Madalali',
+                },
+                // Notifications
+                notifications: {
+                    property_created: 'Mali imeundwa',
+                    property_updated: 'Mali imesasishwa',
+                    property_deleted: 'Mali imefutwa',
+                    visit_scheduled: 'Ziara imepangwa',
+                    message_sent: 'Ujumbe umetumwa',
+                    login_success: 'Umeingia',
+                    logout_success: 'Umetoka',
+                    error_occurred: 'Kosa limetokea',
+                    try_again: 'Tafadhali jaribu tena',
+                },
+            },
+        },
+    
+
+    });
+export default i18n;

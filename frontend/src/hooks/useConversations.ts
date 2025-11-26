@@ -1,49 +1,36 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchConversations, fetchMessages } from '@/api/communications';
-import { FEATURES } from '@/lib/constants';
-import { useUI } from '@/contexts/UIContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchConversations, fetchMessages, sendMessage, fetchNotifications } from '@/api/communications';
 
 export function useConversations() {
-    const { showMessagingDisabled } = useUI();
+  return useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+  });
+}
 
-    // Fetch conversations (returns empty array if disabled)
-    const {
-        data: conversations = [],
-        isLoading,
-        error,
-    } = useQuery({
-        queryKey: ['conversations'],
-        queryFn: fetchConversations,
-        enabled: FEATURES.MESSAGING_ENABLED,
-    });
+export function useMessages(conversationId: number) {
+  return useQuery({
+    queryKey: ['messages', conversationId],
+    queryFn: () => fetchMessages(conversationId),
+    enabled: !!conversationId,
+  });
+}
 
-    // Fetch messages for a conversation
-    const useMessages = (conversationId: string) => {
-        return useQuery({
-            queryKey: ['messages', conversationId],
-            queryFn: () => fetchMessages(conversationId),
-            enabled: !!conversationId && FEATURES.MESSAGING_ENABLED,
-        });
-    };
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, content }: { conversationId: number; content: string }) =>
+      sendMessage(conversationId, content),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', variables.conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+}
 
-    /**
-     * Attempt to send message (will show disabled message)
-     */
-    const sendMessage = async (conversationId: string, content: string) => {
-        if (!FEATURES.MESSAGING_ENABLED) {
-            showMessagingDisabled();
-            return null;
-        }
-        // This won't be reached in launch mode
-        return null;
-    };
-
-    return {
-        conversations,
-        isLoading,
-        error,
-        useMessages,
-        sendMessage,
-        isMessagingEnabled: FEATURES.MESSAGING_ENABLED,
-    };
+export function useNotifications() {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: fetchNotifications,
+  });
 }

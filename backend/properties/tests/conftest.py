@@ -110,6 +110,9 @@ def image_file():
     return SimpleUploadedFile("test.jpg", b"filecontent", content_type="image/jpeg")
 
 
+
+
+
 @pytest.fixture
 def property_data(agent_user):
     return {
@@ -196,6 +199,14 @@ def sample_callback_payload(payment):
                 "stkCallback": {
                     "CheckoutRequestID": payment.transaction_id,
                     "ResultCode": 0,
+                    "ResultDesc": "The service request is processed successfully.",
+                    "CallbackMetadata": {
+                        "Item": [
+                            {"Name": "Amount", "Value": 1.0},
+                            {"Name": "MpesaReceiptNumber", "Value": "QWERTY"},
+                            {"Name": "TransactionDate", "Value": 20220101120000}
+                        ]
+                    }
                 }
             }
         }

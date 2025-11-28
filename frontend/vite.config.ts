@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => {
   return ({
     server: {
       host: "::", // Allows access from any interface (IPv4 or IPv6)
-      port: 8080,
+      port: 5173,
       hmr: hmrConfig, // Apply the dynamic HMR host setting
     },
     // Only include react() plugin for a working setup.

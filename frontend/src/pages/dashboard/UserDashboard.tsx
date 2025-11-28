@@ -6,6 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { getLikedProperties, getViewedProperties } from '@/api/properties';
 import { getSupportTickets } from '@/api/support';
 import { useTranslation } from 'react-i18next';
+import { BecomeAgentCard } from '@/components/user/BecomeAgentCard';
+import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { SubscriptionTimer } from '@/components/subscription/SubscriptionTimer';
 
 export default function UserDashboard() {
   const { t } = useTranslation();
@@ -28,12 +31,21 @@ export default function UserDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Onboarding Modal */}
+      <OnboardingModal />
+
       <div>
         <h1 className="text-3xl font-bold mb-2">{t('dashboard.my_dashboard')}</h1>
         <p className="text-muted-foreground">
-          {t('dashboard.manage_desc')}
+          {t('dashboard.user_manage_desc')}
         </p>
       </div>
+
+      {/* Subscription Timer */}
+      <SubscriptionTimer />
+
+      {/* Agent Upgrade Card */}
+      <BecomeAgentCard />
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card>

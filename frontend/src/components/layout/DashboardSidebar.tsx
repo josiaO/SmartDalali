@@ -16,13 +16,15 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 interface NavItem {
   title: string;
@@ -62,21 +64,27 @@ export function DashboardSidebar() {
       roles: ['admin'],
     },
     {
-      title: t('sidebar.features'),
-      href: '/admin/dashboard?tab=features',
+      title: t('admin.manage_features'),
+      href: '/admin/features',
       icon: Settings,
       roles: ['admin'],
     },
     // Agent-specific items
     {
       title: t('sidebar.my_properties'),
-      href: '/agent/properties',
+      href: '/agent/my-properties', // Updated href
       icon: Home,
       roles: ['agent'],
     },
     {
+      title: t('sidebar.browse_properties'), // New item
+      href: '/agent/properties',
+      icon: Search,
+      roles: ['agent'],
+    },
+    {
       title: t('sidebar.profile'),
-      href: user?.id ? `/agents/${user.id}` : '#',
+      href: user?.id ? `/agents/${user.id}/profile` : '#',
       icon: User,
       roles: ['agent'],
     },
@@ -92,9 +100,7 @@ export function DashboardSidebar() {
       title: t('sidebar.messages'),
       href: '/communication',
       icon: MessageSquare,
-      roles: ['admin', 'agent', 'user'],
-      disabled: user?.role === 'user',
-      badge: user?.role === 'user' ? t('sidebar.soon') : undefined,
+      roles: ['admin', 'agent', 'user'], // Roles adjusted, disabled/badge removed
     },
     {
       title: t('sidebar.support'),
@@ -220,20 +226,30 @@ export function DashboardSidebar() {
 
   return (
     <>
-      {/* Mobile Hamburger Menu */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
-            <div className="flex h-full flex-col bg-sidebar">
-              <SidebarContent onItemClick={() => setIsMobileOpen(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
+      {/* Mobile Sticky Header */}
+      <div className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-14 items-center px-4">
+          <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="-ml-2 mr-2">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle Menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-64">
+              <VisuallyHidden.Root>
+                <SheetTitle>Dashboard Menu</SheetTitle>
+              </VisuallyHidden.Root>
+              <div className="flex h-full flex-col bg-sidebar">
+                <SidebarContent onItemClick={() => setIsMobileOpen(false)} />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <div className="flex items-center gap-2 font-semibold">
+            <Building2 className="h-5 w-5 text-primary" />
+            <span>SmartDalali</span>
+          </div>
+        </div>
       </div>
 
       {/* Desktop Sidebar */}

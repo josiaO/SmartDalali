@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Building2, Menu, X } from 'lucide-react';
+import { Building2, Menu, X, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 export function PublicHeader() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -53,6 +55,7 @@ export function PublicHeader() {
 
         <div className="flex items-center space-x-4">
           <LanguageSwitcher />
+          <ThemeToggle />
 
           {/* Mobile Menu Trigger */}
           <div className="md:hidden">
@@ -62,8 +65,11 @@ export function PublicHeader() {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right">
-                <div className="flex flex-col space-y-4 mt-6">
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <VisuallyHidden.Root>
+                  <SheetTitle>Navigation Menu</SheetTitle>
+                </VisuallyHidden.Root>
+                <nav className="flex flex-col gap-4 mt-8">
                   <NavLinks mobile />
                   <div className="pt-4 border-t">
                     {isAuthenticated ? (
@@ -75,9 +81,54 @@ export function PublicHeader() {
                         } onClick={() => setIsOpen(false)}>
                           <Button className="w-full">{t('nav.dashboard')}</Button>
                         </Link>
+
+                        {/* Agent Specific Links */}
+                        {user?.role === 'agent' && (
+                          <>
+                            <Link to="/agent/my-properties" onClick={() => setIsOpen(false)}>
+                              <Button variant="ghost" className="w-full justify-start">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                {t('agent.properties')}
+                              </Button>
+                            </Link>
+                            <Link to="/properties/create" onClick={() => setIsOpen(false)}>
+                              <Button variant="ghost" className="w-full justify-start">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                {t('dashboard.add_property')}
+                              </Button>
+                            </Link>
+                            <Link to="/communication" onClick={() => setIsOpen(false)}>
+                              <Button variant="ghost" className="w-full justify-start">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                {t('sidebar.messages')}
+                              </Button>
+                            </Link>
+                          </>
+                        )}
+
+                        {/* User Specific Links */}
+                        {user?.role === 'user' && (
+                          <Link to="/saved" onClick={() => setIsOpen(false)}>
+                            <Button variant="ghost" className="w-full justify-start">
+                              <Building2 className="mr-2 h-4 w-4" />
+                              {t('dashboard.saved_properties')}
+                            </Button>
+                          </Link>
+                        )}
                         <div className="text-sm text-muted-foreground text-center">
                           {user?.first_name} {user?.last_name}
                         </div>
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => {
+                            logout();
+                            setIsOpen(false);
+                          }}
+                        >
+                          <LogOut className="h-4 w-4" />
+                          {t('nav.logout')}
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex flex-col space-y-3">
@@ -90,7 +141,7 @@ export function PublicHeader() {
                       </div>
                     )}
                   </div>
-                </div>
+                </nav>
               </SheetContent>
             </Sheet>
           </div>
@@ -106,7 +157,7 @@ export function PublicHeader() {
                 }>
                   <Button variant="ghost">{t('nav.dashboard')}</Button>
                 </Link>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
                     {user?.first_name} {user?.last_name}
                   </span>
@@ -115,6 +166,10 @@ export function PublicHeader() {
                       {user.role === 'admin' ? 'Admin' : user.role === 'agent' ? 'Agent' : 'User'}
                     </span>
                   )}
+                  <Button variant="ghost" size="sm" onClick={logout} className="gap-2">
+                    <LogOut className="h-4 w-4" />
+                    {t('nav.logout')}
+                  </Button>
                 </div>
               </>
             ) : (

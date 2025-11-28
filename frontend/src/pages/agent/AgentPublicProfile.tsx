@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Mail, Phone, Building2, MapPin, ArrowLeft } from 'lucide-react';
+import { Mail, Phone, Building2, MapPin, ArrowLeft, MessageSquare } from 'lucide-react';
 import { Property } from '@/api/properties';
 
 interface AgentProfile {
@@ -148,6 +148,18 @@ export default function AgentPublicProfile() {
                             </div>
                         </div>
                     </div>
+                    <div className="mt-6">
+                        <Button onClick={() => {
+                            // Check if user is logged in (we can check if we have a token or useAuth)
+                            // For now, let's just navigate and let the protected route handle it, 
+                            // or better, check for token in localStorage since we don't have useAuth imported yet.
+                            // Actually, let's import useAuth.
+                            navigate('/communication', { state: { recipientId: agent.id } });
+                        }} className="w-full md:w-auto">
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            Message Agent
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -184,7 +196,7 @@ export default function AgentPublicProfile() {
                                     <div className="flex items-center gap-4 text-sm text-gray-600">
                                         {property.bedrooms > 0 && <span>{property.bedrooms} beds</span>}
                                         {property.bathrooms > 0 && <span>{property.bathrooms} baths</span>}
-                                        {property.square_feet && <span>{property.square_feet} sqft</span>}
+                                        {property.area && <span>{property.area} sqft</span>}
                                     </div>
                                     <div className="mt-2 text-sm text-gray-500 flex items-center gap-1">
                                         <MapPin className="h-3 w-3" />
@@ -196,6 +208,6 @@ export default function AgentPublicProfile() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

@@ -4,8 +4,8 @@ from .views import (
     PropertyVisitListCreateView, PropertyVisitRetrieveUpdateDestroyView,
     PropertyListCreateView, PropertyRetrieveUpdateDestroyView,
     PaymentViewSet, SupportTicketViewSet, stk_push, mpesa_callback,
-    payment_status, geocode_property_location, agent_stats,
-    FeatureViewSet, SubscriptionPlanViewSet, AgentRatingViewSet,
+    payment_status, geocode_property_location, agent_stats, agent_properties,
+    AgentRatingViewSet,
     toggle_property_like, track_property_view, liked_properties, viewed_properties,
     public_stats
 )
@@ -19,12 +19,6 @@ payment_router.register(r'', PaymentViewSet, basename='payment')
 support_router = DefaultRouter()
 support_router.register(r'tickets', SupportTicketViewSet, basename='support-ticket')
 
-# Feature router - matches frontend expectations
-# Frontend calls: /api/v1/properties/features/ and /api/v1/properties/features/plans/
-feature_router = DefaultRouter()
-feature_router.register(r'plans', SubscriptionPlanViewSet, basename='subscription-plan')
-feature_router.register(r'', FeatureViewSet, basename='feature')
-
 # Ratings router
 ratings_router = DefaultRouter()
 ratings_router.register(r'', AgentRatingViewSet, basename='agent-rating')
@@ -37,6 +31,7 @@ urlpatterns = [
     path('visits/<int:pk>/', PropertyVisitRetrieveUpdateDestroyView.as_view(), name='propertyvisit-retrieve-update-destroy'),
     
     path('agent-stats/', agent_stats, name='agent_stats'),
+    path('agent-properties/', agent_properties, name='agent_properties'),
 
     # Payment endpoints - specific routes first, then router
     path('payments/mpesa/stk/<int:property_id>/', stk_push, name='stk_push'),
@@ -47,11 +42,6 @@ urlpatterns = [
     
     # Support endpoints
     path('support/', include(support_router.urls)),
-    
-    # Feature & Subscription endpoints
-    # Changed from 'admin/' to 'features/' to match frontend
-    path('features/', include(feature_router.urls)),
-    
     
     # Agent ratings endpoints
     path('ratings/', include(ratings_router.urls)),

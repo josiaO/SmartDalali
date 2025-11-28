@@ -255,6 +255,33 @@ class MyTokenObtainPairView(TokenObtainPairView):
         serializer = self.get_serializer(data=data)
         try:
             serializer.is_valid(raise_exception=True)
+        except ValidationError as ve:
+            logger.error('TokenObtain: ValidationError: %s', str(ve))
+            # Check if user exists to provide better error message
+            from django.contrib.auth.models import User
+            from django.db import models
+            username_or_email = data.get('username') or data.get('email')
+            
+            if not username_or_email:
+                return Response(
+                    {'error': 'Email is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user_exists = User.objects.filter(
+                models.Q(username=username_or_email) | models.Q(email=username_or_email)
+            ).exists()
+            
+            if not user_exists:
+                return Response(
+                    {'error': 'No account found with this email. Please sign up first.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            else:
+                return Response(
+                    {'error': 'Invalid email or password'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
         except Exception as e:
             logger.error('TokenObtain: serializer validation failed: %s', str(e))
             
@@ -262,6 +289,13 @@ class MyTokenObtainPairView(TokenObtainPairView):
             from django.contrib.auth.models import User
             from django.db import models
             username_or_email = data.get('username') or data.get('email')
+            
+            if not username_or_email:
+                return Response(
+                    {'error': 'Email is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             user_exists = User.objects.filter(
                 models.Q(username=username_or_email) | models.Q(email=username_or_email)
             ).exists()
@@ -477,6 +511,9 @@ def register(request):
 
     if User.objects.filter(username=username).exists():
         return Response({'error': 'username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(email=email).exists():
+        return Response({'error': 'email already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     user = User.objects.create_user(username=username, email=email, password=password)
     # Auto-activate users immediately so they can sign in; activation email is still sent for verification

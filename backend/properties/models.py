@@ -2,9 +2,11 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.utils.translation import gettext_lazy as _
+from datetime import timedelta
 import uuid
+from features.models import SubscriptionPlan
 
 PROPERTY_TYPES = (
         ('House', _('House')),
@@ -23,36 +25,6 @@ STATUS_CHOICES = (
         ('rented', _('Rented')),
 )
 
-
-class Feature(models.Model):
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=50, unique=True, help_text="Unique code used in code checks e.g. 'create_listing'")
-    description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True, help_text="Global toggle for this feature")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-    
-    class Meta:
-        app_label = 'properties'
-
-
-class SubscriptionPlan(models.Model):
-    name = models.CharField(max_length=100)
-    price = models.DecimalField(max_digits=12, decimal_places=2)
-    duration_days = models.PositiveIntegerField(default=30)
-    description = models.TextField()
-    features = models.ManyToManyField(Feature, blank=True, related_name='plans')
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.name} ({self.price})"
-    
-    class Meta:
-        app_label = 'properties'
 
 
 class AgentProfile(models.Model):

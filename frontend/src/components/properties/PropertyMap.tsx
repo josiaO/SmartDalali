@@ -43,18 +43,42 @@ export function PropertyMap({ properties }: PropertyMapProps) {
 
     if (!apiKey) {
         return (
-            <Card className="h-[600px] flex flex-col items-center justify-center p-6 text-center bg-muted/20">
-                <MapPin className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Map Integration Ready</h3>
-                <p className="text-muted-foreground max-w-md mb-6">
-                    To enable the map view, you need to add your Google Maps API Key to the environment variables.
-                </p>
-                <div className="bg-muted p-4 rounded-md text-left font-mono text-sm mb-6 w-full max-w-md overflow-x-auto">
-                    VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
+            <Card className="h-[600px] relative overflow-hidden bg-slate-100 dark:bg-slate-800">
+                {/* Mock Map Background */}
+                <div className="absolute inset-0 opacity-50 dark:opacity-30" style={{
+                    backgroundImage: 'url("https://upload.wikimedia.org/wikipedia/commons/e/ec/World_map_blank_without_borders.svg")',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'grayscale(100%)'
+                }}></div>
+
+                {/* Mock Pins */}
+                <div className="absolute top-1/3 left-1/4">
+                    <MapPin className="h-8 w-8 text-red-500 drop-shadow-md animate-bounce" />
                 </div>
-                <Button variant="outline" onClick={() => window.open('https://developers.google.com/maps/documentation/javascript/get-api-key', '_blank')}>
-                    Get API Key
-                </Button>
+                <div className="absolute top-1/2 left-1/2">
+                    <MapPin className="h-8 w-8 text-red-500 drop-shadow-md animate-bounce delay-100" />
+                </div>
+                <div className="absolute bottom-1/3 right-1/3">
+                    <MapPin className="h-8 w-8 text-red-500 drop-shadow-md animate-bounce delay-200" />
+                </div>
+
+                {/* Overlay Content */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/10 backdrop-blur-[1px]">
+                    <div className="bg-background/90 p-6 rounded-xl shadow-lg max-w-md text-center border backdrop-blur-sm">
+                        <MapPin className="h-12 w-12 mx-auto text-primary mb-4" />
+                        <h3 className="text-xl font-bold mb-2">Interactive Map View</h3>
+                        <p className="text-muted-foreground mb-6">
+                            Explore properties geographically. This feature requires a Google Maps API key to be configured.
+                        </p>
+                        <div className="bg-muted p-3 rounded-md text-left font-mono text-xs mb-4 overflow-x-auto">
+                            VITE_GOOGLE_MAPS_API_KEY=your_api_key
+                        </div>
+                        <Button variant="default" onClick={() => window.open('https://developers.google.com/maps/documentation/javascript/get-api-key', '_blank')}>
+                            Get API Key
+                        </Button>
+                    </div>
+                </div>
             </Card>
         );
     }
@@ -112,9 +136,9 @@ export function PropertyMap({ properties }: PropertyMapProps) {
                         onCloseClick={() => setSelectedProperty(null)}
                     >
                         <div className="p-2 max-w-xs">
-                            {selectedProperty.images?.[0] && (
+                            {(selectedProperty.main_image_url || selectedProperty.media?.[0]?.Images) && (
                                 <img
-                                    src={selectedProperty.images[0].image}
+                                    src={selectedProperty.main_image_url || selectedProperty.media?.[0]?.Images}
                                     alt={selectedProperty.title}
                                     className="w-full h-32 object-cover rounded mb-2"
                                 />

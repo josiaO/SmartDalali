@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,13 +15,20 @@ import { useTranslation } from 'react-i18next';
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, error: authError, clearError } = useAuth();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+
+  // Clear any existing auth errors when component mounts
+  useEffect(() => {
+    if (authError) {
+      clearError();
+    }
+  }, []);
 
   async function handleLoginSuccess(access: string, refresh: string) {
     try {
@@ -40,7 +47,7 @@ export default function Login() {
       const currentUser = await getCurrentUser();
       const role = getUserRole(currentUser);
 
-      toast.success('Logged in successfully!');
+      toast.success(t('auth.login_success'));
 
       if (role === 'admin') {
         navigate('/admin', { replace: true });
@@ -51,7 +58,7 @@ export default function Login() {
       }
     } catch (error) {
       console.error('Error during post-login redirect:', error);
-      toast.error('Login successful but failed to load profile');
+      toast.error(t('auth.login_profile_error'));
     }
   }
 
@@ -73,7 +80,7 @@ export default function Login() {
       await handleLoginSuccess(access, refresh);
     } catch (error: any) {
       console.error('Google login error:', error);
-      toast.error(error.message || 'Failed to login with Google');
+      toast.error(error.message || t('auth.google_login_failed'));
     } finally {
       setGoogleLoading(false);
     }
@@ -112,9 +119,9 @@ export default function Login() {
           <div className="flex justify-center">
             <Building2 className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl">{t('auth.welcome_back')}</CardTitle>
           <CardDescription>
-            Sign in to access your account
+            {t('auth.login_desc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -132,7 +139,7 @@ export default function Login() {
                 <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
               </svg>
             )}
-            Sign in with Google
+            {t('auth.google_login')}
           </Button>
 
           <div className="relative">
@@ -141,14 +148,14 @@ export default function Login() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
+                {t('auth.or_email')}
               </span>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('form.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -160,12 +167,12 @@ export default function Login() {
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('form.password')}</Label>
                 <Link
                   to="/auth/forgot-password"
                   className="text-sm text-primary hover:underline"
                 >
-                  Forgot password?
+                  {t('auth.forgot_password')}
                 </Link>
               </div>
               <Input
@@ -181,15 +188,15 @@ export default function Login() {
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                'Sign In'
+                t('nav.login')
               )}
             </Button>
           </form>
 
           <div className="mt-4 text-center text-sm">
-            <span className="text-muted-foreground">Don't have an account? </span>
+            <span className="text-muted-foreground">{t('auth.no_account')} </span>
             <Link to="/auth/signup" className="text-primary hover:underline">
-              Sign up
+              {t('nav.signup')}
             </Link>
           </div>
         </CardContent>

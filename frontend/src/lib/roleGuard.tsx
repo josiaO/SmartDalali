@@ -5,9 +5,9 @@ import type { UserRole } from '@/contexts/AuthContext';
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  requireRole?: 'admin' | 'agent' | 'user';
-  requireAnyRole?: ('admin' | 'agent' | 'user')[];
-  requireAuth?: boolean;
+  requireAnyRole?: UserRole[];
+  requireAllRoles?: UserRole[];
+  redirectPath?: string; // Optional custom redirect path
 }
 
 /**
@@ -16,9 +16,9 @@ interface RoleGuardProps {
  */
 export function RoleGuard({
   children,
-  requireRole,
   requireAnyRole,
-  requireAuth = true
+  requireAllRoles,
+  redirectPath,
 }: RoleGuardProps) {
   const { user, loading } = useAuth();
 
@@ -30,21 +30,23 @@ export function RoleGuard({
     );
   }
 
-  // Check authentication requirement
-  if (requireAuth && !user) {
+  if (!user) {
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Check specific role requirement
-  if (requireRole && user && user.role !== requireRole) {
-    // Redirect based on user's role
-    return <Navigate to={getDashboardRouteForRole(user.role)} replace />;
+  const userRole = user.role;
+
+  // Check if user has required roles
+  if (requireAnyRole && !requireAnyRole.includes(userRole)) {
+    // Redirect to user's appropriate dashboard
+    const dashboardRoute = redirectPath || getDashboardRouteForRole(userRole);
+    return <Navigate to={dashboardRoute} replace />;
   }
 
-  // Check if user has any of the required roles
-  if (requireAnyRole && user && !requireAnyRole.includes(user.role)) {
-    // Redirect based on user's role
-    return <Navigate to={getDashboardRouteForRole(user.role)} replace />;
+  if (requireAllRoles && !requireAllRoles.every(role => userRole === role)) {
+    // Redirect to user's appropriate dashboard
+    const dashboardRoute = redirectPath || getDashboardRouteForRole(userRole);
+    return <Navigate to={dashboardRoute} replace />;
   }
 
   return <>{children}</>;

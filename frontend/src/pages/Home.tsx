@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -22,6 +23,7 @@ import { getPublicStats } from '@/api/properties';
 
 export default function Home() {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   const { data: publicStats } = useQuery({
     queryKey: ['public-stats'],
@@ -62,17 +64,69 @@ export default function Home() {
               {t('home.hero.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/properties">
-                <Button size="lg" className="w-full sm:w-auto">
-                  {t('home.hero.browse')}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/auth/signup">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                  {t('home.hero.getStarted')}
-                </Button>
-              </Link>
+              {!user && (
+                <>
+                  <Link to="/properties">
+                    <Button size="lg" className="w-full sm:w-auto">
+                      {t('home.hero.browse')}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/auth/signup">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                      {t('home.hero.getStarted')}
+                    </Button>
+                  </Link>
+                </>
+              )}
+
+              {user && user.role === 'user' && (
+                <>
+                  <Link to="/properties">
+                    <Button size="lg" className="w-full sm:w-auto">
+                      {t('home.hero.browse')}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/profile">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                      List Your Property
+                    </Button>
+                  </Link>
+                </>
+              )}
+
+              {user && user.role === 'agent' && (
+                <>
+                  <Link to="/properties/create">
+                    <Button size="lg" className="w-full sm:w-auto">
+                      List New Property
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/agent/dashboard">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                      My Dashboard
+                    </Button>
+                  </Link>
+                </>
+              )}
+
+              {user && user.role === 'admin' && (
+                <>
+                  <Link to="/admin/dashboard">
+                    <Button size="lg" className="w-full sm:w-auto">
+                      Admin Dashboard
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/properties">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                      {t('home.hero.browse')}
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -172,12 +226,34 @@ export default function Home() {
           <h2 className="mb-4 text-3xl md:text-4xl font-bold">{t('home.cta.title')}</h2>
           <p className="mb-8 text-lg md:text-xl opacity-90 max-w-2xl mx-auto">{t('home.cta.subtitle')}</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/auth/signup">
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto">{t('home.cta.signup')}</Button>
-            </Link>
-            <Link to="/properties">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10">{t('home.cta.explore')}</Button>
-            </Link>
+            {!user && (
+              <>
+                <Link to="/auth/signup">
+                  <Button size="lg" variant="secondary" className="w-full sm:w-auto">{t('home.cta.signup')}</Button>
+                </Link>
+                <Link to="/properties">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10">{t('home.cta.explore')}</Button>
+                </Link>
+              </>
+            )}
+
+            {user && user.role === 'user' && (
+              <Link to="/profile">
+                <Button size="lg" variant="secondary" className="w-full sm:w-auto">Start Listing Today</Button>
+              </Link>
+            )}
+
+            {user && user.role === 'agent' && (
+              <Link to="/properties/create">
+                <Button size="lg" variant="secondary" className="w-full sm:w-auto">Add New Property</Button>
+              </Link>
+            )}
+
+            {user && user.role === 'admin' && (
+              <Link to="/admin/dashboard">
+                <Button size="lg" variant="secondary" className="w-full sm:w-auto">Go to Dashboard</Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

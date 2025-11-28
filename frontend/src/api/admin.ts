@@ -5,14 +5,26 @@ export interface Feature {
   name: string;
   code: string;
   description: string;
+  status: 'active' | 'coming_soon' | 'disabled';
+  is_global: boolean;
+}
+
+export interface Plan {
+  id: number;
+  name: string;
+  price_monthly: number;
+  price_yearly: number;
+  duration_days: number;
+  features: Feature[];
   is_active: boolean;
-  created_at: string;
 }
 
 export interface SubscriptionPlan {
   id: number;
   name: string;
-  price: number;
+  price: number;  // Legacy
+  price_monthly?: number;
+  price_yearly?: number;
   duration_days: number;
   description: string;
   features: Feature[];
@@ -24,44 +36,44 @@ export interface SubscriptionPlan {
 
 // Features - Updated to use correct Django endpoints
 export async function fetchFeatures() {
-  const response = await api.get<Feature[] | { results: Feature[] }>('/api/v1/properties/features/?page_size=100');
+  const response = await api.get<Feature[] | { results: Feature[] }>('/api/v1/features/?page_size=100');
   // Handle both direct array and paginated response
   return Array.isArray(response.data) ? response.data : response.data.results || [];
 }
 
 export async function createFeature(data: Partial<Feature>) {
-  const response = await api.post<Feature>('/api/v1/properties/features/', data);
+  const response = await api.post<Feature>('/api/v1/features/', data);
   return response.data;
 }
 
 export async function updateFeature(id: number, data: Partial<Feature>) {
-  const response = await api.patch<Feature>(`/api/v1/properties/features/${id}/`, data);
+  const response = await api.patch<Feature>(`/api/v1/features/${id}/`, data);
   return response.data;
 }
 
 export async function deleteFeature(id: number) {
-  await api.delete(`/api/v1/properties/features/${id}/`);
+  await api.delete(`/api/v1/features/${id}/`);
 }
 
 // Plans - Updated to use correct Django endpoints
 export async function fetchPlans() {
-  const response = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/properties/features/plans/');
+  const response = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/plans/');
   // Handle both direct array and paginated response
   return Array.isArray(response.data) ? response.data : response.data.results || [];
 }
 
 export async function createPlan(data: Partial<SubscriptionPlan>) {
-  const response = await api.post<SubscriptionPlan>('/api/v1/properties/features/plans/', data);
+  const response = await api.post<SubscriptionPlan>('/api/v1/plans/', data);
   return response.data;
 }
 
 export async function updatePlan(id: number, data: Partial<SubscriptionPlan>) {
-  const response = await api.patch<SubscriptionPlan>(`/api/v1/properties/features/plans/${id}/`, data);
+  const response = await api.patch<SubscriptionPlan>(`/api/v1/plans/${id}/`, data);
   return response.data;
 }
 
 export async function deletePlan(id: number) {
-  await api.delete(`/api/v1/properties/features/plans/${id}/`);
+  await api.delete(`/api/v1/plans/${id}/`);
 }
 
 // Agent Ratings - New endpoints

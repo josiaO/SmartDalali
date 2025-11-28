@@ -51,8 +51,11 @@ if not SECRET_KEY:
 # DEBUG should be False in production. Control via environment variable.
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('1', 'true', 'yes')
 
-# Hosts allowed to serve the app. In production set this explicitly.
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',') if os.getenv('ALLOWED_HOSTS') else ['*']
+# 1. Get the string of hosts from your environment (which came from .env)
+HOSTS_STRING = os.environ.get('ALLOWED_HOSTS', '') 
+
+# 2. Split the string by commas to create the required Python list
+ALLOWED_HOSTS = HOSTS_STRING.split(',')
 
 # Validate production settings
 if os.getenv('DJANGO_ENV') == 'production':
@@ -121,6 +124,8 @@ INSTALLED_APPS = [
     'accounts',
     'properties',
     'communications',
+    'insights',
+    'features',
 ]
 
 SITE_ID = 1

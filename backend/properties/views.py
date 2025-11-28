@@ -18,13 +18,12 @@ from utils.google_maps import geocode_address, build_maps_url
 
 from .models import (
     PropertyVisit, Property, Payment, SupportTicket, TicketReply, AgentProfile,
-    Feature, SubscriptionPlan, AgentRating
+    AgentRating
 )
 from .serializers import (
     PropertyVisitSerializer, SerializerProperty, PaymentSerializer,
     SubscriptionPaymentSerializer, SupportTicketSerializer,
     CreateSupportTicketSerializer, TicketReplySerializer,
-    FeatureSerializer, SubscriptionPlanSerializer,
     AgentRatingSerializer, CreateAgentRatingSerializer
 )
 from accounts.permissions import IsAdmin
@@ -110,35 +109,6 @@ class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
 
 
-class FeatureViewSet(viewsets.ModelViewSet):
-    queryset = Feature.objects.all()
-    serializer_class = FeatureSerializer
-    permission_classes = [permissions.AllowAny]  # Allow anyone to read features
-    pagination_class = None  # Disable pagination for admin endpoints
-
-    def get_permissions(self):
-        # Only admins can create/update/delete features
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAdmin()]
-        # Anyone can list/retrieve features (needed for app initialization)
-        return [permissions.AllowAny()]
-
-
-class SubscriptionPlanViewSet(viewsets.ModelViewSet):
-    queryset = SubscriptionPlan.objects.filter(is_active=True)
-    serializer_class = SubscriptionPlanSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = None  # Disable pagination for admin endpoints
-
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return SubscriptionPlan.objects.all()
-        return SubscriptionPlan.objects.filter(is_active=True)
-
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy', 'assign_to_agent', 'remove_from_agent']:
-            return [IsAdmin()]
-        return [IsAuthenticated()]
     
     @action(detail=True, methods=['post'])
     def assign_to_agent(self, request, pk=None):
@@ -801,6 +771,19 @@ def geocode_property_location(request):
         'formatted_address': geo.get('formatted_address'),
         'maps_url': build_maps_url(latitude, longitude)
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def agent_properties(request):
+    """Get all properties owned by the authenticated agent."""
+    user = request.user
+    if not (user.is_superuser or user.groups.filter(name='agent').exists()):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    properties = Property.objects.filter(owner=user).order_by('-created_at')
+    serializer = SerializerProperty(properties, many=True, context={'request': request})
+    return Response(serializer.data)
 
 
 @api_view(['GET'])

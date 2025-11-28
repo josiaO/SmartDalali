@@ -3,7 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from .models import (
     AgentProfile, Property, MediaProperty, PropertyFeature, PropertyVisit,
-    Payment, SupportTicket, TicketReply, Feature, SubscriptionPlan, AgentRating,
+    Payment, SupportTicket, TicketReply, AgentRating,
     PropertyLike
 )
 from accounts.models import Profile
@@ -39,24 +39,6 @@ class PropertyFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = PropertyFeature
         fields = ['id', 'features', 'property']
-
-class FeatureSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Feature
-        fields = ['id', 'name', 'code', 'description', 'is_active', 'created_at']
-        read_only_fields = ['id', 'created_at']
-
-
-class SubscriptionPlanSerializer(serializers.ModelSerializer):
-    features = FeatureSerializer(many=True, read_only=True)
-    feature_ids = serializers.PrimaryKeyRelatedField(
-        many=True, write_only=True, queryset=Feature.objects.all(), source='features'
-    )
-
-    class Meta:
-        model = SubscriptionPlan
-        fields = ['id', 'name', 'price', 'duration_days', 'description', 'features', 'feature_ids', 'is_active', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class PropertyVisitSerializer(serializers.ModelSerializer):

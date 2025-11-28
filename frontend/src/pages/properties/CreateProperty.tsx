@@ -59,7 +59,7 @@ export default function CreateProperty() {
         title: t('common.success'),
         description: t('notifications.property_created'),
       });
-      navigate('/agent/properties');
+      navigate('/agent/my-properties');
     },
     onError: () => {
       toast({
@@ -191,10 +191,10 @@ export default function CreateProperty() {
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
   const STEPS = [
-    { id: 1, title: t('property.basic_info') },
-    { id: 2, title: t('property.location') },
-    { id: 3, title: t('property.details') },
-    { id: 4, title: t('property.media') },
+    { id: 1, title: t('properties.basic_info') },
+    { id: 2, title: t('properties.location') },
+    { id: 3, title: t('properties.details') },
+    { id: 4, title: t('properties.media') },
     { id: 5, title: t('common.review') },
   ];
 
@@ -232,7 +232,7 @@ export default function CreateProperty() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="type">{t('property.type')} *</Label>
+                    <Label htmlFor="type">{t('properties.type')} *</Label>
                     <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v })}>
                       <SelectTrigger><SelectValue placeholder={t('form.select_type')} /></SelectTrigger>
                       <SelectContent>
@@ -241,18 +241,18 @@ export default function CreateProperty() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="status">{t('property.status')} *</Label>
+                    <Label htmlFor="status">{t('properties.status')} *</Label>
                     <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={PROPERTY_STATUS[0].value}>{t('property.for_sale')}</SelectItem>
-                        <SelectItem value={PROPERTY_STATUS[1].value}>{t('property.for_rent')}</SelectItem>
+                        <SelectItem value={PROPERTY_STATUS[0].value}>{t('properties.for_sale')}</SelectItem>
+                        <SelectItem value={PROPERTY_STATUS[1].value}>{t('properties.for_rent')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="price">{t('property.price')} (TZS) *</Label>
+                  <Label htmlFor="price">{t('properties.price')} (TZS) *</Label>
                   <Input id="price" type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} />
                 </div>
               </div>
@@ -263,25 +263,25 @@ export default function CreateProperty() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city">{t('property.city')} *</Label>
-                    <Input id="city" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder={t('property.city_placeholder')} />
+                    <Label htmlFor="city">{t('properties.city')} *</Label>
+                    <Input id="city" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder={t('properties.city_placeholder')} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="address">{t('property.address')} *</Label>
-                    <Input id="address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder={t('property.address_placeholder')} />
+                    <Label htmlFor="address">{t('properties.address')} *</Label>
+                    <Input id="address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder={t('properties.address_placeholder')} />
                   </div>
                 </div>
                 <Button type="button" variant="outline" onClick={handleAutoLocate} disabled={geocodeAddress.isPending}>
                   {geocodeAddress.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
-                  {geocodeAddress.isPending ? t('common.locating') : t('property.auto_locate_coordinates')}
+                  {geocodeAddress.isPending ? t('common.locating') : t('properties.auto_locate_coordinates')}
                 </Button>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>{t('property.latitude')}</Label>
+                    <Label>{t('properties.latitude')}</Label>
                     <Input value={formData.latitude} onChange={e => setFormData({ ...formData, latitude: e.target.value })} placeholder={t('common.optional')} />
                   </div>
                   <div className="space-y-2">
-                    <Label>{t('property.longitude')}</Label>
+                    <Label>{t('properties.longitude')}</Label>
                     <Input value={formData.longitude} onChange={e => setFormData({ ...formData, longitude: e.target.value })} placeholder={t('common.optional')} />
                   </div>
                 </div>
@@ -293,30 +293,30 @@ export default function CreateProperty() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>{t('property.bedrooms')}</Label>
+                    <Label>{t('properties.bedrooms')}</Label>
                     <Input type="number" value={formData.bedrooms} onChange={e => setFormData({ ...formData, bedrooms: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label>{t('property.bathrooms')}</Label>
+                    <Label>{t('properties.bathrooms')}</Label>
                     <Input type="number" value={formData.bathrooms} onChange={e => setFormData({ ...formData, bathrooms: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label>{t('property.total_rooms')}</Label>
+                    <Label>{t('properties.total_rooms')}</Label>
                     <Input type="number" value={formData.rooms} onChange={e => setFormData({ ...formData, rooms: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label>{t('property.square_feet')}</Label>
+                    <Label>{t('properties.square_feet')}</Label>
                     <Input type="number" value={formData.area} onChange={e => setFormData({ ...formData, area: e.target.value })} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>{t('property.year_built')}</Label>
+                    <Label>{t('properties.year_built')}</Label>
                     <Input type="date" value={formData.year_built} onChange={e => setFormData({ ...formData, year_built: e.target.value })} />
                   </div>
                   <div className="flex items-center space-x-2 pt-8">
                     <Checkbox id="parking" checked={formData.parking} onCheckedChange={(checked) => setFormData({ ...formData, parking: checked as boolean })} />
-                    <Label htmlFor="parking">{t('property.has_parking')}</Label>
+                    <Label htmlFor="parking">{t('properties.has_parking')}</Label>
                   </div>
                 </div>
               </div>
@@ -327,7 +327,7 @@ export default function CreateProperty() {
               <div className="space-y-6">
                 {/* Images */}
                 <div className="space-y-2">
-                  <Label>{t('property.images')}</Label>
+                  <Label>{t('properties.images')}</Label>
                   <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
                     <Input type="file" accept="image/*" multiple onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                     <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -349,7 +349,7 @@ export default function CreateProperty() {
 
                 {/* Videos */}
                 <div className="space-y-2">
-                  <Label>{t('property.videos')}</Label>
+                  <Label>{t('properties.videos')}</Label>
                   <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
                     <Input type="file" accept="video/*" multiple onChange={handleVideoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                     <Video className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -378,19 +378,19 @@ export default function CreateProperty() {
                   <h3 className="font-semibold">{formData.title}</h3>
                   <p className="text-sm text-muted-foreground">{formData.description}</p>
                   <div className="grid grid-cols-2 gap-2 text-sm mt-4">
-                    <div><strong>{t('property.price')}:</strong> {formData.price}</div>
-                    <div><strong>{t('property.type')}:</strong> {formData.type}</div>
-                    <div><strong>{t('property.location')}:</strong> {formData.city}, {formData.address}</div>
-                    <div><strong>{t('property.rooms')}:</strong> {formData.rooms}</div>
-                    <div><strong>{t('property.parking')}:</strong> {formData.parking ? t('common.yes') : t('common.no')}</div>
-                    <div><strong>{t('property.year_built')}:</strong> {formData.year_built}</div>
-                    <div><strong>{t('property.images')}:</strong> {images.length} {t('common.uploaded')}</div>
-                    <div><strong>{t('property.videos')}:</strong> {videos.length} {t('common.uploaded')}</div>
+                    <div><strong>{t('properties.price')}:</strong> {formData.price}</div>
+                    <div><strong>{t('properties.type')}:</strong> {formData.type}</div>
+                    <div><strong>{t('properties.location')}:</strong> {formData.city}, {formData.address}</div>
+                    <div><strong>{t('properties.rooms')}:</strong> {formData.rooms}</div>
+                    <div><strong>{t('properties.parking')}:</strong> {formData.parking ? t('common.yes') : t('common.no')}</div>
+                    <div><strong>{t('properties.year_built')}:</strong> {formData.year_built}</div>
+                    <div><strong>{t('properties.images')}:</strong> {images.length} {t('common.uploaded')}</div>
+                    <div><strong>{t('properties.videos')}:</strong> {videos.length} {t('common.uploaded')}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded border border-green-200">
                   <Check className="h-4 w-4" />
-                  <span className="text-sm">{t('property.ready_to_publish')}</span>
+                  <span className="text-sm">{t('properties.ready_to_publish')}</span>
                 </div>
               </div>
             )}
@@ -402,7 +402,7 @@ export default function CreateProperty() {
               <Button onClick={nextStep}>{t('common.next')}</Button>
             ) : (
               <Button onClick={handleSubmit} disabled={createPropertyMutation.isPending}>
-                {createPropertyMutation.isPending ? t('common.publishing') : t('property.publish_listing')}
+                {createPropertyMutation.isPending ? t('common.publishing') : t('properties.publish_listing')}
               </Button>
             )}
           </CardFooter>

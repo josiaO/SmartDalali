@@ -103,9 +103,12 @@ class RegisterSerializer(serializers.ModelSerializer):
     is_agent = serializers.BooleanField(default=False, write_only=True)
     email = serializers.EmailField(required=True)
 
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'password_confirm', 'is_agent']
+        fields = ['username', 'email', 'password', 'password_confirm', 'is_agent', 'first_name', 'last_name']
 
     def validate(self, data):
         if data['password'] != data['password_confirm']:
@@ -123,7 +126,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
-            password=validated_data['password']
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', '')
         )
         
         # Auto-activate for now (or keep inactive if email verification is strict)

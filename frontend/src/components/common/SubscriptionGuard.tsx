@@ -48,8 +48,8 @@ export function SubscriptionGuard({ children, feature, fallback }: SubscriptionG
               )}
             </div>
             <CardTitle className="text-2xl">
-              {permission.requiresSubscription 
-                ? 'Subscription Required' 
+              {permission.requiresSubscription
+                ? 'Subscription Required'
                 : 'Access Denied'}
             </CardTitle>
             <CardDescription className="text-base">
@@ -92,7 +92,7 @@ export function SubscriptionGuard({ children, feature, fallback }: SubscriptionG
                       View Subscription Plans
                     </Button>
                   </Link>
-                  <Link to="/agent">
+                  <Link to="/agent/dashboard">
                     <Button variant="outline" className="w-full">
                       Back to Dashboard
                     </Button>

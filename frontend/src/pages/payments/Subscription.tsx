@@ -70,12 +70,25 @@ export default function Subscription() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-3 mb-6">
-                {plan.features.map((feature) => (
-                  <li key={feature.id} className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                    <span className="text-sm">{feature.name}</span>
-                  </li>
-                ))}
+                {plan.features.map((feature) => {
+                  const isActive = feature.status === 'active';
+                  const isComingSoon = feature.status === 'coming_soon';
+
+                  return (
+                    <li key={feature.id} className="flex items-start gap-2">
+                      <Check className={`h-5 w-5 shrink-0 mt-0.5 ${isActive ? 'text-accent' : 'text-muted-foreground'}`} />
+                      <div className="flex-1 flex items-center gap-2">
+                        <span className={`text-sm ${!isActive ? 'text-muted-foreground' : ''}`}>{feature.name}</span>
+                        {isComingSoon && (
+                          <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                        )}
+                        {!isActive && !isComingSoon && (
+                          <Badge variant="outline" className="text-xs">Disabled</Badge>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
                 {plan.features.length === 0 && (
                   <li className="text-sm text-muted-foreground italic">No specific features listed</li>
                 )}

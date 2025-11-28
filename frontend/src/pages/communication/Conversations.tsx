@@ -175,33 +175,36 @@ export default function Conversations() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {messages?.map((message) => {
-                        const isOwn = message.sender === message.conversation; // Simplified - adjust based on actual user ID
+                      {(() => {
+                        const messagesList = Array.isArray(messages) ? messages : (messages as any)?.results || [];
+                        return messagesList.map((message: any) => {
+                          const isOwn = message.sender === message.conversation; // Simplified - adjust based on actual user ID
 
-                        return (
-                          <div
-                            key={message.id}
-                            className={cn(
-                              'flex',
-                              isOwn ? 'justify-end' : 'justify-start'
-                            )}
-                          >
+                          return (
                             <div
+                              key={message.id}
                               className={cn(
-                                'max-w-[70%] rounded-lg p-3',
-                                isOwn
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-muted'
+                                'flex',
+                                isOwn ? 'justify-end' : 'justify-start'
                               )}
                             >
-                              <p className="text-sm">{message.content}</p>
-                              <span className="text-xs opacity-70 mt-1 block">
-                                {format(new Date(message.created_at), 'h:mm a')}
-                              </span>
+                              <div
+                                className={cn(
+                                  'max-w-[70%] rounded-lg p-3',
+                                  isOwn
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
+                                )}
+                              >
+                                <p className="text-sm">{message.content}</p>
+                                <span className="text-xs opacity-70 mt-1 block">
+                                  {format(new Date(message.created_at), 'h:mm a')}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </ScrollArea>

@@ -2,22 +2,25 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchProperties, type Property, type PropertyFilters } from '@/api/properties';
 import { PropertyCard } from '@/components/properties/PropertyCard';
+import { PropertyRow } from '@/components/properties/PropertyRow';
 import { PropertyMap } from '@/components/properties/PropertyMap';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, X, Map as MapIcon, List } from 'lucide-react';
+import { Search, Filter, X, Map as MapIcon, List, LayoutGrid } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PROPERTY_TYPES } from '@/lib/constants';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useTranslation } from 'react-i18next';
 
 export default function BrowseProperties() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
   const { toast } = useToast();
 
   // Filter states
@@ -50,8 +53,8 @@ export default function BrowseProperties() {
       setProperties(data.results);
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to load properties',
+        title: t('common.error'),
+        description: t('notifications.error_occurred'),
         variant: 'destructive',
       });
     } finally {
@@ -90,9 +93,9 @@ export default function BrowseProperties() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">Property Listings</h1>
+        <h1 className="text-4xl font-bold mb-4">{t('properties.properties')}</h1>
         <p className="text-muted-foreground mb-6">
-          Find your dream home from our exclusive listings.
+          {t('dashboard.manage_desc')}
         </p>
 
         {/* Search Bar & Filter Toggle */}
@@ -100,19 +103,28 @@ export default function BrowseProperties() {
           <form onSubmit={handleSearch} className="flex-1 flex gap-2">
             <Input
               type="search"
-              placeholder="Search by title or description..."
+              placeholder={t('properties.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1"
             />
             <Button type="submit">
               <Search className="h-4 w-4 mr-2" />
-              Search
+              {t('common.search')}
             </Button>
           </form>
 
           <div className="flex gap-2">
             <div className="flex bg-muted rounded-md p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="px-3"
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                {t('properties.view_mode_grid')}
+              </Button>
               <Button
                 variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                 size="sm"
@@ -120,7 +132,7 @@ export default function BrowseProperties() {
                 className="px-3"
               >
                 <List className="h-4 w-4 mr-2" />
-                List
+                {t('properties.view_mode_list')}
               </Button>
               <Button
                 variant={viewMode === 'map' ? 'secondary' : 'ghost'}
@@ -129,7 +141,7 @@ export default function BrowseProperties() {
                 className="px-3"
               >
                 <MapIcon className="h-4 w-4 mr-2" />
-                Map
+                {t('properties.view_mode_map')}
               </Button>
             </div>
 
@@ -137,37 +149,37 @@ export default function BrowseProperties() {
               <SheetTrigger asChild>
                 <Button variant="outline">
                   <Filter className="h-4 w-4 mr-2" />
-                  Filters
+                  {t('common.filters')}
                 </Button>
               </SheetTrigger>
               <SheetContent className="w-full sm:max-w-md overflow-y-auto">
                 <SheetHeader>
-                  <SheetTitle>Filter Properties</SheetTitle>
+                  <SheetTitle>{t('common.filters')}</SheetTitle>
                   <SheetDescription>
-                    Refine your search results
+                    {t('properties.filter_desc')}
                   </SheetDescription>
                 </SheetHeader>
                 <div className="space-y-6 mt-6">
                   <div className="space-y-2">
-                    <Label>City</Label>
+                    <Label>{t('properties.city')}</Label>
                     <Input
-                      placeholder="Enter city..."
+                      placeholder={t('properties.city_placeholder')}
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Property Type</Label>
+                    <Label>{t('properties.type')}</Label>
                     <Select value={propertyType} onValueChange={setPropertyType}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
+                        <SelectValue placeholder={t('form.select_type')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="all">{t('common.all')}</SelectItem>
                         {PROPERTY_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -176,7 +188,7 @@ export default function BrowseProperties() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Min Price</Label>
+                      <Label>{t('properties.min_price')}</Label>
                       <Input
                         type="number"
                         placeholder="Min"
@@ -185,7 +197,7 @@ export default function BrowseProperties() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Max Price</Label>
+                      <Label>{t('properties.max_price')}</Label>
                       <Input
                         type="number"
                         placeholder="Max"
@@ -196,25 +208,25 @@ export default function BrowseProperties() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Bedrooms</Label>
+                    <Label>{t('properties.bedrooms')}</Label>
                     <Input
                       type="number"
-                      placeholder="Number of bedrooms"
+                      placeholder={t('properties.bedrooms')}
                       value={bedrooms}
                       onChange={(e) => setBedrooms(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Sort By</Label>
+                    <Label>{t('common.sort_by')}</Label>
                     <Select value={sort} onValueChange={setSort}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="-created_at">Newest First</SelectItem>
-                        <SelectItem value="price">Price: Low to High</SelectItem>
-                        <SelectItem value="-price">Price: High to Low</SelectItem>
+                        <SelectItem value="-created_at">{t('common.newest')}</SelectItem>
+                        <SelectItem value="price">{t('common.price_low_high')}</SelectItem>
+                        <SelectItem value="-price">{t('common.price_high_low')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -222,12 +234,11 @@ export default function BrowseProperties() {
                   <div className="flex gap-2 pt-4">
                     <Button className="flex-1" onClick={() => {
                       applyFilters();
-                      // Close sheet logic would go here if controlled
                     }}>
-                      Apply Filters
+                      {t('common.apply')}
                     </Button>
                     <Button variant="outline" onClick={clearFilters}>
-                      Clear
+                      {t('common.clear')}
                     </Button>
                   </div>
                 </div>
@@ -241,12 +252,12 @@ export default function BrowseProperties() {
           <div className="flex flex-wrap gap-2 mb-6">
             {city && (
               <Button variant="secondary" size="sm" onClick={() => { setCity(''); applyFilters(); }}>
-                City: {city} <X className="ml-2 h-3 w-3" />
+                {t('properties.city')}: {city} <X className="ml-2 h-3 w-3" />
               </Button>
             )}
             {propertyType && propertyType !== 'all' && (
               <Button variant="secondary" size="sm" onClick={() => { setPropertyType(''); applyFilters(); }}>
-                Type: {PROPERTY_TYPES.find(t => t.value === propertyType)?.label || propertyType} <X className="ml-2 h-3 w-3" />
+                {t('properties.type')}: {PROPERTY_TYPES.find(t => t.value === propertyType)?.label || propertyType} <X className="ml-2 h-3 w-3" />
               </Button>
             )}
             {minPrice && (
@@ -261,11 +272,11 @@ export default function BrowseProperties() {
             )}
             {bedrooms && (
               <Button variant="secondary" size="sm" onClick={() => { setBedrooms(''); applyFilters(); }}>
-                Beds: {bedrooms} <X className="ml-2 h-3 w-3" />
+                {t('properties.bedrooms')}: {bedrooms} <X className="ml-2 h-3 w-3" />
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-              Clear All
+              {t('common.clear_all')}
             </Button>
           </div>
         )}
@@ -276,13 +287,19 @@ export default function BrowseProperties() {
           </div>
         ) : properties.length === 0 ? (
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold mb-2">No properties found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('properties.no_properties')}</h3>
             <p className="text-muted-foreground">
-              Try adjusting your search or filters to find what you're looking for.
+              {t('properties.no_results')}
             </p>
           </div>
         ) : viewMode === 'map' ? (
           <PropertyMap properties={properties} />
+        ) : viewMode === 'list' ? (
+          <div className="space-y-4">
+            {properties.map((property) => (
+              <PropertyRow key={property.id} property={property} />
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {properties.map((property) => (
@@ -294,3 +311,4 @@ export default function BrowseProperties() {
     </div>
   );
 }
+

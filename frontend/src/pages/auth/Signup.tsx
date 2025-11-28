@@ -10,11 +10,15 @@ import { auth, googleProvider } from '@/lib/firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { toast } from 'sonner';
 
+import { useTranslation } from 'react-i18next';
+
 export default function Signup() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     first_name: '',
     last_name: '',
     username: '',
@@ -40,16 +44,17 @@ export default function Signup() {
       await register({
         email: formData.email,
         password: formData.password,
+        password_confirm: formData.confirmPassword,
         first_name: firstName,
         last_name: lastName,
-        username: username, // Add username to payload
+        username: username,
       });
 
-      toast.success('Account created successfully! Please login.');
+      toast.success(t('auth.account_created'));
       navigate('/auth/login');
     } catch (error: any) {
       console.error('Signup error:', error);
-      toast.error(error.response?.data?.error || 'Failed to create account');
+      toast.error(error.response?.data?.error || t('auth.signup_failed'));
     } finally {
       setLoading(false);
     }
@@ -77,7 +82,7 @@ export default function Signup() {
       const currentUser = await getCurrentUser();
       const role = getUserRole(currentUser);
 
-      toast.success('Logged in successfully!');
+      toast.success(t('auth.login_success'));
 
       if (role === 'admin') {
         navigate('/admin', { replace: true });
@@ -88,7 +93,7 @@ export default function Signup() {
       }
     } catch (error: any) {
       console.error('Google login error:', error);
-      toast.error(error.message || 'Failed to login with Google');
+      toast.error(error.message || t('auth.google_login_failed'));
     } finally {
       setGoogleLoading(false);
     }
@@ -101,9 +106,9 @@ export default function Signup() {
           <div className="flex justify-center">
             <Building2 className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Sign Up</CardTitle>
+          <CardTitle className="text-2xl">{t('auth.signup_title')}</CardTitle>
           <CardDescription>
-            Create your account to get started
+            {t('auth.signup_desc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -121,7 +126,7 @@ export default function Signup() {
                 <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
               </svg>
             )}
-            Sign up with Google
+            {t('auth.google_signup')}
           </Button>
 
           <div className="relative">
@@ -130,14 +135,14 @@ export default function Signup() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
+                {t('auth.or_email')}
               </span>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
+              <Label htmlFor="full_name">{t('form.full_name')}</Label>
               <Input
                 id="full_name"
                 placeholder="John Doe"
@@ -147,7 +152,7 @@ export default function Signup() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t('form.username')}</Label>
               <Input
                 id="username"
                 placeholder="johndoe"
@@ -157,7 +162,7 @@ export default function Signup() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('form.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -168,7 +173,7 @@ export default function Signup() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('form.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -182,15 +187,15 @@ export default function Signup() {
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                'Sign Up'
+                t('nav.signup')
               )}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Already have an account? </span>
+            <span className="text-muted-foreground">{t('auth.already_have_account')} </span>
             <Link to="/auth/login" className="text-primary hover:underline">
-              Login
+              {t('nav.login')}
             </Link>
           </div>
         </CardContent>

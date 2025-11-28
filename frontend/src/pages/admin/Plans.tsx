@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { fetchPlans, createPlan, updatePlan, deletePlan, fetchFeatures, type SubscriptionPlan, type Feature } from '@/api/admin';
+import { fetchPlans, createPlan, updatePlan, deletePlan, fetchFeatures } from '@/api/admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -11,22 +10,39 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 
+interface Feature {
+    id: number;
+    name: string;
+    code: string;
+    description: string;
+    status: string;
+}
+
+interface Plan {
+    id: number;
+    title: string;
+    slug: string;
+    price_monthly: number;
+    price_yearly: number;
+    highlight: boolean;
+    features: { feature: Feature; included: boolean }[];
+}
+
 export default function AdminPlans() {
-    const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+    const [plans, setPlans] = useState<Plan[]>([]);
     const [features, setFeatures] = useState<Feature[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+    const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
     const { toast } = useToast();
 
-    // Form state
     const [formData, setFormData] = useState({
-        name: '',
-        price: 0,
-        duration_days: 30,
-        description: '',
-        feature_ids: [] as number[],
-        is_active: true,
+        title: '',
+        slug: '',
+        price_monthly: 0,
+        price_yearly: 0,
+        highlight: false,
+        feature_ids: [] as number[]
     });
 
     useEffect(() => {
@@ -36,7 +52,6 @@ export default function AdminPlans() {
     async function loadData() {
         try {
             const [plansData, featuresData] = await Promise.all([fetchPlans(), fetchFeatures()]);
-
             const pResults = Array.isArray(plansData) ? plansData : (plansData as any).results || [];
             const fResults = Array.isArray(featuresData) ? featuresData : (featuresData as any).results || [];
 
@@ -53,26 +68,26 @@ export default function AdminPlans() {
         }
     }
 
-    function handleOpenDialog(plan?: SubscriptionPlan) {
+    function handleOpenDialog(plan?: Plan) {
         if (plan) {
             setEditingPlan(plan);
             setFormData({
-                name: plan.name,
-                price: plan.price,
-                duration_days: plan.duration_days,
-                description: plan.description,
-                feature_ids: plan.features.map(f => f.id),
-                is_active: plan.is_active,
+                title: plan.title,
+                slug: plan.slug,
+                price_monthly: plan.price_monthly,
+                price_yearly: plan.price_yearly,
+                highlight: plan.highlight,
+                feature_ids: plan.features.map(f => f.feature.id)
             });
         } else {
             setEditingPlan(null);
             setFormData({
-                name: '',
-                price: 0,
-                duration_days: 30,
-                description: '',
-                feature_ids: [],
-                is_active: true,
+                title: '',
+                slug: '',
+                price_monthly: 0,
+                price_yearly: 0,
+                highlight: false,
+                feature_ids: []
             });
         }
         setIsDialogOpen(true);
@@ -131,8 +146,8 @@ export default function AdminPlans() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold">Subscription Plans</h1>
-                    <p className="text-muted-foreground">Manage pricing tiers and included features</p>
+                    <h1 className="text-3xl font-bold">Pricing Plans</h1>
+                    <p className="text-muted-foreground">Manage subscription tiers and features</p>
                 </div>
                 <Button onClick={() => handleOpenDialog()}>
                     <Plus className="mr-2 h-4 w-4" />
@@ -142,13 +157,21 @@ export default function AdminPlans() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {plans.map((plan) => (
-                    <div key={plan.id} className="border rounded-lg p-6 space-y-4">
+                    <div key={plan.id} className={`border rounded-lg p-6 space-y-4 ${plan.highlight ? 'ring-2 ring-primary' : ''}`}>
                         <div className="flex justify-between items-start">
                             <div>
-                                <h3 className="font-bold text-xl">{plan.name}</h3>
-                                <p className="text-2xl font-bold mt-1">
-                                    {plan.price.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">/ {plan.duration_days} days</span>
-                                </p>
+                                <h3 className="font-bold text-xl">{plan.title}</h3>
+                                {plan.highlight && <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">Popular</span>}
+                                <div className="mt-2 space-y-1">
+                                    <p className="text-2xl font-bold">
+                                        ${Number(plan.price_monthly).toLocaleString()}
+                                        <span className="text-sm font-normal text-muted-foreground">/month</span>
+                                    </p>
+                                    <p className="text-lg">
+                                        ${Number(plan.price_yearly).toLocaleString()}
+                                        <span className="text-sm font-normal text-muted-foreground">/year</span>
+                                    </p>
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(plan)}>
@@ -160,24 +183,22 @@ export default function AdminPlans() {
                             </div>
                         </div>
 
-                        <p className="text-sm text-muted-foreground">{plan.description}</p>
-
                         <div className="space-y-2">
-                            <p className="font-medium text-sm">Included Features:</p>
+                            <p className="font-medium text-sm">Features:</p>
                             <ul className="text-sm space-y-1">
-                                {plan.features.map(f => (
-                                    <li key={f.id} className="flex items-center gap-2">
-                                        <span className="text-primary">✓</span> {f.name}
+                                {plan.features.filter(f => f.included).map(pf => (
+                                    <li key={pf.feature.id} className="flex items-center gap-2">
+                                        <span className="text-primary">✓</span>
+                                        {pf.feature.name}
+                                        {pf.feature.status === 'coming_soon' && (
+                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">Coming Soon</span>
+                                        )}
                                     </li>
                                 ))}
-                                {plan.features.length === 0 && <li className="text-muted-foreground italic">No features assigned</li>}
+                                {plan.features.filter(f => f.included).length === 0 && (
+                                    <li className="text-muted-foreground italic">No features assigned</li>
+                                )}
                             </ul>
-                        </div>
-
-                        <div className="pt-4 border-t flex items-center justify-between">
-                            <span className={`text-xs px-2 py-1 rounded-full ${plan.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                {plan.is_active ? 'Active' : 'Inactive'}
-                            </span>
                         </div>
                     </div>
                 ))}
@@ -191,44 +212,46 @@ export default function AdminPlans() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="name">Plan Name</Label>
+                                <Label htmlFor="title">Plan Title</Label>
                                 <Input
-                                    id="name"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    id="title"
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     required
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="price">Price</Label>
+                                <Label htmlFor="slug">Slug</Label>
                                 <Input
-                                    id="price"
-                                    type="number"
-                                    value={formData.price}
-                                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                                    id="slug"
+                                    value={formData.slug}
+                                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                                     required
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="duration">Duration (Days)</Label>
-                            <Input
-                                id="duration"
-                                type="number"
-                                value={formData.duration_days}
-                                onChange={(e) => setFormData({ ...formData, duration_days: Number(e.target.value) })}
-                                required
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="price_monthly">Monthly Price</Label>
+                                <Input
+                                    id="price_monthly"
+                                    type="number"
+                                    value={formData.price_monthly}
+                                    onChange={(e) => setFormData({ ...formData, price_monthly: Number(e.target.value) })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="price_yearly">Yearly Price</Label>
+                                <Input
+                                    id="price_yearly"
+                                    type="number"
+                                    value={formData.price_yearly}
+                                    onChange={(e) => setFormData({ ...formData, price_yearly: Number(e.target.value) })}
+                                    required
+                                />
+                            </div>
                         </div>
 
                         <div className="space-y-3">
@@ -243,6 +266,9 @@ export default function AdminPlans() {
                                         />
                                         <Label htmlFor={`f-${feature.id}`} className="cursor-pointer font-normal">
                                             {feature.name}
+                                            {feature.status === 'coming_soon' && (
+                                                <span className="ml-2 text-xs text-yellow-600">(Soon)</span>
+                                            )}
                                         </Label>
                                     </div>
                                 ))}
@@ -251,11 +277,11 @@ export default function AdminPlans() {
 
                         <div className="flex items-center space-x-2">
                             <Switch
-                                id="is_active"
-                                checked={formData.is_active}
-                                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                                id="highlight"
+                                checked={formData.highlight}
+                                onCheckedChange={(checked) => setFormData({ ...formData, highlight: checked })}
                             />
-                            <Label htmlFor="is_active">Active</Label>
+                            <Label htmlFor="highlight">Mark as Popular</Label>
                         </div>
 
                         <div className="flex justify-end gap-2">

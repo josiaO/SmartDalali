@@ -25,6 +25,9 @@ urlpatterns = [
     path('api/v1/properties/', include('properties.urls')),
     path('api/v1/communications/', include('communications.urls')),
     path('api/v1/agents/stats/', agent_stats, name='agent-stats'),
+    path("api/v1/insights/", include("insights.urls")),
+    path("api/", include("features.urls")),
+
     path('api/schema/', SpectacularAPIView.as_view(), name='api-schema'),
     path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='api-schema'), name='api-docs-redoc'),
     path('favicon.ico', empty_favicon),

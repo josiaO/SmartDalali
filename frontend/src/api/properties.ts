@@ -10,8 +10,8 @@ export interface Property {
   bedrooms: number;
   bathrooms: number;
   rooms: number;
-  square_feet?: number;
-  property_type: string;
+  area: number;
+  type: string;
   status: string;
   parking: boolean;
   year_built: string | null;
@@ -19,6 +19,7 @@ export interface Property {
   like_count: number;
   is_liked: boolean;
   media: Array<{ id: number; Images: string; videos: string | null; caption: string }>;
+  main_image_url: string | null;
   agent: {
     id: string;
     first_name: string;
@@ -56,11 +57,6 @@ export const getProperties = async () => {
   return response.data;
 };
 
-export const getAgentProperties = async () => {
-  const response = await api.get<Property[]>('/api/v1/properties/agent/?page_size=100');
-  return response.data;
-};
-
 export const getLikedProperties = async () => {
   const response = await api.get<Property[]>('/api/v1/properties/liked/');
   return response.data;
@@ -71,15 +67,30 @@ export const getViewedProperties = async () => {
   return response.data;
 };
 
-export const getPublicStats = async () => {
+export async function getPublicStats() {
   const response = await api.get('/api/v1/properties/public-stats/');
   return response.data;
-};
+}
 
 export const getAgentStats = async () => {
   const response = await api.get('/api/v1/properties/agent-stats/');
   return response.data;
 };
+
+export async function getAgentProperties() {
+  const response = await api.get('/api/v1/properties/agent-properties/');
+  return response.data;
+}
+
+export async function updatePropertyStatus(propertyId: number, status: string) {
+  const response = await api.patch(`/api/v1/properties/${propertyId}/`, { status });
+  return response.data;
+}
+
+export async function deleteProperty(propertyId: number) {
+  const response = await api.delete(`/api/v1/properties/${propertyId}/`);
+  return response.data;
+}
 
 export async function fetchProperty(id: string) {
   const response = await api.get<Property>(`/api/v1/properties/${id}/`);
@@ -102,10 +113,6 @@ export async function updateProperty(id: string, formData: FormData) {
     },
   });
   return response.data;
-}
-
-export async function deleteProperty(id: string) {
-  await api.delete(`/api/v1/properties/${id}/`);
 }
 
 export async function geocodeAddress(address: string) {

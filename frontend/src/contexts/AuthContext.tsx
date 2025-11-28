@@ -17,6 +17,8 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   features: string[];
   hasFeature: (code: string) => boolean;
+  error: string | null;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [allFeatures, setAllFeatures] = useState<Feature[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -58,19 +61,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const userProfile = await getCurrentUser();
       setUser(userProfile);
-    } catch (error) {
-      console.error('Auth check failed:', error);
+      setUser(userProfile);
+    } catch (err: any) {
+      console.error('Auth check failed:', err);
       // If token is invalid, clear it
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       setUser(null);
+      setError(err.message || 'Authentication failed');
     }
   }
 
   async function login(access: string, refresh: string) {
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
-    await checkAuth();
+    try {
+      localStorage.setItem('access_token', access);
+      localStorage.setItem('refresh_token', refresh);
+      await checkAuth();
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+      throw err;
+    }
   }
 
   async function logout() {
@@ -95,25 +105,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   function hasFeature(code: string): boolean {
     if (user?.is_superuser) return true; // Superusers have all features
-    
+
     const feature = allFeatures.find(f => f.code === code);
     if (!feature || !feature.is_active) {
-        return false; // Feature does not exist or is inactive globally
+      return false; // Feature does not exist or is inactive globally
     }
 
     // For agents, check if the feature is in their plan
     if (user?.role === 'agent') {
-        return userFeatureCodes.includes(code);
+      return userFeatureCodes.includes(code);
     }
-    
+
     // For other roles, if they are not superuser, they don't have features from plans
     return false;
   }
-  
+
   const accessibleFeatures = userFeatureCodes.filter(code => {
-      const feature = allFeatures.find(f => f.code === code);
-      return feature?.is_active;
+    const feature = allFeatures.find(f => f.code === code);
+    return feature?.is_active;
   });
+
+  const clearError = () => setError(null);
 
   return (
     <AuthContext.Provider
@@ -126,6 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshUser,
         features: user?.is_superuser ? allFeatures.map(f => f.code) : accessibleFeatures,
         hasFeature,
+        error,
+        clearError,
       }}
     >
       {children}

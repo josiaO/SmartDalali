@@ -253,13 +253,13 @@ export default function PropertyDetails() {
                     <Square className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Area</p>
-                      <p className="font-semibold">{property.square_feet || 'N/A'} sq ft</p>
+                      <p className="font-semibold">{property.area || 'N/A'} sq ft</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div>
                       <p className="text-sm text-muted-foreground">Type</p>
-                      <p className="font-semibold">{property.property_type}</p>
+                      <p className="font-semibold">{property.type}</p>
                     </div>
                   </div>
                 </div>
@@ -300,7 +300,7 @@ export default function PropertyDetails() {
                     <div>
                       <p
                         className="font-semibold text-lg cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => navigate(`/agents/${property.agent.id}`)}
+                        onClick={() => navigate(`/agents/${property.agent.id}/profile`)}
                       >
                         {property.agent.first_name} {property.agent.last_name}
                       </p>
@@ -338,9 +338,9 @@ export default function PropertyDetails() {
                     />
                     {user && (
                       <RateAgentDialog
-                        agentId={property.agent.id}
+                        agentId={Number(property.agent.id)}
                         agentName={`${property.agent.first_name} ${property.agent.last_name}`}
-                        propertyId={property.id}
+                        propertyId={Number(property.id)}
                         trigger={
                           <Button variant="outline" className="w-full">
                             <Star className="mr-2 h-4 w-4" />

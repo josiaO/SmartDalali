@@ -82,6 +82,7 @@ export interface LoginCredentials {
 export interface RegisterData {
   email: string;
   password: string;
+  password_confirm?: string;
   first_name: string;
   last_name: string;
   username: string;
@@ -234,3 +235,9 @@ export async function deleteAccount(password?: string) {
   });
   return response.data;
 }
+
+export async function upgradeToAgent(data: { agency_name?: string; phone?: string }) {
+  const response = await api.post('/api/v1/accounts/profile/upgrade-to-agent/', data);
+  return response.data;
+}
+

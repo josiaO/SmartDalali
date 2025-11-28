@@ -16,7 +16,9 @@ export interface Feature {
 export interface SubscriptionPlan {
     id: number;
     name: string;
-    price: number;
+    price: number;  // Legacy field for backward compatibility
+    price_monthly?: number;
+    price_yearly?: number;
     duration_days: number;
     description: string;
     features: Feature[];
@@ -75,7 +77,7 @@ export interface AssignPlanResponse {
  * Admins see all plans, regular users see only active plans
  */
 export async function fetchSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-    const res = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/properties/features/plans/');
+    const res = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/plans/');
     // Handle both direct array and paginated response
     return Array.isArray(res.data) ? res.data : res.data.results || [];
 }
@@ -84,7 +86,7 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlan[]> {
  * Fetch a single subscription plan by ID
  */
 export async function fetchSubscriptionPlan(planId: number): Promise<SubscriptionPlan> {
-    const res = await api.get(`/api/v1/properties/features/plans/${planId}/`);
+    const res = await api.get(`/api/v1/plans/${planId}/`);
     return res.data;
 }
 
@@ -99,7 +101,7 @@ export async function createSubscriptionPlan(data: {
     feature_ids: number[];
     is_active?: boolean;
 }): Promise<SubscriptionPlan> {
-    const res = await api.post('/api/v1/properties/features/plans/', data);
+    const res = await api.post('/api/v1/plans/', data);
     return res.data;
 }
 
@@ -117,7 +119,7 @@ export async function updateSubscriptionPlan(
         is_active: boolean;
     }>
 ): Promise<SubscriptionPlan> {
-    const res = await api.patch(`/api/v1/properties/features/plans/${planId}/`, data);
+    const res = await api.patch(`/api/v1/plans/${planId}/`, data);
     return res.data;
 }
 
@@ -125,7 +127,7 @@ export async function updateSubscriptionPlan(
  * Delete a subscription plan (Admin only)
  */
 export async function deleteSubscriptionPlan(planId: number): Promise<void> {
-    await api.delete(`/api/v1/properties/features/plans/${planId}/`);
+    await api.delete(`/api/v1/plans/${planId}/`);
 }
 
 /**
@@ -135,7 +137,7 @@ export async function assignPlanToAgent(
     planId: number,
     agentId: number
 ): Promise<AssignPlanResponse> {
-    const res = await api.post(`/api/v1/properties/features/plans/${planId}/assign_to_agent/`, {
+    const res = await api.post(`/api/v1/plans/${planId}/assign_to_agent/`, {
         agent_id: agentId,
     });
     return res.data;
@@ -148,7 +150,7 @@ export async function removePlanFromAgent(
     planId: number,
     agentId: number
 ): Promise<{ message: string }> {
-    const res = await api.post(`/api/v1/properties/features/plans/${planId}/remove_from_agent/`, {
+    const res = await api.post(`/api/v1/plans/${planId}/remove_from_agent/`, {
         agent_id: agentId,
     });
     return res.data;
@@ -162,7 +164,7 @@ export async function fetchPlanSubscribers(planId: number): Promise<{
     total_subscribers: number;
     subscribers: AgentSubscription[];
 }> {
-    const res = await api.get(`/api/v1/properties/features/plans/${planId}/subscribers/`);
+    const res = await api.get(`/api/v1/plans/${planId}/subscribers/`);
     return res.data;
 }
 
@@ -170,7 +172,7 @@ export async function fetchPlanSubscribers(planId: number): Promise<{
  * Get subscription plan statistics (Admin only)
  */
 export async function fetchSubscriptionStats(): Promise<SubscriptionStats> {
-    const res = await api.get('/api/v1/properties/features/plans/stats/');
+    const res = await api.get('/api/v1/plans/stats/');
     return res.data;
 }
 
@@ -182,7 +184,7 @@ export async function fetchSubscriptionStats(): Promise<SubscriptionStats> {
  * Fetch all features
  */
 export async function fetchFeatures(): Promise<Feature[]> {
-    const res = await api.get('/api/v1/properties/features/?page_size=100');
+    const res = await api.get('/api/v1/features/?page_size=100');
     return res.data;
 }
 
@@ -195,7 +197,7 @@ export async function createFeature(data: {
     description?: string;
     is_active?: boolean;
 }): Promise<Feature> {
-    const res = await api.post('/api/v1/properties/features/', data);
+    const res = await api.post('/api/v1/features/', data);
     return res.data;
 }
 
@@ -211,7 +213,7 @@ export async function updateFeature(
         is_active: boolean;
     }>
 ): Promise<Feature> {
-    const res = await api.patch(`/api/v1/properties/features/${featureId}/`, data);
+    const res = await api.patch(`/api/v1/features/${featureId}/`, data);
     return res.data;
 }
 
@@ -219,7 +221,7 @@ export async function updateFeature(
  * Delete a feature (Admin only)
  */
 export async function deleteFeature(featureId: number): Promise<void> {
-    await api.delete(`/api/v1/properties/features/${featureId}/`);
+    await api.delete(`/api/v1/features/${featureId}/`);
 }
 
 /**

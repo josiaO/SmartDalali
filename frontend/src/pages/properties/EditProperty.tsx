@@ -264,13 +264,13 @@ export default function EditProperty() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{t('property.edit_property')}</CardTitle>
+            <CardTitle>{t('properties.edit_property')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Info */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">{t('property.basic_info')}</h3>
+                <h3 className="text-lg font-semibold">{t('properties.basic_info')}</h3>
 
                 <div className="space-y-2">
                   <Label htmlFor="title">{t('form.title')}</Label>
@@ -284,7 +284,7 @@ export default function EditProperty() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="type">{t('property.type')}</Label>
+                    <Label htmlFor="type">{t('properties.type')}</Label>
                     <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder={t('form.select_type')} />
@@ -300,7 +300,7 @@ export default function EditProperty() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="status">{t('property.status')}</Label>
+                    <Label htmlFor="status">{t('properties.status')}</Label>
                     <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder={t('form.select_status')} />
@@ -317,7 +317,7 @@ export default function EditProperty() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="price">{t('property.price')} (TZS)</Label>
+                  <Label htmlFor="price">{t('properties.price')} (TZS)</Label>
                   <Input
                     id="price"
                     type="number"
@@ -341,11 +341,11 @@ export default function EditProperty() {
 
               {/* Location */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">{t('property.location')}</h3>
+                <h3 className="text-lg font-semibold">{t('properties.location')}</h3>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city">{t('property.city')}</Label>
+                    <Label htmlFor="city">{t('properties.city')}</Label>
                     <Input
                       id="city"
                       value={formData.city}
@@ -355,7 +355,7 @@ export default function EditProperty() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">{t('property.address')}</Label>
+                    <Label htmlFor="address">{t('properties.address')}</Label>
                     <Input
                       id="address"
                       value={formData.address}
@@ -379,7 +379,7 @@ export default function EditProperty() {
                   ) : (
                     <>
                       <MapPin className="mr-2 h-4 w-4" />
-                      {t('property.auto_locate_coordinates')}
+                      {t('properties.auto_locate_coordinates')}
                     </>
                   )}
                 </Button>
@@ -393,11 +393,11 @@ export default function EditProperty() {
 
               {/* Details */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">{t('property.details')}</h3>
+                <h3 className="text-lg font-semibold">{t('properties.details')}</h3>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="bedrooms">{t('property.bedrooms')}</Label>
+                    <Label htmlFor="bedrooms">{t('properties.bedrooms')}</Label>
                     <Input
                       id="bedrooms"
                       type="number"
@@ -409,7 +409,7 @@ export default function EditProperty() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="bathrooms">{t('property.bathrooms')}</Label>
+                    <Label htmlFor="bathrooms">{t('properties.bathrooms')}</Label>
                     <Input
                       id="bathrooms"
                       type="number"
@@ -421,7 +421,7 @@ export default function EditProperty() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="rooms">{t('property.total_rooms')}</Label>
+                    <Label htmlFor="rooms">{t('properties.total_rooms')}</Label>
                     <Input
                       id="rooms"
                       type="number"
@@ -433,7 +433,7 @@ export default function EditProperty() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="area">{t('property.area')} (sq ft)</Label>
+                    <Label htmlFor="area">{t('properties.area')} (sq ft)</Label>
                     <Input
                       id="area"
                       type="number"
@@ -446,7 +446,7 @@ export default function EditProperty() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="year_built">{t('property.year_built')}</Label>
+                    <Label htmlFor="year_built">{t('properties.year_built')}</Label>
                     <Input
                       id="year_built"
                       type="date"
@@ -462,7 +462,7 @@ export default function EditProperty() {
                       onCheckedChange={(checked) => setFormData({ ...formData, parking: checked as boolean })}
                     />
                     <Label htmlFor="parking" className="cursor-pointer">
-                      {t('property.has_parking')}
+                      {t('properties.has_parking')}
                     </Label>
                   </div>
                 </div>
@@ -470,12 +470,12 @@ export default function EditProperty() {
 
               {/* Media */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">{t('property.media')}</h3>
+                <h3 className="text-lg font-semibold">{t('properties.media')}</h3>
 
                 {/* Existing Images */}
                 {existingImages.length > 0 && (
                   <div>
-                    <Label>{t('property.images')}</Label>
+                    <Label>{t('properties.images')}</Label>
                     <div className="grid grid-cols-3 gap-4 mt-2">
                       {existingImages.map((img, index) => (
                         <div key={index} className="relative group">
@@ -511,10 +511,10 @@ export default function EditProperty() {
                       onClick={() => document.getElementById('images')?.click()}
                     >
                       <Upload className="mr-2 h-4 w-4" />
-                      {t('property.upload_images')}
+                      {t('properties.upload_images')}
                     </Button>
                     <span className="text-sm text-muted-foreground">
-                      {existingImages.length + images.length} / 10 {t('property.images')}
+                      {existingImages.length + images.length} / 10 {t('properties.images')}
                     </span>
                   </div>
 
@@ -539,7 +539,7 @@ export default function EditProperty() {
                 {/* Existing Videos */}
                 {existingVideos.length > 0 && (
                   <div>
-                    <Label>{t('property.videos')}</Label>
+                    <Label>{t('properties.videos')}</Label>
                     <div className="grid grid-cols-2 gap-4 mt-2">
                       {existingVideos.map((vid, index) => (
                         <div key={index} className="relative group">
@@ -575,10 +575,10 @@ export default function EditProperty() {
                       onClick={() => document.getElementById('videos')?.click()}
                     >
                       <Video className="mr-2 h-4 w-4" />
-                      {t('property.upload_videos')}
+                      {t('properties.upload_videos')}
                     </Button>
                     <span className="text-sm text-muted-foreground">
-                      {existingVideos.length + videos.length} / 2 {t('property.videos')}
+                      {existingVideos.length + videos.length} / 2 {t('properties.videos')}
                     </span>
                   </div>
 

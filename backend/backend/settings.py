@@ -27,9 +27,9 @@ if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration()],
-        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.2')),
-        profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE', '0.0')),
-        send_default_pii=os.getenv('SENTRY_SEND_DEFAULT_PII', 'false').lower() in ('1', 'true', 'yes'),
+        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE')),
+        profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE')),
+        send_default_pii=os.getenv('SENTRY_SEND_DEFAULT_PII').lower() in ('1', 'true', 'yes'),
     )
 
 # Quick-start development settings - unsuitable for production
@@ -44,15 +44,12 @@ if not SECRET_KEY:
             "SECRET_KEY environment variable is required in production. "
             "Generate one with: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
         )
-    # Development fallback only
-    SECRET_KEY = 'django-insecure-dhfn74p*yyq0djgdi73&prs88^h903a3a$1s_z4u*-vh@!n+hf'
-    print("WARNING: Using default SECRET_KEY. Set SECRET_KEY environment variable for production!")
 
 # DEBUG should be False in production. Control via environment variable.
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('1', 'true', 'yes')
+DEBUG = os.getenv('DEBUG').lower() in ('1', 'true', 'yes')
 
 # 1. Get the string of hosts from your environment (which came from .env)
-HOSTS_STRING = os.environ.get('ALLOWED_HOSTS', '') 
+HOSTS_STRING = os.environ.get('ALLOWED_HOSTS') 
 
 # 2. Split the string by commas to create the required Python list
 ALLOWED_HOSTS = HOSTS_STRING.split(',')
@@ -68,10 +65,10 @@ if os.getenv('DJANGO_ENV') == 'production':
 # development-friendly values (False/0) but can be overridden via environment.
 SESSION_COOKIE_SECURE = not DEBUG  # Only secure in production
 CSRF_COOKIE_SECURE = not DEBUG  # Only secure in production
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() in ('1', 'true', 'yes')
-SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('1', 'true', 'yes')
-SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False').lower() in ('1', 'true', 'yes')
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT').lower() in ('1', 'true', 'yes')
+SECURE_HSTS_SECONDS=os.getenv('SECURE_HSTS_SECONDS')
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS').lower() in ('1', 'true', 'yes')
+SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD').lower() in ('1', 'true', 'yes')
 
 # Additional security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME type sniffing
@@ -134,8 +131,8 @@ SITE_ID = 1
 # These settings provide sensible defaults and read provider secrets from environment variables.
 # Adjust ACCOUNT_EMAIL_VERIFICATION to 'mandatory' if you want allauth to enforce email activation
 # (the project already has a custom activation/code flow, so 'optional' is a safer default).
-ACCOUNT_AUTHENTICATION_METHOD = os.getenv('ACCOUNT_AUTHENTICATION_METHOD', 'username_email')
-ACCOUNT_EMAIL_REQUIRED = os.getenv('ACCOUNT_EMAIL_REQUIRED', 'True').lower() in ('1', 'true', 'yes')
+ACCOUNT_AUTHENTICATION_METHOD = os.getenv('ACCOUNT_AUTHENTICATION_METHOD')
+ACCOUNT_EMAIL_REQUIRED = os.getenv('ACCOUNT_EMAIL_REQUIRED').lower() in ('1', 'true', 'yes')
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'optional')
@@ -222,8 +219,8 @@ AUTHENTICATION_BACKENDS = [
 # CSRF trusted origins - read from environment variable
 # Format: comma-separated list of URLs
 # Example: http://localhost:5173,https://app.smartdalali.com
-csrf_origins_env = os.getenv('CSRF_TRUSTED_ORIGINS', '')
-if csrf_origins_env:
+csrf_origins_env = os.getenv('CSRF_TRUSTED_ORIGINS')
+'''if csrf_origins_env:
     CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
 else:
     # Default development origins if not set
@@ -233,12 +230,12 @@ else:
         'http://localhost:5173',
         'http://127.0.0.1:5173',
     ]
-
+'''
 # CORS allowed origins - read from environment variable
 # Format: comma-separated list of URLs
 # Example: http://localhost:5173,https://app.smartdalali.com
 cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
-if cors_origins_env:
+'''if cors_origins_env:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
 else:
     # Default development origins if not set
@@ -253,7 +250,7 @@ else:
         'http://127.0.0.1:8080',
         'http://localhost:8081',
         'http://127.0.0.1:8081',
-    ]
+    ]'''
 
 # Allow credentials (cookies) for session-authenticated endpoints
 CORS_ALLOW_CREDENTIALS = True
@@ -304,7 +301,7 @@ STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 
 # Frontend URL used in activation emails and links
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv('FRONTEND_URL')
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -345,26 +342,23 @@ ASGI_APPLICATION = 'backend.asgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Support both SQLite (development) and PostgreSQL (production) via environment variables
-db_engine = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
-if db_engine == 'django.db.backends.postgresql':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DB_NAME', 'smartdalali'),
-            'USER': os.getenv('DB_USER', 'smartdalali_user'),
-            'PASSWORD': os.getenv('DB_PASSWORD', ''),
-            'HOST': os.getenv('DB_HOST', 'localhost'),
-            'PORT': os.getenv('DB_PORT', '5432'),
-        }
-    }
-else:
-    # Default to SQLite for development
-    DATABASES = {
+'''DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
+    }'''
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
+}
+
 
 # Cache configuration
 if REDIS_URL:
@@ -530,13 +524,13 @@ SIMPLE_JWT = {
 
 
 # Email Configuration / Transactional mail providers
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS').lower() in ('1', 'true', 'yes')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
 
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 if SENDGRID_API_KEY:
@@ -544,9 +538,9 @@ if SENDGRID_API_KEY:
     ANYMAIL = {
         'SENDGRID_API_KEY': SENDGRID_API_KEY,
         'SENDGRID_GENERATE_MESSAGE_ID': True,
-        'SENDGRID_API_URL': os.getenv('SENDGRID_API_URL', 'https://api.sendgrid.com/v3/'),
+        'SENDGRID_API_URL': os.getenv('SENDGRID_API_URL'),
     }
-    DEFAULT_FROM_EMAIL = os.getenv('SENDGRID_DEFAULT_FROM', DEFAULT_FROM_EMAIL or 'no-reply@example.com')
+    DEFAULT_FROM_EMAIL = os.getenv('SENDGRID_DEFAULT_FROM', DEFAULT_FROM_EMAIL)
     SERVER_EMAIL = os.getenv('SENDGRID_SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 
@@ -598,15 +592,15 @@ from firebase_admin import credentials
 
 FIREBASE_CREDENTIALS_JSON = os.getenv('FIREBASE_CREDENTIALS_JSON')
 FIREBASE_CONFIG = {
-    "type": os.getenv("FIREBASE_TYPE", "service_account"),
-    "project_id": os.getenv("FIREBASE_PROJECT_ID", "real-estate-4b95b"),
+    "type": os.getenv("FIREBASE_TYPE"),
+    "project_id": os.getenv("FIREBASE_PROJECT_ID"),
     "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-    "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace("\\n", "\n"),
+    "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
     "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
     "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-    "auth_uri": os.getenv("FIREBASE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-    "token_uri": os.getenv("FIREBASE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
-    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+    "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+    "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL"),
     "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL"),
 }
 

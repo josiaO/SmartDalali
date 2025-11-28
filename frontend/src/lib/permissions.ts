@@ -36,12 +36,12 @@ interface PermissionConfig {
 const PERMISSION_CONFIG: Record<Feature, PermissionConfig> = {
   [FEATURES.CREATE_PROPERTY]: {
     roles: ['agent'],
-    requiresSubscription: true,
+    requiresSubscription: false, // ✅ No subscription needed
     description: 'Create new property listings',
   },
   [FEATURES.EDIT_PROPERTY]: {
     roles: ['agent'],
-    requiresSubscription: true,
+    requiresSubscription: false, // ✅ No subscription needed
     description: 'Edit existing property listings',
   },
   [FEATURES.DELETE_PROPERTY]: {
@@ -51,7 +51,7 @@ const PERMISSION_CONFIG: Record<Feature, PermissionConfig> = {
   },
   [FEATURES.VIEW_ANALYTICS]: {
     roles: ['agent', 'admin'],
-    requiresSubscription: true,
+    requiresSubscription: false, // ✅ Analytics available to all agents
     description: 'Access detailed analytics and insights',
   },
   [FEATURES.MANAGE_USERS]: {
@@ -71,12 +71,12 @@ const PERMISSION_CONFIG: Record<Feature, PermissionConfig> = {
   },
   [FEATURES.MESSAGING]: {
     roles: ['agent', 'user'],
-    requiresSubscription: true,
+    requiresSubscription: false, // ✅ Messaging available to all
     description: 'Access messaging system',
   },
   [FEATURES.ADVANCED_MESSAGING]: {
     roles: ['agent'],
-    requiresSubscription: true,
+    requiresSubscription: false, // ✅ Advanced messaging available to all agents
     description: 'Access advanced messaging features',
   },
 };

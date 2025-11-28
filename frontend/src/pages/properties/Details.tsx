@@ -84,7 +84,8 @@ export default function PropertyDetails() {
       });
       return;
     }
-    navigate('/communications', { state: { recipientId: property?.agent.id } });
+    // Navigate to agent messages page
+    navigate('/agent/messages', { state: { recipientId: property?.agent.id, propertyId: property?.id } });
   };
 
   const nextImage = () => {

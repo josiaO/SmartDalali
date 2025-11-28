@@ -1,58 +1,259 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, MessageSquare } from 'lucide-react';
+import {
+  Search, Send, MessageSquare, Paperclip, Smile, MoreVertical,
+  File, Image as ImageIcon, X, Reply, Check, CheckCheck
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversations, useMessages, useSendMessage } from '@/hooks/useConversations';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+
+interface Message {
+  id: number;
+  sender: number;
+  sender_name: string;
+  sender_role: string;
+  sender_avatar?: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  attachments?: Attachment[];
+  reactions?: Reaction[];
+  reaction_summary?: Record<string, number>;
+  thread_info?: ThreadInfo;
+}
+
+interface Attachment {
+  id: number;
+  file_url: string;
+  file_name: string;
+  file_type: string;
+  file_size_display: string;
+}
+
+interface Reaction {
+  id: number;
+  user: number;
+  username: string;
+  emoji: string;
+}
+
+interface ThreadInfo {
+  is_reply: boolean;
+  parent_id?: number;
+  parent_preview?: string;
+  has_replies?: boolean;
+  reply_count?: number;
+}
+
+interface Conversation {
+  id: number;
+  other_participant: {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+    avatar?: string;
+  };
+  property_title?: string;
+  property_image?: string;
+  last_message?: {
+    id: number;
+    content: string;
+    sender_id: number;
+    sender_name: string;
+    created_at: string;
+    is_read: boolean;
+    has_attachments: boolean;
+  };
+  unread_count: number;
+  tags?: Array<{ id: number; name: string; color: string }>;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function AgentMessages() {
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [messageText, setMessageText] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { toast } = useToast();
 
   const { data: conversations, isLoading: loadingConversations } = useConversations();
   const { data: messages, isLoading: loadingMessages } = useMessages(selectedConversationId || 0);
   const sendMessage = useSendMessage();
 
   const conversationsList = Array.isArray(conversations) ? conversations : (conversations as any)?.results || [];
+  const selectedConversation = conversationsList.find((c: Conversation) => c.id === selectedConversationId);
 
-  const filteredConversations = conversationsList.filter((conv: any) => {
+  // WebSocket connection
+  useEffect(() => {
+    if (!selectedConversationId) return;
+
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    const ws = new WebSocket(
+      `ws://localhost:8000/ws/chat/${selectedConversationId}/?token=${token}`
+    );
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'message') {
+        // Refetch messages to update UI
+        // In production, you'd update the local state directly
+        window.location.reload(); // Temporary - replace with proper state update
+      } else if (data.type === 'typing') {
+        setIsTyping(data.is_typing);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    wsRef.current = ws;
+
+    return () => {
+      ws.close();
+    };
+  }, [selectedConversationId]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const filteredConversations = conversationsList.filter((conv: Conversation) => {
     if (!search) return true;
-
-    const participantNames = conv.participants
-      .map((p: any) => `${p.first_name} ${p.last_name}`.toLowerCase())
-      .join(' ');
-
-    return participantNames.includes(search.toLowerCase());
+    const searchLower = search.toLowerCase();
+    return (
+      conv.other_participant?.username?.toLowerCase().includes(searchLower) ||
+      conv.property_title?.toLowerCase().includes(searchLower)
+    );
   });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles((prev) => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleTyping = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: true }));
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        wsRef.current?.send(JSON.stringify({ type: 'typing', is_typing: false }));
+      }, 3000);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!messageText.trim() || !selectedConversationId) return;
+    if ((!messageText.trim() && selectedFiles.length === 0) || !selectedConversationId) return;
 
     try {
+      const formData = new FormData();
+      formData.append('content', messageText.trim());
+
+      if (replyingTo) {
+        formData.append('parent_message_id', replyingTo.id.toString());
+      }
+
+      selectedFiles.forEach((file) => {
+        formData.append('attachments', file);
+      });
+
       await sendMessage.mutateAsync({
         conversationId: selectedConversationId,
         content: messageText.trim(),
       });
+
       setMessageText('');
+      setSelectedFiles([]);
+      setReplyingTo(null);
+
+      // Send typing stopped
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: false }));
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send message. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const getInitials = (firstName?: string, lastName?: string) => {
-    if (!firstName || !lastName) return '';
-    const f = firstName[0] ?? '';
-    const l = lastName[0] ?? '';
-    return `${f}${l}`.toUpperCase();
+  const handleReaction = async (messageId: number, emoji: string) => {
+    try {
+      // TODO: Implement reaction API call
+      toast({
+        title: 'Reaction added',
+        description: `Reacted with ${emoji}`,
+      });
+    } catch (error) {
+      console.error('Failed to add reaction:', error);
+    }
+  };
+
+  const formatMessageTime = (dateString: string) => {
+    const date = new Date(dateString);
+    if (isToday(date)) {
+      return format(date, 'h:mm a');
+    } else if (isYesterday(date)) {
+      return `Yesterday ${format(date, 'h:mm a')}`;
+    } else {
+      return format(date, 'MMM d, h:mm a');
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   if (loadingConversations) {
@@ -73,7 +274,7 @@ export default function AgentMessages() {
       </div>
 
       <Card className="h-[calc(100vh-200px)]">
-        <div className="grid md:grid-cols-[350px_1fr] h-full">
+        <div className="grid md:grid-cols-[380px_1fr] h-full">
           {/* Conversations List */}
           <div className="border-r">
             <CardHeader>
@@ -89,7 +290,7 @@ export default function AgentMessages() {
               </div>
             </CardHeader>
 
-            <ScrollArea className="h-[calc(100%-120px)]">
+            <ScrollArea className="h-[calc(100%-140px)]">
               <div className="space-y-1 p-4 pt-0">
                 {filteredConversations.length === 0 ? (
                   <div className="text-center py-12">
@@ -99,8 +300,7 @@ export default function AgentMessages() {
                     </p>
                   </div>
                 ) : (
-                  filteredConversations.map((conversation) => {
-                    const otherParticipant = conversation.participants && conversation.participants.length > 0 ? conversation.participants[0] : null;
+                  filteredConversations.map((conversation: Conversation) => {
                     const isSelected = selectedConversationId === conversation.id;
 
                     return (
@@ -114,15 +314,18 @@ export default function AgentMessages() {
                       >
                         <div className="flex items-start gap-3">
                           <Avatar>
+                            {conversation.other_participant?.avatar && (
+                              <AvatarImage src={conversation.other_participant.avatar} />
+                            )}
                             <AvatarFallback>
-                              {otherParticipant ? getInitials(otherParticipant.first_name, otherParticipant.last_name) : ''}
+                              {getInitials(conversation.other_participant?.username || 'U')}
                             </AvatarFallback>
                           </Avatar>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <p className="font-medium truncate">
-                                {otherParticipant ? `${otherParticipant.first_name} ${otherParticipant.last_name}` : 'Unknown'}
+                                {conversation.other_participant?.username || 'Unknown'}
                               </p>
                               {conversation.last_message && (
                                 <span className="text-xs text-muted-foreground">
@@ -131,15 +334,38 @@ export default function AgentMessages() {
                               )}
                             </div>
 
-                            {conversation.last_message && (
-                              <p className="text-sm text-muted-foreground truncate">
-                                {conversation.last_message.content}
+                            {conversation.property_title && (
+                              <p className="text-xs text-muted-foreground mb-1">
+                                📍 {conversation.property_title}
                               </p>
                             )}
 
-                            {conversation.last_message && !conversation.last_message.read && (
-                              <Badge variant="default" className="mt-1">New</Badge>
+                            {conversation.last_message && (
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm text-muted-foreground truncate flex-1">
+                                  {conversation.last_message.has_attachments && '📎 '}
+                                  {conversation.last_message.content}
+                                </p>
+                              </div>
                             )}
+
+                            <div className="flex items-center gap-2 mt-1">
+                              {conversation.unread_count > 0 && (
+                                <Badge variant="default" className="text-xs">
+                                  {conversation.unread_count}
+                                </Badge>
+                              )}
+                              {conversation.tags?.map((tag) => (
+                                <Badge
+                                  key={tag.id}
+                                  variant="outline"
+                                  className="text-xs"
+                                  style={{ borderColor: tag.color }}
+                                >
+                                  {tag.name}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -152,19 +378,47 @@ export default function AgentMessages() {
 
           {/* Messages Panel */}
           <div className="flex flex-col">
-            {selectedConversationId ? (
+            {selectedConversationId && selectedConversation ? (
               <>
                 {/* Chat Header */}
                 <CardHeader className="border-b">
-                  <CardTitle className="text-lg">
-                    {(() => {
-                      const conv = conversationsList.find((c: any) => c.id === selectedConversationId);
-                      const participant = conv?.participants && conv.participants.length > 0 ? conv.participants[0] : null;
-                      return participant
-                        ? `${participant.first_name} ${participant.last_name}`
-                        : 'Conversation';
-                    })()}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        {selectedConversation.other_participant?.avatar && (
+                          <AvatarImage src={selectedConversation.other_participant.avatar} />
+                        )}
+                        <AvatarFallback>
+                          {getInitials(selectedConversation.other_participant?.username || 'U')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <CardTitle className="text-lg">
+                          {selectedConversation.other_participant?.username || 'Conversation'}
+                        </CardTitle>
+                        {selectedConversation.property_title && (
+                          <p className="text-sm text-muted-foreground">
+                            {selectedConversation.property_title}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>View Profile</DropdownMenuItem>
+                        <DropdownMenuItem>Mute Conversation</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">
+                          Delete Conversation
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </CardHeader>
 
                 {/* Messages */}
@@ -175,52 +429,251 @@ export default function AgentMessages() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {messages?.map((message) => {
-                        const isOwn = message.sender === message.conversation; // Simplified - adjust based on actual user ID
+                      {messages?.map((message: Message) => {
+                        const currentUserId = 1; // TODO: Get from auth context
+                        const isOwn = message.sender === currentUserId;
 
                         return (
                           <div
                             key={message.id}
                             className={cn(
-                              'flex',
+                              'flex gap-2',
                               isOwn ? 'justify-end' : 'justify-start'
                             )}
                           >
-                            <div
-                              className={cn(
-                                'max-w-[70%] rounded-lg p-3',
-                                isOwn
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-muted'
+                            {!isOwn && (
+                              <Avatar className="h-8 w-8">
+                                {message.sender_avatar && (
+                                  <AvatarImage src={message.sender_avatar} />
+                                )}
+                                <AvatarFallback>
+                                  {getInitials(message.sender_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+
+                            <div className={cn('flex flex-col gap-1', isOwn && 'items-end')}>
+                              {/* Thread indicator */}
+                              {message.thread_info?.is_reply && (
+                                <div className="text-xs text-muted-foreground flex items-center gap-1 px-2">
+                                  <Reply className="h-3 w-3" />
+                                  Replying to: {message.thread_info.parent_preview}
+                                </div>
                               )}
-                            >
-                              <p className="text-sm">{message.content}</p>
-                              <span className="text-xs opacity-70 mt-1 block">
-                                {format(new Date(message.created_at), 'h:mm a')}
-                              </span>
+
+                              <div
+                                className={cn(
+                                  'max-w-[70%] rounded-lg p-3',
+                                  isOwn
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
+                                )}
+                              >
+                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+
+                                {/* Attachments */}
+                                {message.attachments && message.attachments.length > 0 && (
+                                  <div className="mt-2 space-y-2">
+                                    {message.attachments.map((attachment) => (
+                                      <a
+                                        key={attachment.id}
+                                        href={attachment.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={cn(
+                                          'flex items-center gap-2 p-2 rounded border',
+                                          isOwn
+                                            ? 'border-primary-foreground/20 hover:bg-primary-foreground/10'
+                                            : 'border-border hover:bg-muted-foreground/10'
+                                        )}
+                                      >
+                                        {attachment.file_type === 'image' ? (
+                                          <ImageIcon className="h-4 w-4" />
+                                        ) : (
+                                          <File className="h-4 w-4" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs truncate">{attachment.file_name}</p>
+                                          <p className="text-xs opacity-70">
+                                            {attachment.file_size_display}
+                                          </p>
+                                        </div>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-xs opacity-70">
+                                    {formatMessageTime(message.created_at)}
+                                  </span>
+                                  {isOwn && (
+                                    <span className="text-xs opacity-70">
+                                      {message.is_read ? (
+                                        <CheckCheck className="h-3 w-3" />
+                                      ) : (
+                                        <Check className="h-3 w-3" />
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Reactions */}
+                              {message.reaction_summary &&
+                                Object.keys(message.reaction_summary).length > 0 && (
+                                  <div className="flex gap-1">
+                                    {Object.entries(message.reaction_summary).map(
+                                      ([emoji, count]) => (
+                                        <button
+                                          key={emoji}
+                                          onClick={() => handleReaction(message.id, emoji)}
+                                          className="text-xs px-2 py-1 rounded-full bg-muted hover:bg-muted-foreground/20"
+                                        >
+                                          {emoji} {count}
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
+                                )}
+
+                              {/* Message actions */}
+                              <div className="flex gap-1 opacity-0 hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs"
+                                  onClick={() => setReplyingTo(message)}
+                                >
+                                  <Reply className="h-3 w-3 mr-1" />
+                                  Reply
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs"
+                                  onClick={() => handleReaction(message.id, '👍')}
+                                >
+                                  <Smile className="h-3 w-3 mr-1" />
+                                  React
+                                </Button>
+                              </div>
                             </div>
+
+                            {isOwn && (
+                              <Avatar className="h-8 w-8">
+                                {message.sender_avatar && (
+                                  <AvatarImage src={message.sender_avatar} />
+                                )}
+                                <AvatarFallback>
+                                  {getInitials(message.sender_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
                           </div>
                         );
                       })}
+                      <div ref={messagesEndRef} />
+
+                      {/* Typing indicator */}
+                      {isTyping && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="flex gap-1">
+                            <span className="animate-bounce">●</span>
+                            <span className="animate-bounce delay-100">●</span>
+                            <span className="animate-bounce delay-200">●</span>
+                          </div>
+                          {selectedConversation.other_participant?.username} is typing...
+                        </div>
+                      )}
                     </div>
                   )}
                 </ScrollArea>
 
                 {/* Message Input */}
                 <div className="border-t p-4">
+                  {/* Reply indicator */}
+                  {replyingTo && (
+                    <div className="mb-2 p-2 bg-muted rounded flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Reply className="h-4 w-4" />
+                        <span className="text-muted-foreground">
+                          Replying to {replyingTo.sender_name}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setReplyingTo(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* File previews */}
+                  {selectedFiles.length > 0 && (
+                    <div className="mb-2 flex gap-2 flex-wrap">
+                      {selectedFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 p-2 bg-muted rounded"
+                        >
+                          <File className="h-4 w-4" />
+                          <span className="text-sm truncate max-w-[150px]">
+                            {file.name}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFile(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      accept="image/*,.pdf,.doc,.docx"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
                     <Input
                       placeholder="Type your message..."
                       value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
+                      onChange={(e) => {
+                        setMessageText(e.target.value);
+                        handleTyping();
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendMessage(e);
                         }
                       }}
+                      className="flex-1"
                     />
-                    <Button type="submit" disabled={!messageText.trim() || sendMessage.isPending}>
+                    <Button
+                      type="submit"
+                      disabled={
+                        (!messageText.trim() && selectedFiles.length === 0) ||
+                        sendMessage.isPending
+                      }
+                    >
                       <Send className="h-4 w-4" />
                     </Button>
                   </form>

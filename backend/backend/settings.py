@@ -579,6 +579,12 @@ LOGGING = {
     },
 }
 
+# Silence non-critical system checks
+# These warnings are for django-allauth social providers that are configured but not actively used
+SILENCED_SYSTEM_CHECKS = [
+    'accounts.W001',  # SocialApp not configured warnings for social auth providers
+]
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'SmartDalali API',
     'DESCRIPTION': 'Marketplace APIs for accounts, properties, messaging, and payments.',

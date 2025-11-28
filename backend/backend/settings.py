@@ -220,7 +220,7 @@ AUTHENTICATION_BACKENDS = [
 # Format: comma-separated list of URLs
 # Example: http://localhost:5173,https://app.smartdalali.com
 csrf_origins_env = os.getenv('CSRF_TRUSTED_ORIGINS')
-'''if csrf_origins_env:
+if csrf_origins_env:
     CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
 else:
     # Default development origins if not set
@@ -230,12 +230,12 @@ else:
         'http://localhost:5173',
         'http://127.0.0.1:5173',
     ]
-'''
+
 # CORS allowed origins - read from environment variable
 # Format: comma-separated list of URLs
 # Example: http://localhost:5173,https://app.smartdalali.com
 cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
-'''if cors_origins_env:
+if cors_origins_env:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
 else:
     # Default development origins if not set
@@ -250,7 +250,7 @@ else:
         'http://127.0.0.1:8080',
         'http://localhost:8081',
         'http://127.0.0.1:8081',
-    ]'''
+    ]
 
 # Allow credentials (cookies) for session-authenticated endpoints
 CORS_ALLOW_CREDENTIALS = True
@@ -342,19 +342,21 @@ ASGI_APPLICATION = 'backend.asgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Support both SQLite (development) and PostgreSQL (production) via environment variables
+
 '''DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }'''
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}'''
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME'),
         'USER': os.getenv('DB_USER'),
         'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
+       'HOST': os.getenv('DB_HOST'),
         'PORT': os.getenv('DB_PORT'),
     }
 }

@@ -46,7 +46,7 @@ if not SECRET_KEY:
         )
 
 # DEBUG should be False in production. Control via environment variable.
-DEBUG = os.getenv('DEBUG').lower() in ('1', 'true', 'yes')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
 # 1. Get the string of hosts from your environment (which came from .env)
 HOSTS_STRING = os.environ.get('ALLOWED_HOSTS') 
@@ -306,6 +306,7 @@ FRONTEND_URL = os.getenv('FRONTEND_URL')
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -453,6 +454,9 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [ BASE_DIR / "static" ]
 STATIC_ROOT = BASE_DIR / "static_root"
+
+# Whitenoise configuration
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
 if AWS_STORAGE_BUCKET_NAME:

@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 email = 'agent@example.com'
-password = 'agentpassword'
+password = os.getenv('AGENT_PASSWORD', 'agentpassword')
 
 try:
     user = User.objects.get(email=email)

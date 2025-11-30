@@ -19,14 +19,22 @@ def empty_favicon(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
+    path('api/v1/properties/', include('properties.urls')),
+    path('api/v1/support/', include('properties.support_urls')),
 
     # Unified API root
-    path('api/v1/accounts/', include('accounts.urls')),
-    path('api/v1/properties/', include('properties.urls')),
     path('api/v1/communications/', include('communications.urls')),
     path('api/v1/agents/stats/', agent_stats, name='agent-stats'),
     path("api/v1/insights/", include("insights.urls")),
-    path("api/", include("features.urls")),
+    path("api/v1/features/", include("features.urls")),
+    path('api/v1/accounts/', include('accounts.urls')),
+
+
+    path('api/schema/', SpectacularAPIView.as_view(), name='api-schema'),
+    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='api-schema'), name='api-docs-redoc'),
+    path('favicon.ico', empty_favicon),
+]", include("features.urls")),
+
 
     path('api/schema/', SpectacularAPIView.as_view(), name='api-schema'),
     path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='api-schema'), name='api-docs-redoc'),

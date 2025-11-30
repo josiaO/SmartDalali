@@ -382,24 +382,28 @@ def firebase_login(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Verify Firebase token (optional - only if Firebase Admin SDK is initialized)
+        # Verify Firebase token
         try:
             import firebase_admin
             from firebase_admin import auth as firebase_auth
 
-            # Check if Firebase is properly initialized
-            if firebase_admin._apps:
-                decoded_token = firebase_auth.verify_id_token(firebase_token)
-                
-                # Verify that the token's uid matches the provided uid
-                if decoded_token.get('uid') != firebase_uid:
-                    return Response(
-                        {'error': 'Firebase token UID mismatch'},
-                        status=status.HTTP_401_UNAUTHORIZED
-                    )
-                logger.info(f'Firebase token verified for UID: {firebase_uid}')
-            else:
-                logger.debug(f'Firebase Admin SDK not initialized, skipping token verification for UID: {firebase_uid}')
+            # Check if Firebase is properly initialized. If not, authentication cannot proceed.
+            if not firebase_admin._apps:
+                logger.error("Firebase Admin SDK is not initialized. Cannot verify Firebase token.")
+                return Response(
+                    {'error': 'Authentication service is not configured.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
+
+            decoded_token = firebase_auth.verify_id_token(firebase_token)
+            
+            # Verify that the token's uid matches the provided uid
+            if decoded_token.get('uid') != firebase_uid:
+                return Response(
+                    {'error': 'Firebase token UID mismatch'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            logger.info(f'Firebase token verified for UID: {firebase_uid}')
 
         except firebase_admin.exceptions.FirebaseError as e:
             logger.error(f'Firebase token verification failed: {str(e)}')
@@ -408,8 +412,12 @@ def firebase_login(request):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         except Exception as e:
-            logger.debug(f'Firebase verification skipped: {str(e)}')
-            # Continue anyway - verification is optional for development
+            # Catch any other unexpected errors during verification
+            logger.error(f'An unexpected error occurred during Firebase verification: {str(e)}')
+            return Response(
+                {'error': 'Could not verify authentication credentials.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         # Create or get user
         try:

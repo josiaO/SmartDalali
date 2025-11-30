@@ -22,16 +22,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv()  # take environment variables from .env.
 
 # Observability / Error tracking
-SENTRY_DSN = os.getenv('SENTRY_DSN')
+'''SENTRY_DSN = os.getenv('SENTRY_DSN')
 if SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE')),
-        profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE')),
-        send_default_pii=os.getenv('SENTRY_SEND_DEFAULT_PII').lower() in ('1', 'true', 'yes'),
-    )
-
+    # sentry_sdk.init(
+    #     dsn=SENTRY_DSN,
+    #     integrations=[DjangoIntegration()],
+    #     traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE')),
+    #     profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE')),
+    #     send_default_pii=os.getenv('SENTRY_SEND_DEFAULT_PII').lower() in ('1', 'true', 'yes'),
+    # )
+'''
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
@@ -49,43 +49,46 @@ if not SECRET_KEY:
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
 
 # 1. Get the string of hosts from your environment (which came from .env)
-HOSTS_STRING = os.environ.get('ALLOWED_HOSTS') 
+HOSTS_STRING = os.environ.get('ALLOWED_HOSTS', '') 
 
 # 2. Split the string by commas to create the required Python list
-ALLOWED_HOSTS = HOSTS_STRING.split(',')
+ALLOWED_HOSTS = HOSTS_STRING.split(',') if HOSTS_STRING else []
 
 # Validate production settings
 if os.getenv('DJANGO_ENV') == 'production':
     if DEBUG:
         raise ValueError("DEBUG must be False in production. Set DEBUG=False in environment.")
-    if '*' in ALLOWED_HOSTS:
-        raise ValueError("ALLOWED_HOSTS must be explicitly set in production. Do not use '*'.")
+    if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
+        raise ValueError("ALLOWED_HOSTS must be explicitly set in production and not contain '*'.")
+    if not os.getenv('CSRF_TRUSTED_ORIGINS'):
+        raise ValueError("CSRF_TRUSTED_ORIGINS must be explicitly set in production.")
+    if not os.getenv('CORS_ALLOWED_ORIGINS'):
+        raise ValueError("CORS_ALLOWED_ORIGINS must be explicitly set in production.")
 
-# Security-sensitive settings that should be set for production. These default to
-# development-friendly values (False/0) but can be overridden via environment.
-SESSION_COOKIE_SECURE = not DEBUG  # Only secure in production
-CSRF_COOKIE_SECURE = not DEBUG  # Only secure in production
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT').lower() in ('1', 'true', 'yes')
-SECURE_HSTS_SECONDS=os.getenv('SECURE_HSTS_SECONDS')
-SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS').lower() in ('1', 'true', 'yes')
-SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD').lower() in ('1', 'true', 'yes')
+# Security-sensitive settings that should be set for production.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', str(not DEBUG)).lower() in ('true', '1', 'yes')
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', 0)) if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', str(not DEBUG)).lower() in ('true', '1', 'yes')
+SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', str(not DEBUG)).lower() in ('true', '1', 'yes')
 
 # Additional security headers
-SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME type sniffing
-SECURE_BROWSER_XSS_FILTER = True  # Enable browser XSS filter
-X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
 
 # Proxy SSL header for HTTPS behind reverse proxy (e.g., nginx, load balancer)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Cookie settings
-SESSION_COOKIE_SAMESITE = 'Lax'  # Changed from None for security
-CSRF_COOKIE_SAMESITE = 'Lax'  # Changed from None for security
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF cookie
-CSRF_USE_SESSIONS = False  # Store CSRF token in cookie instead of session
-SESSION_COOKIE_AGE = 86400  # 24 hours (in seconds)
-SESSION_SAVE_EVERY_REQUEST = False  # Only save session if modified
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+SESSION_COOKIE_AGE = 86400  # 24 hours
+SESSION_SAVE_EVERY_REQUEST = False
 
 
 
@@ -128,23 +131,18 @@ INSTALLED_APPS = [
 SITE_ID = 1
 
 # Django-allauth configuration
-# These settings provide sensible defaults and read provider secrets from environment variables.
-# Adjust ACCOUNT_EMAIL_VERIFICATION to 'mandatory' if you want allauth to enforce email activation
-# (the project already has a custom activation/code flow, so 'optional' is a safer default).
-ACCOUNT_AUTHENTICATION_METHOD = os.getenv('ACCOUNT_AUTHENTICATION_METHOD')
-ACCOUNT_EMAIL_REQUIRED = os.getenv('ACCOUNT_EMAIL_REQUIRED').lower() in ('1', 'true', 'yes')
+ACCOUNT_AUTHENTICATION_METHOD = os.getenv('ACCOUNT_AUTHENTICATION_METHOD', 'email')
+ACCOUNT_EMAIL_REQUIRED = os.getenv('ACCOUNT_EMAIL_REQUIRED', 'True').lower() in ('true', '1', 'yes')
 ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_USERNAME_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'optional')
+ACCOUNT_USERNAME_REQUIRED = False # Users will log in with email
+ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'mandatory')
 SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = os.getenv('SOCIALACCOUNT_EMAIL_VERIFICATION', 'optional')
 
 # Redirect after login (you can change this to your frontend URL)
 LOGIN_REDIRECT_URL = os.getenv('LOGIN_REDIRECT_URL', '/')
 
-# Social provider placeholders. Replace values in environment or configure provider APPs
-# via the Django admin (recommended for production). These placeholders allow running
-# the app without hard failures when django-allauth is present.
+# Social provider placeholders.
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': ['profile', 'email'],
@@ -182,7 +180,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 100,  # Increased from 10 to show more items by default
+    'PAGE_SIZE': 100,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle'
@@ -190,10 +188,6 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'user': '1000/day',
-        'property_list': '30/minute',
-        'property_search': '60/minute',
-        'property_detail': '60/minute',
-        'property_create': '10/hour',
     },
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -202,6 +196,8 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        # SessionAuth is useful for the browsable API and admin site.
+        # Keep it for development, consider removing for a stateless production API.
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
@@ -216,79 +212,48 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-# CSRF trusted origins - read from environment variable
-# Format: comma-separated list of URLs
-# Example: http://localhost:5173,https://app.smartdalali.com
+# CSRF trusted origins - MUST be set in production
 csrf_origins_env = os.getenv('CSRF_TRUSTED_ORIGINS')
 if csrf_origins_env:
     CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
+elif not DEBUG:
+    CSRF_TRUSTED_ORIGINS = [] # Empty list is a safe default if not debug
 else:
     # Default development origins if not set
     CSRF_TRUSTED_ORIGINS = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
+        'http://localhost:3000', 'http://127.0.0.1:3000',
+        'http://localhost:5173', 'http://127.0.0.1:5173',
     ]
 
-# CORS allowed origins - read from environment variable
-# Format: comma-separated list of URLs
-# Example: http://localhost:5173,https://app.smartdalali.com
-cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+# CORS allowed origins - MUST be set in production
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS')
 if cors_origins_env:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+elif not DEBUG:
+    CORS_ALLOWED_ORIGINS = [] # Empty list is a safe default if not debug
 else:
-    # Default development origins if not set
+    # Default development origins
     CORS_ALLOWED_ORIGINS = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:8000',
-        'http://127.0.0.1:8000',
-        'http://localhost:8080',
-        'http://127.0.0.1:8080',
-        'http://localhost:8081',
-        'http://127.0.0.1:8081',
+        'http://localhost:3000', 'http://127.0.0.1:3000',
+        'http://localhost:5173', 'http://127.0.0.1:5173',
+        'http://localhost:8000', 'http://127.0.0.1:8000',
     ]
 
-# Allow credentials (cookies) for session-authenticated endpoints
 CORS_ALLOW_CREDENTIALS = True
-
-# Additional CORS settings
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
+CORS_ALLOW_METHODS = ('DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT')
+CORS_ALLOW_HEADERS = ('accept', 'authorization', 'content-type', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with')
 
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
-GOOGLE_MAPS_GEOCODE_TIMEOUT = int(os.getenv('GOOGLE_MAPS_GEOCODE_TIMEOUT', '5'))
+GOOGLE_MAPS_GEOCODE_TIMEOUT = int(os.getenv('GOOGLE_MAPS_GEOCODE_TIMEOUT', 5))
 REDIS_URL = os.getenv('REDIS_URL')
 
 # M-Pesa Payment Integration (Daraja API)
-# Get credentials from: https://developer.safaricom.co.ke/
 DAR_AFFILIATE_CONSUMER_KEY = os.getenv('DAR_AFFILIATE_CONSUMER_KEY')
 DAR_AFFILIATE_CONSUMER_SECRET = os.getenv('DAR_AFFILIATE_CONSUMER_SECRET')
-DAR_SHORTCODE = os.getenv('DAR_SHORTCODE')  # Business Shortcode (Paybill/Till Number)
-DAR_PASSKEY = os.getenv('DAR_PASSKEY')  # Lipa Na M-Pesa Online Passkey
-MPESA_API_BASE = os.getenv('MPESA_API_BASE', 'https://sandbox.safaricom.co.ke')  # Use 'https://api.safaricom.co.ke' for production
-MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')  # Full URL for payment callbacks
+DAR_SHORTCODE = os.getenv('DAR_SHORTCODE')
+DAR_PASSKEY = os.getenv('DAR_PASSKEY')
+MPESA_API_BASE = os.getenv('MPESA_API_BASE', 'https://sandbox.safaricom.co.ke')
+MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
 
 # Twilio SMS Integration
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
@@ -304,9 +269,9 @@ STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 FRONTEND_URL = os.getenv('FRONTEND_URL')
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -340,27 +305,18 @@ ASGI_APPLICATION = 'backend.asgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+# Use PostgreSQL in production. Use dj-database-url to parse DATABASE_URL env var.
+import dj_database_url
 
-# Support both SQLite (development) and PostgreSQL (production) via environment variables
-
-'''DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.getenv('DATABASE_URL'):
+    DATABASES = {'default': dj_database_url.config(conn_max_age=600, ssl_require=os.getenv('DB_SSL_REQUIRE', 'true').lower() in ('true', '1', 'yes'))}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}'''
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-       'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
-    }
-}
 
 
 # Cache configuration
@@ -371,7 +327,7 @@ if REDIS_URL:
             'LOCATION': REDIS_URL,
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-                'IGNORE_EXCEPTIONS': True,
+                'IGNORE_EXCEPTIONS': True, # Don't crash if Redis is down
             }
         }
     }
@@ -381,109 +337,18 @@ else:
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             'LOCATION': 'property-cache',
-            'TIMEOUT': 60 * 15,  # 15 minutes default timeout
-            'OPTIONS': {
-                'MAX_ENTRIES': 1000  # Maximum number of items in cache
-            }
         }
     }
 
 # Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 9}},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# JWT optional validation settings
-JWT_ISSUER = 'smartdalali'
-JWT_AUDIENCE = 'smartdalali:web'
-JWT_LEEWAY_SECONDS = 10
-
-# Channels
-if REDIS_URL:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [REDIS_URL],
-            },
-        }
-    }
-else:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
-        }
-    }
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
-
-LANGUAGE_CODE = 'en'
-LANGUAGES = [
-    ('en', 'English'),
-    ('sw', 'Kiswahili'),
-]
-
-LOCALE_PATHS = [
-    BASE_DIR / 'locale',
-]
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [ BASE_DIR / "static" ]
-STATIC_ROOT = BASE_DIR / "static_root"
-
-# Whitenoise configuration
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-if AWS_STORAGE_BUCKET_NAME:
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    AWS_S3_REGION_NAME = os.getenv('AWS_REGION', os.getenv('AWS_S3_REGION_NAME'))
-    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN')
-    AWS_QUERYSTRING_AUTH = False
-    AWS_DEFAULT_ACL = None
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-    }
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-    media_domain = AWS_S3_CUSTOM_DOMAIN or f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-    MEDIA_URL = f"https://{media_domain}/"
-    MEDIA_ROOT = None
-else:
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / "media_root"
-
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# SIMPLE_JWT settings
+# JWT settings
 from datetime import timedelta
 
 SIMPLE_JWT = {
@@ -492,102 +357,101 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
-
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "VERIFYING_KEY": None,
-    "AUDIENCE": os.getenv("JWT_AUDIENCE", "smartdalali:web"), # Use os.getenv for flexibility
-    "ISSUER": os.getenv("JWT_ISSUER", "smartdalali"),         # Use os.getenv for flexibility
-    "JWK_URL": None,
-    "LEEWAY": int(os.getenv("JWT_LEEWAY_SECONDS", "10")),     # Use os.getenv for flexibility
-
+    "AUDIENCE": os.getenv("JWT_AUDIENCE", "smartdalali:web"),
+    "ISSUER": os.getenv("JWT_ISSUER", "smartdalali"),
+    "LEEWAY": int(os.getenv("JWT_LEEWAY_SECONDS", 5)),
     "AUTH_HEADER_TYPES": ("Bearer",),
-    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
-    "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
-
-    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
-    "TOKEN_TYPE_CLAIM": "token_type",
-    "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
-
-    "JTI_CLAIM": "jti",
-
-    # These are for sliding tokens, not standard access/refresh.
-    # Keep default or adjust if sliding tokens are intended.
-    "SLIDING_TOKEN_REFRESH_EXP_CLAIM": "refresh_exp",
-    "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
-    "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
-
-    "TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
-    "TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSerializer",
-    "TOKEN_VERIFY_SERIALIZER": "rest_framework_simplejwt.serializers.TokenVerifySerializer",
-    "TOKEN_BLACKLIST_SERIALIZER": "rest_framework_simplejwt.serializers.TokenBlacklistSerializer",
-    "TOKEN_TYPE_PAIR_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
-    "TOKEN_CLAIM_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
+    "TOKEN_OBTAIN_SERIALIZER": "accounts.serializers.MyTokenObtainPairSerializer",
 }
 
+# Channels
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [REDIS_URL]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
 
 
-# Email Configuration / Transactional mail providers
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+# Internationalization
+LANGUAGE_CODE = 'en'
+LANGUAGES = [('en', 'English'), ('sw', 'Kiswahili')]
+LOCALE_PATHS = [BASE_DIR / 'locale']
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / "static_root"
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (User uploads)
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+if AWS_STORAGE_BUCKET_NAME:
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME')
+    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN')
+    AWS_QUERYSTRING_AUTH = False # URLs should be public
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/" if AWS_S3_CUSTOM_DOMAIN else f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / "media_root"
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Email Configuration
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS').lower() in ('1', 'true', 'yes')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'webmaster@localhost')
 
+# Transactional email providers (e.g., SendGrid)
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 if SENDGRID_API_KEY:
     EMAIL_BACKEND = 'anymail.backends.sendgrid.EmailBackend'
-    ANYMAIL = {
-        'SENDGRID_API_KEY': SENDGRID_API_KEY,
-        'SENDGRID_GENERATE_MESSAGE_ID': True,
-        'SENDGRID_API_URL': os.getenv('SENDGRID_API_URL'),
-    }
-    DEFAULT_FROM_EMAIL = os.getenv('SENDGRID_DEFAULT_FROM', DEFAULT_FROM_EMAIL)
-    SERVER_EMAIL = os.getenv('SENDGRID_SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+    ANYMAIL = {'SENDGRID_API_KEY': SENDGRID_API_KEY}
 
-
-# Redirect to home URL after login (Default redirects to /accounts/profile/)
-# LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
-# Logging configuration for debugging
+# Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '[{levelname}] {name}: {message}',
+            'format': '{levelname} {asctime} {name} {process:d} {thread:d} {message}',
             'style': '{',
         },
     },
     'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'},
     },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
     'loggers': {
-        'accounts.views': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
+        'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
     },
 }
 
-# Silence non-critical system checks
-# These warnings are for django-allauth social providers that are configured but not actively used
-SILENCED_SYSTEM_CHECKS = [
-    'accounts.W001',  # SocialApp not configured warnings for social auth providers
-]
-
+# drf-spectacular (API Schema) settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'SmartDalali API',
-    'DESCRIPTION': 'Marketplace APIs for accounts, properties, messaging, and payments.',
+    'DESCRIPTION': 'API for property listings, user management, and more.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
@@ -595,26 +459,36 @@ SPECTACULAR_SETTINGS = {
 # Firebase Admin SDK Configuration
 import firebase_admin
 from firebase_admin import credentials
+import json
 
 FIREBASE_CREDENTIALS_JSON = os.getenv('FIREBASE_CREDENTIALS_JSON')
-FIREBASE_CONFIG = {
-    "type": os.getenv("FIREBASE_TYPE"),
-    "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-    "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
-    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
-    "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-    "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
-    "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
-    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL"),
-    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL"),
-}
 
 # Initialize Firebase Admin SDK if not already initialized
 if not firebase_admin._apps:
-    try:
-        cred = credentials.Certificate(FIREBASE_CONFIG)
-        firebase_admin.initialize_app(cred)
-    except Exception as e:
-        print(f"Warning: Could not initialize Firebase Admin SDK: {e}")
-        print("Firebase authentication endpoints will not work without proper credentials.")
+    if FIREBASE_CREDENTIALS_JSON:
+        try:
+            # Parse the JSON string into a dictionary
+            firebase_creds_dict = json.loads(FIREBASE_CREDENTIALS_JSON)
+            cred = credentials.Certificate(firebase_creds_dict)
+            firebase_admin.initialize__app(cred)
+        except (json.JSONDecodeError, ValueError) as e:
+            error_message = f"Firebase credentials JSON is malformed: {e}"
+            if os.getenv('DJANGO_ENV') == 'production':
+                raise ValueError(error_message)
+            else:
+                print(f"Warning: {error_message}")
+        except Exception as e:
+            error_message = f"Could not initialize Firebase Admin SDK: {e}"
+            if os.getenv('DJANGO_ENV') == 'production':
+                raise ValueError(error_message)
+            else:
+                print(f"Warning: {error_message}")
+    elif os.getenv('DJANGO_ENV') == 'production':
+        # In production, require Firebase credentials
+        raise ValueError("FIREBASE_CREDENTIALS_JSON environment variable is not set. This is required for production.")
+    else:
+        # In development, it's a non-fatal warning
+        print("Warning: FIREBASE_CREDENTIALS_JSON is not set. Firebase authentication will not work.")
+
+# AI Configuration
+AI_API_KEY = os.getenv('AI_API_KEY')

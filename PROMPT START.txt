@@ -1,0 +1,52 @@
+
+**PROMPT START**
+
+Analyze the entire backend codebase for production readiness and perform a comprehensive security hardening pass. I want you to inspect all authentication logic, environment variable handling, package versions, API endpoints, database connections, and configuration files. Your job is to identify and fix anything that could break deployment on Choreo or cause authentication errors.
+
+Perform the following tasks:
+
+1. **Security Audit**
+
+   * Detect any security misconfigurations, weak patterns, or missing protections.
+   * Identify unsafe default values, hard-coded secrets, missing environment variable checks, or incorrect ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS usage.
+   * Ensure no sensitive data is exposed in code.
+
+2. **Dependency & Package Health**
+
+   * Check for outdated libraries, deprecated packages, or known vulnerabilities.
+   * Replace dangerous or unmaintained packages with secure alternatives.
+   * Generate an updated, production-safe `requirements.txt`.
+
+3. **Django Configuration Hardening**
+
+   * Ensure all production settings follow best practices:
+
+     * DEBUG=False
+     * Secure session and cookie settings
+     * Correct CSRF and CORS configuration
+     * Secure database configuration
+     * Proper use of `os.environ` for all secrets
+   * Validate middleware ordering.
+   * Harden DRF authentication and permission settings.
+
+4. **Authentication & Authorization**
+
+   * Investigate and fix any logic that could cause authentication errors during Choreo deployment.
+   * Ensure authentication is stable, stateless, and compatible with production.
+   * Validate token handling, JWT configuration, or Firebase integration.
+
+5. **Error Sources in Choreo Deployment**
+
+   * Detect anything in the codebase that blocks deployment.
+   * Fix incorrect import paths, missing modules, or misconfigured runtime commands.
+   * Ensure backend can run smoothly under Gunicorn in a containerized environment.
+
+6. **Output**
+
+   * Provide corrected code.
+   * Provide optimized configuration files.
+   * Provide improved security best practices.
+   * Give a summary of all vulnerabilities found and how you fixed them.
+
+Focus on a complete security, dependency, and authentication repair sweep that makes the backend fully production-ready, stable, and deployable on Choreo.
+

@@ -233,14 +233,18 @@ class SupportTicket(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ticket_number = models.CharField(max_length=20, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='support_tickets')
-    title = models.CharField(max_length=200)
+    subject = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='open')
     assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
-    admin_reply = models.TextField(blank=True, null=True)
-    user_reply = models.TextField(blank=True, null=True)
+    
+    # AI fields
+    ai_summary = models.TextField(blank=True, null=True)
+    ai_topic = models.CharField(max_length=255, blank=True, null=True)
+    ai_sentiment = models.CharField(max_length=50, blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -255,22 +259,40 @@ class SupportTicket(models.Model):
         super().save(*args, **kwargs)
     
     def __str__(self):
-        return f"{self.ticket_number} - {self.title}"
+        return f"{self.ticket_number} - {self.subject}"
 
 
-class TicketReply(models.Model):
-    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='replies')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+class TicketMessage(models.Model):
+    SENDER_TYPES = [
+        ("user", "User"),
+        ("admin", "Admin"),
+        ("ai", "AI System"),
+    ]
+
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name="messages")
+    sender_type = models.CharField(max_length=10, choices=SENDER_TYPES)
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     message = models.TextField()
-    is_admin_reply = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
+    # AI embeddings for later semantic search
+    embedding_vector = models.JSONField(null=True, blank=True)
+
     class Meta:
-        ordering = ['created_at']
         app_label = 'properties'
-    
+        ordering = ['created_at']
+
     def __str__(self):
-        return f"Reply to {self.ticket.ticket_number} by {self.user.username}"
+        return f"{self.sender_type} - {self.created_at}"
+
+
+class TicketAttachment(models.Model):
+    message = models.ForeignKey(TicketMessage, on_delete=models.CASCADE, related_name="attachments")
+    file = models.FileField(upload_to="support_attachments/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'properties'
 
 
 class AgentRating(models.Model):

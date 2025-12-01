@@ -3,7 +3,8 @@ from decimal import Decimal
 from rest_framework import serializers
 from .models import (
     AgentProfile, Property, MediaProperty, PropertyFeature, PropertyVisit,
-    Payment, SupportTicket, TicketReply, AgentRating,
+    AgentProfile, Property, MediaProperty, PropertyFeature, PropertyVisit,
+    Payment, SupportTicket, TicketMessage, TicketAttachment, AgentRating,
     PropertyLike
 )
 from accounts.models import Profile
@@ -337,49 +338,51 @@ class SubscriptionPaymentSerializer(serializers.Serializer):
 
 
 # Serializers from support app
-class TicketReplySerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.username', read_only=True)
-    user_role = serializers.SerializerMethodField()
-    
+class TicketAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
-        model = TicketReply
-        fields = ['id', 'user', 'user_name', 'user_role', 'message', 'is_admin_reply', 'created_at']
-        read_only_fields = ['user', 'is_admin_reply', 'created_at']
-    
-    def get_user_role(self, obj):
-        if obj.user.is_superuser:
-            return 'admin'
-        elif obj.user.groups.filter(name='agent').exists():
-            return 'agent'
-        else:
-            return 'user'
+        model = TicketAttachment
+        fields = ['id', 'file', 'uploaded_at']
 
+class TicketMessageSerializer(serializers.ModelSerializer):
+    attachments = TicketAttachmentSerializer(many=True, read_only=True)
+    sender_email = serializers.EmailField(source='sender.email', read_only=True)
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TicketMessage
+        fields = ['id', 'ticket', 'sender_type', 'sender', 'sender_name', 'sender_email', 'message', 'created_at', 'attachments']
+        read_only_fields = ['sender', 'ticket', 'created_at']
+
+    def get_sender_name(self, obj):
+        if not obj.sender:
+            return "Unknown"
+        return obj.sender.username
 
 class SupportTicketSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.username', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     assigned_to_name = serializers.CharField(source='assigned_to.username', read_only=True)
-    replies = TicketReplySerializer(many=True, read_only=True)
-    reply_count = serializers.SerializerMethodField()
+    messages = TicketMessageSerializer(many=True, read_only=True)
+    message_count = serializers.SerializerMethodField()
     
     class Meta:
         model = SupportTicket
         fields = [
             'id', 'ticket_number', 'user', 'user_name', 'user_email',
-            'title', 'description', 'category', 'priority', 'status',
-            'assigned_to', 'assigned_to_name', 'admin_reply', 'user_reply',
-            'created_at', 'updated_at', 'closed_at', 'replies', 'reply_count'
+            'subject', 'description', 'category', 'priority', 'status',
+            'assigned_to', 'assigned_to_name', 'ai_summary', 'ai_topic', 'ai_sentiment',
+            'created_at', 'updated_at', 'closed_at', 'messages', 'message_count'
         ]
-        read_only_fields = ['user', 'ticket_number', 'created_at', 'updated_at', 'closed_at']
+        read_only_fields = ['user', 'ticket_number', 'created_at', 'updated_at', 'closed_at', 'ai_summary', 'ai_topic', 'ai_sentiment']
     
-    def get_reply_count(self, obj):
-        return obj.replies.count()
+    def get_message_count(self, obj):
+        return obj.messages.count()
 
 
 class CreateSupportTicketSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupportTicket
-        fields = ['title', 'description', 'category', 'priority']
+        fields = ['subject', 'description', 'category', 'priority']
     
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user

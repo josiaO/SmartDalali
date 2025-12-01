@@ -14,6 +14,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 import sentry_sdk
+import dj_database_url
+from datetime import timedelta
 from sentry_sdk.integrations.django import DjangoIntegration
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -96,6 +98,7 @@ SESSION_SAVE_EVERY_REQUEST = False
 
 INSTALLED_APPS = [
     'corsheaders',
+    'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -306,7 +309,6 @@ ASGI_APPLICATION = 'backend.asgi.application'
 
 # Database
 # Use PostgreSQL in production. Use dj-database-url to parse DATABASE_URL env var.
-import dj_database_url
 
 if os.getenv('DATABASE_URL'):
     DATABASES = {'default': dj_database_url.config(conn_max_age=600, ssl_require=os.getenv('DB_SSL_REQUIRE', 'true').lower() in ('true', '1', 'yes'))}
@@ -349,8 +351,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # JWT settings
-from datetime import timedelta
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -470,7 +470,7 @@ if not firebase_admin._apps:
             # Parse the JSON string into a dictionary
             firebase_creds_dict = json.loads(FIREBASE_CREDENTIALS_JSON)
             cred = credentials.Certificate(firebase_creds_dict)
-            firebase_admin.initialize__app(cred)
+            firebase_admin.initialize_app(cred)
         except (json.JSONDecodeError, ValueError) as e:
             error_message = f"Firebase credentials JSON is malformed: {e}"
             if os.getenv('DJANGO_ENV') == 'production':

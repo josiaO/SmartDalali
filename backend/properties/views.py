@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions, viewsets, status
+from rest_framework import generics, permissions, viewsets, status, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -17,13 +17,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from utils.google_maps import geocode_address, build_maps_url
 
 from .models import (
-    PropertyVisit, Property, Payment, SupportTicket, TicketReply, AgentProfile,
+    PropertyVisit, Property, Payment, SupportTicket, TicketMessage, TicketAttachment, AgentProfile,
     AgentRating
 )
 from .serializers import (
     PropertyVisitSerializer, SerializerProperty, PaymentSerializer,
     SubscriptionPaymentSerializer, SupportTicketSerializer,
-    CreateSupportTicketSerializer, TicketReplySerializer,
+    CreateSupportTicketSerializer, TicketMessageSerializer, TicketAttachmentSerializer,
     AgentRatingSerializer, CreateAgentRatingSerializer
 )
 from accounts.permissions import IsAdmin
@@ -867,6 +867,64 @@ def agent_stats(request):
     })
 
 
+class SupportTicketViewSet(viewsets.ModelViewSet):
+    serializer_class = SupportTicketSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'priority', 'category']
+    search_fields = ['subject', 'description', 'ticket_number']
+    ordering_fields = ['created_at', 'updated_at', 'priority']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return SupportTicket.objects.all()
+        return SupportTicket.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreateSupportTicketSerializer
+        return SupportTicketSerializer
+
+
+class TicketMessageViewSet(viewsets.ModelViewSet):
+    serializer_class = TicketMessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        ticket_id = self.kwargs.get('ticket_pk')
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return TicketMessage.objects.filter(ticket_id=ticket_id)
+        return TicketMessage.objects.filter(ticket_id=ticket_id, ticket__user=user)
+
+    def perform_create(self, serializer):
+        ticket_id = self.kwargs.get('ticket_pk')
+        ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+        
+        # Ensure user can only add message to their own ticket unless staff
+        if not (self.request.user.is_staff or self.request.user.is_superuser) and ticket.user != self.request.user:
+            raise PermissionDenied("You cannot add messages to this ticket.")
+
+        sender_type = 'admin' if (self.request.user.is_staff or self.request.user.is_superuser) else 'user'
+        serializer.save(ticket=ticket, sender=self.request.user, sender_type=sender_type)
+
+
+class TicketAttachmentViewSet(viewsets.ModelViewSet):
+    serializer_class = TicketAttachmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = TicketAttachment.objects.all()
+
+    def perform_create(self, serializer):
+        message_id = self.kwargs.get('message_pk')
+        message = get_object_or_404(TicketMessage, pk=message_id)
+        
+        # Verify permission
+        if not (self.request.user.is_staff or self.request.user.is_superuser) and message.ticket.user != self.request.user:
+            raise PermissionDenied("You cannot add attachments to this message.")
 # Views from support app
 class SupportTicketViewSet(viewsets.ModelViewSet):
     serializer_class = SupportTicketSerializer

@@ -31,6 +31,7 @@ export interface Property {
   latitude?: number;
   longitude?: number;
   created_at: string;
+  property_features?: Array<{ id: number; features: string }>;
 }
 
 export interface PropertyFilters {

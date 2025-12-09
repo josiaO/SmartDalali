@@ -149,7 +149,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Handle message read receipt"""
         message_id = data.get('message_id')
         if message_id:
-            await self.mark_message_read(message_id)
+            success = await self.mark_message_read(message_id)
+            if success:
+                await self.broadcast_read_receipt(message_id)
     
     # Event handlers
     async def chat_message(self, event):
@@ -221,11 +223,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             notification.is_read = True
             notification.save()
-            
-            # Broadcast read receipt
-            await self.broadcast_read_receipt(message_id)
+            return True
         except MessageNotification.DoesNotExist:
-            pass
+            return False
     
     async def broadcast_read_receipt(self, message_id):
         """Broadcast read receipt to group"""

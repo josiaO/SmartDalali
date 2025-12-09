@@ -108,12 +108,12 @@ export interface Notification {
 
 // API Functions
 export async function fetchConversations(): Promise<Conversation[]> {
-  const res = await api.get('/api/communications/conversations/');
+  const res = await api.get('/api/v1/communications/conversations/');
   return res.data;
 }
 
 export async function fetchMessages(conversationId: number): Promise<Message[]> {
-  const res = await api.get(`/api/communications/conversations/${conversationId}/messages/`);
+  const res = await api.get(`/api/v1/communications/conversations/${conversationId}/messages/`);
   return res.data;
 }
 
@@ -137,7 +137,7 @@ export async function sendMessage(
   }
 
   const res = await api.post(
-    `/api/communications/conversations/${conversationId}/send_message/`,
+    `/api/v1/communications/conversations/${conversationId}/send_message/`,
     formData,
     {
       headers: {
@@ -149,14 +149,14 @@ export async function sendMessage(
 }
 
 export async function markConversationAsRead(conversationId: number): Promise<void> {
-  await api.post(`/api/communications/conversations/${conversationId}/mark_read/`);
+  await api.post(`/api/v1/communications/conversations/${conversationId}/mark_read/`);
 }
 
 export async function startConversation(
   userId: number,
   propertyId?: number
 ): Promise<Conversation> {
-  const res = await api.post('/api/communications/conversations/start_conversation/', {
+  const res = await api.post('/api/v1/communications/conversations/start_conversation/', {
     user_id: userId,
     property_id: propertyId,
   });
@@ -164,19 +164,19 @@ export async function startConversation(
 }
 
 export async function addReaction(messageId: number, emoji: string): Promise<void> {
-  await api.post(`/api/communications/messages/${messageId}/react/`, { emoji });
+  await api.post(`/api/v1/communications/messages/${messageId}/react/`, { emoji });
 }
 
 export async function getUnreadCount(): Promise<number> {
-  const res = await api.get('/api/communications/conversations/unread_count/');
+  const res = await api.get('/api/v1/communications/conversations/unread_count/');
   return res.data.unread_count;
 }
 
 export async function fetchNotifications(): Promise<Notification[]> {
-  const res = await api.get('/api/communications/notifications/');
+  const res = await api.get('/api/v1/communications/notifications/');
   return res.data;
 }
 
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  await api.patch(`/api/communications/notifications/${notificationId}/`, { read: true });
+  await api.patch(`/api/v1/communications/notifications/${notificationId}/`, { read: true });
 }

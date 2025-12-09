@@ -1,18 +1,19 @@
 import api from '@/lib/axios';
 
-export interface TicketReply {
+export interface TicketMessage {
   id: number;
-  user: number;
-  user_name: string;
-  user_role: 'admin' | 'agent' | 'user';
+  ticket: number;
+  sender_type: 'admin' | 'user';
+  sender_name: string;
+  sender_email: string;
   message: string;
-  is_admin_reply: boolean;
   created_at: string;
+  attachments: any[];
 }
 export interface ApiError {
   response?: {
     data?: {
-      [key: string]: any; 
+      [key: string]: any;
     };
   };
   message: string;
@@ -23,27 +24,27 @@ export interface SupportTicket {
   user: number;
   user_name: string;
   user_email: string;
-  title: string;
+  subject: string;
   description: string;
   category: 'account' | 'property' | 'payment' | 'technical' | 'report' | 'feature' | 'other';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   assigned_to: number | null;
   assigned_to_name: string | null;
-  admin_reply: string | null;
-  user_reply: string | null;
+  ai_summary: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
-  replies: TicketReply[];
-  reply_count: number;
+  messages: TicketMessage[];
+  message_count: number;
 }
 
 export interface CreateTicketData {
-  title: string;
+  subject: string;
   description: string;
   category: string;
   priority: string;
+  attachments?: File[];
 }
 
 export const getSupportTickets = async () => {
@@ -51,7 +52,7 @@ export const getSupportTickets = async () => {
     const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/');
     console.log('Support tickets response:', response.data);
     return response.data;
-  } catch (error:unknown) {
+  } catch (error: unknown) {
     const apiError = error as ApiError
     console.error('Error fetching support tickets:', apiError.response?.data || apiError.message);
     throw error;
@@ -73,7 +74,24 @@ export const getSupportTicket = async (id: string) => {
 export const createSupportTicket = async (data: CreateTicketData) => {
   try {
     console.log('Creating support ticket with data:', data);
-    const response = await api.post<SupportTicket>('/api/v1/properties/support/tickets/', data);
+
+    let requestData: any = data;
+    let headers = {};
+
+    if (data.attachments && data.attachments.length > 0) {
+      const formData = new FormData();
+      formData.append('subject', data.subject);
+      formData.append('description', data.description);
+      formData.append('category', data.category);
+      formData.append('priority', data.priority);
+      data.attachments.forEach((file) => {
+        formData.append('attachments', file);
+      });
+      requestData = formData;
+      headers = { 'Content-Type': 'multipart/form-data' };
+    }
+
+    const response = await api.post<SupportTicket>('/api/v1/properties/support/tickets/', requestData, { headers });
     console.log('Support ticket created:', response.data);
     return response.data;
   } catch (error: unknown) {
@@ -84,12 +102,17 @@ export const createSupportTicket = async (data: CreateTicketData) => {
 };
 
 export const replyToTicket = async (id: string, message: string) => {
-  const response = await api.post<TicketReply>(`/api/v1/properties/support/tickets/${id}/reply/`, { message });
+  const response = await api.post<TicketMessage>(`/api/v1/properties/support/tickets/${id}/reply/`, { message });
   return response.data;
 };
 
 export const closeTicket = async (id: string) => {
   const response = await api.post(`/api/v1/properties/support/tickets/${id}/close/`);
+  return response.data;
+};
+
+export const updateSupportTicket = async (id: string, data: any) => {
+  const response = await api.patch<SupportTicket>(`/api/v1/properties/support/tickets/${id}/`, data);
   return response.data;
 };
 

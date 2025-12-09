@@ -18,11 +18,12 @@ export function useConversations() {
   });
 }
 
-export function useMessages(conversationId: number) {
+export function useMessages(conversationId: number, enablePolling = false) {
   return useQuery({
     queryKey: ['messages', conversationId],
     queryFn: () => fetchMessages(conversationId),
     enabled: !!conversationId,
+    refetchInterval: enablePolling ? 3000 : false, // Poll every 3 seconds if enabled
   });
 }
 
@@ -40,6 +41,33 @@ export function useSendMessage() {
       attachments?: File[];
       parentMessageId?: number;
     }) => sendMessage(conversationId, content, attachments, parentMessageId),
+    onMutate: async (newMsg) => {
+      await queryClient.cancelQueries({ queryKey: ['messages', newMsg.conversationId] });
+
+      const previousMessages = queryClient.getQueryData(['messages', newMsg.conversationId]);
+
+      queryClient.setQueryData(['messages', newMsg.conversationId], (old: any) => {
+        const optimisticMessage = {
+          id: Date.now(), // Temporary ID
+          content: newMsg.content,
+          sender: { id: 'me', first_name: 'Me', last_name: '' }, // Placeholder sender
+          created_at: new Date().toISOString(),
+          read: false,
+          isOptimistic: true,
+          attachments: newMsg.attachments ? Array.from(newMsg.attachments).map(f => ({ file: URL.createObjectURL(f), file_type: f.type })) : []
+        };
+
+        if (old?.results) {
+          return { ...old, results: [...old.results, optimisticMessage] };
+        }
+        return old ? [...old, optimisticMessage] : [optimisticMessage];
+      });
+
+      return { previousMessages };
+    },
+    onError: (err, newMsg, context) => {
+      queryClient.setQueryData(['messages', newMsg.conversationId], context?.previousMessages);
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['messages', variables.conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });

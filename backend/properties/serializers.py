@@ -1,4 +1,5 @@
 from decimal import Decimal
+import bleach
 
 from rest_framework import serializers
 from .models import (
@@ -12,34 +13,22 @@ from utils.google_maps import geocode_address, build_maps_url
 
 
 class MediaPropertySerializer(serializers.ModelSerializer):
-    Images = serializers.SerializerMethodField()
-    videos = serializers.SerializerMethodField()
+    Images = serializers.ImageField(required=False, allow_null=True)
+    videos = serializers.FileField(required=False, allow_null=True)
 
     class Meta:
         model = MediaProperty
         fields = ['id', 'Images', 'videos', 'caption']
-
-    def get_Images(self, obj):
-        if not obj.Images:
-            return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.Images.url)
-        return obj.Images.url
-
-    def get_videos(self, obj):
-        if not obj.videos:
-            return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.videos.url)
-        return obj.videos.url
 
 
 class PropertyFeatureSerializer(serializers.ModelSerializer):
     class Meta:
         model = PropertyFeature
         fields = ['id', 'features', 'property']
+
+    def validate_features(self, value):
+        """Sanitize features field."""
+        return bleach.clean(value, tags=[], strip=True)
 
 
 class PropertyVisitSerializer(serializers.ModelSerializer):
@@ -79,6 +68,13 @@ class SerializerProperty(serializers.ModelSerializer):
             'like_count', 'is_liked'
         ]
         read_only_fields = ['owner', 'created_at', 'updated_at', 'view_count', 'google_place_id', 'maps_url', 'like_count', 'is_liked']
+
+    def validate(self, data):
+        """Sanitize description field."""
+        if 'description' in data:
+            allowed_tags = ['p', 'br', 'b', 'i', 'u', 'strong', 'em', 'ul', 'ol', 'li']
+            data['description'] = bleach.clean(data['description'], tags=allowed_tags, strip=True)
+        return data
 
     def _get_absolute_url(self, file_field):
         if not file_field:
@@ -148,13 +144,19 @@ class SerializerProperty(serializers.ModelSerializer):
         return False
 
     def create(self, validated_data, owner=None):
-        # Handle nested lists if provided in validated_data
-        media_data = validated_data.pop('MediaProperty', [])
+        media_data = validated_data.pop('media', [])
         features_data = validated_data.pop('property_features', [])
 
         if owner is not None:
             validated_data['owner'] = owner
 
+        # Create a dictionary for Property model fields only
+        property_fields_data = {
+            key: value for key, value in validated_data.items()
+            if key in [field.name for field in self.Meta.model._meta.fields]
+        }
+        property_instance = super().create(property_fields_data)
+        
         request = self.context.get('request') if hasattr(self, 'context') else None
         # Accept multiple possible upload keys for backwards-compatibility
         file_keys = ['MediaProperty', 'ImagesProperty', 'images', 'media']
@@ -173,8 +175,6 @@ class SerializerProperty(serializers.ModelSerializer):
 
         if new_images_count > 10:
             raise serializers.ValidationError({"media": "Maximum of 10 images allowed per property."})
-
-        property_instance = Property.objects.create(**validated_data)
         
         if request is not None:
             # Handle Images
@@ -198,9 +198,9 @@ class SerializerProperty(serializers.ModelSerializer):
 
         # If nested JSON was provided, create related instances too
         for m in media_data:
-            # m may be a dict like {'Images': <file>} or {'Images': <url>}
-            img = m.get('Images') if isinstance(m, dict) else None
-            vid = m.get('videos') if isinstance(m, dict) else None
+            # m is expected to be {'Images': SimpleUploadedFile, 'videos': SimpleUploadedFile}
+            img = m.get('Images')
+            vid = m.get('videos')
             if img or vid:
                 MediaProperty.objects.create(property=property_instance, Images=img, videos=vid)
 
@@ -221,10 +221,10 @@ class SerializerProperty(serializers.ModelSerializer):
         Behavior:
         - Update scalar fields present in validated_data.
         - If 'Features_Property' is present in the payload, replace existing Features with the provided list.
-        - If 'MediaProperty' is present in the payload, replace existing MediaProperty items with the provided list.
+        - If 'media' is present in the payload, replace existing MediaProperty items with the provided list.
         - If request.FILES contains upload keys, append those uploads to the media gallery.
         """
-        media_data = validated_data.pop('MediaProperty', None)
+        media_data = validated_data.pop('media', None)
         features_data = validated_data.pop('property_features', None)
 
         # Prevent owner changes via API
@@ -252,9 +252,12 @@ class SerializerProperty(serializers.ModelSerializer):
             raise serializers.ValidationError({"media": "Maximum of 10 images allowed per property."})
 
         # Update simple fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+        # Create a dictionary for Property model fields only
+        property_fields_data = {
+            key: value for key, value in validated_data.items()
+            if key in [field.name for field in self.Meta.model._meta.fields]
+        }
+        instance = super().update(instance, property_fields_data)
 
         # Replace features if provided
         if features_data is not None:
@@ -272,8 +275,8 @@ class SerializerProperty(serializers.ModelSerializer):
         if media_data is not None:
             MediaProperty.objects.filter(property=instance).delete()
             for m in media_data:
-                img = m.get('Images') if isinstance(m, dict) else None
-                vid = m.get('videos') if isinstance(m, dict) else None
+                img = m.get('Images')
+                vid = m.get('videos')
                 if img or vid:
                     MediaProperty.objects.create(property=instance, Images=img, videos=vid)
 

@@ -321,7 +321,7 @@ export default function AgentDashboard() {
                             <Link to="/agent/my-properties">
                                 <Button variant="ghost" className="w-full justify-start h-12">
                                     <Building2 className="mr-3 h-4 w-4 text-blue-500" />
-                                    {t('property.my_properties')}
+                                    {t('sidebar.my_properties')}
                                 </Button>
                             </Link>
                             <Link to="/payments/subscription">

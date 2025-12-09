@@ -62,25 +62,36 @@ def test_firebase_credentials():
     print("=" * 60)
     
     from django.conf import settings
+    import json
+
+    firebase_credentials_json = settings.FIREBASE_CREDENTIALS_JSON
     
-    config = settings.FIREBASE_CONFIG
-    print(f"✅ Project ID: {config.get('project_id', 'Not set')}")
-    print(f"✅ Client Email: {config.get('client_email', 'Not set')}")
-    print(f"✅ Private Key ID: {config.get('private_key_id', 'Not set')[:20]}...")
-    
-    private_key = config.get('private_key', '')
-    if private_key:
-        has_header = private_key.strip().startswith('-----BEGIN PRIVATE KEY-----')
-        has_footer = private_key.strip().endswith('-----END PRIVATE KEY-----')
-        has_newlines = '\n' in private_key
-        
-        print(f"✅ Private Key Format:")
-        print(f"   - Has BEGIN header: {has_header}")
-        print(f"   - Has END footer: {has_footer}")
-        print(f"   - Contains newlines: {has_newlines}")
-        print(f"   - Key length: {len(private_key)} characters")
+    if firebase_credentials_json:
+        try:
+            config = json.loads(firebase_credentials_json)
+            print(f"✅ Project ID: {config.get('project_id', 'Not set')}")
+            print(f"✅ Client Email: {config.get('client_email', 'Not set')}")
+            print(f"✅ Private Key ID: {config.get('private_key_id', 'Not set')[:20]}...")
+            
+            private_key = config.get('private_key', '')
+            if private_key:
+                has_header = private_key.strip().startswith('-----BEGIN PRIVATE KEY-----')
+                has_footer = private_key.strip().endswith('-----END PRIVATE KEY-----')
+                has_newlines = '\n' in private_key
+                
+                print(f"✅ Private Key Format:")
+                print(f"   - Has BEGIN header: {has_header}")
+                print(f"   - Has END footer: {has_footer}")
+                print(f"   - Contains newlines: {has_newlines}")
+                print(f"   - Key length: {len(private_key)} characters")
+            else:
+                print("❌ Private Key: Not set")
+        except json.JSONDecodeError:
+            print("❌ FAILED: FIREBASE_CREDENTIALS_JSON is not valid JSON.")
+        except Exception as e:
+            print(f"❌ FAILED: Error parsing Firebase credentials: {e}")
     else:
-        print("❌ Private Key: Not set")
+        print("❌ FIREBASE_CREDENTIALS_JSON is not set in settings.")
 
 if __name__ == "__main__":
     print("\n🔥 Starting Firebase Admin SDK Tests...\n")

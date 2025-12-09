@@ -53,7 +53,7 @@ export function useUserSubscription(): UseUserSubscriptionReturn {
         setError(null);
         try {
             // Fetch user's current subscription
-            const response = await api.get<UserSubscriptionData>('/api/v1/subscriptions/current/');
+            const response = await api.get<UserSubscriptionData>('/api/v1/features/subscriptions/current/');
             setSubscription(response.data);
         } catch (err: any) {
             if (err?.response?.status === 404) {

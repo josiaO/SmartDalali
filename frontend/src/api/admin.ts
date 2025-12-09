@@ -57,23 +57,23 @@ export async function deleteFeature(id: number) {
 
 // Plans - Updated to use correct Django endpoints
 export async function fetchPlans() {
-  const response = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/plans/');
+  const response = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/features/plans/');
   // Handle both direct array and paginated response
   return Array.isArray(response.data) ? response.data : response.data.results || [];
 }
 
 export async function createPlan(data: Partial<SubscriptionPlan>) {
-  const response = await api.post<SubscriptionPlan>('/api/v1/plans/', data);
+  const response = await api.post<SubscriptionPlan>('/api/v1/features/plans/', data);
   return response.data;
 }
 
 export async function updatePlan(id: number, data: Partial<SubscriptionPlan>) {
-  const response = await api.patch<SubscriptionPlan>(`/api/v1/plans/${id}/`, data);
+  const response = await api.patch<SubscriptionPlan>(`/api/v1/features/plans/${id}/`, data);
   return response.data;
 }
 
 export async function deletePlan(id: number) {
-  await api.delete(`/api/v1/plans/${id}/`);
+  await api.delete(`/api/v1/features/plans/${id}/`);
 }
 
 // Agent Ratings - New endpoints

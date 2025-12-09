@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createProperty } from '@/api/properties';
@@ -17,6 +17,8 @@ import { PROPERTY_TYPES, PROPERTY_STATUS } from '@/lib/constants';
 import { SubscriptionGuard } from '@/components/common/SubscriptionGuard';
 import { FEATURES } from '@/lib/permissions';
 import { Progress } from '@/components/ui/progress';
+import { MediaUpload } from '@/components/common/MediaUpload';
+import { MiniGuide } from '@/components/common/MiniGuide';
 import { useTranslation } from 'react-i18next';
 
 
@@ -212,6 +214,19 @@ export default function CreateProperty() {
           <Progress value={(currentStep / 5) * 100} className="h-2" />
         </div>
 
+        {currentStep === 1 && (
+          <div className="mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+            <MiniGuide
+              title={t('common.how_it_works')}
+              steps={[
+                { title: t('create_property_guide.step1_title'), description: t('create_property_guide.step1_desc') },
+                { title: t('create_property_guide.step2_title'), description: t('create_property_guide.step2_desc') },
+                { title: t('create_property_guide.step3_title'), description: t('create_property_guide.step3_desc') }
+              ]}
+            />
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
@@ -325,48 +340,30 @@ export default function CreateProperty() {
             {/* Step 4: Media */}
             {currentStep === 4 && (
               <div className="space-y-6">
-                {/* Images */}
                 <div className="space-y-2">
                   <Label>{t('properties.images')}</Label>
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                    <Input type="file" accept="image/*" multiple onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{t('form.upload_images_max', { count: 10 })}</p>
-                  </div>
-                  {imagePreviews.length > 0 && (
-                    <div className="grid grid-cols-4 gap-4 mt-4">
-                      {imagePreviews.map((src, i) => (
-                        <div key={i} className="relative group aspect-square">
-                          <img src={src} alt="Preview" className="w-full h-full object-cover rounded-lg" />
-                          <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-destructive text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <MediaUpload
+                    type="image"
+                    files={images}
+                    previews={imagePreviews}
+                    maxFiles={10}
+                    onFilesChange={setImages}
+                    onPreviewsChange={setImagePreviews}
+                    onRemove={removeImage}
+                  />
                 </div>
 
-                {/* Videos */}
                 <div className="space-y-2">
                   <Label>{t('properties.videos')}</Label>
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                    <Input type="file" accept="video/*" multiple onChange={handleVideoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    <Video className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{t('form.upload_videos_max', { count: 2 })}</p>
-                  </div>
-                  {videoPreviews.length > 0 && (
-                    <div className="grid grid-cols-4 gap-4 mt-4">
-                      {videoPreviews.map((src, i) => (
-                        <div key={i} className="relative group aspect-video bg-black rounded-lg overflow-hidden">
-                          <video src={src} className="w-full h-full object-cover" />
-                          <button onClick={() => removeVideo(i)} className="absolute top-1 right-1 bg-destructive text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <MediaUpload
+                    type="video"
+                    files={videos}
+                    previews={videoPreviews}
+                    maxFiles={2}
+                    onFilesChange={setVideos}
+                    onPreviewsChange={setVideoPreviews}
+                    onRemove={removeVideo}
+                  />
                 </div>
               </div>
             )}

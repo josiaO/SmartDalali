@@ -48,6 +48,15 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
+
+        if (!refreshToken) {
+          // No refresh token available, redirect to login
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          window.location.href = '/auth/login';
+          return Promise.reject(new Error('No refresh token available'));
+        }
+
         const response = await axios.post(
           `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/accounts/auth/token/refresh/`,
           { refresh: refreshToken }
@@ -59,9 +68,15 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${access}`;
         return api(originalRequest);
       } catch (refreshError) {
+        // Refresh token is invalid or expired, clear storage and redirect
+        console.error('Token refresh failed:', refreshError);
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
-        window.location.href = '/auth/login';
+
+        // Only redirect if not already on login page
+        if (!window.location.pathname.includes('/auth/login')) {
+          window.location.href = '/auth/login';
+        }
         return Promise.reject(refreshError);
       }
     }

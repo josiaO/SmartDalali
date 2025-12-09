@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, MessageSquare } from 'lucide-react';
+import { Search, Send, MessageSquare, Paperclip, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversations, useMessages, useSendMessage } from '@/hooks/useConversations';
+import { useChatWebSocket } from '@/hooks/useChatWebSocket';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { format } from 'date-fns';
 
@@ -15,9 +16,12 @@ export default function Conversations() {
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [messageText, setMessageText] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { isConnected } = useChatWebSocket(selectedConversationId);
   const { data: conversations, isLoading: loadingConversations } = useConversations();
-  const { data: messages, isLoading: loadingMessages } = useMessages(selectedConversationId || 0);
+  const { data: messages, isLoading: loadingMessages } = useMessages(selectedConversationId || 0, !isConnected);
   const sendMessage = useSendMessage();
 
   const conversationsList = Array.isArray(conversations) ? conversations : (conversations as any)?.results || [];
@@ -35,16 +39,25 @@ export default function Conversations() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!messageText.trim() || !selectedConversationId) return;
+    if ((!messageText.trim() && !selectedFile) || !selectedConversationId) return;
 
     try {
       await sendMessage.mutateAsync({
         conversationId: selectedConversationId,
         content: messageText.trim(),
+        attachments: selectedFile ? [selectedFile] : undefined,
       });
       setMessageText('');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error('Failed to send message:', error);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
     }
   };
 
@@ -75,7 +88,10 @@ export default function Conversations() {
       <Card className="h-[calc(100vh-200px)]">
         <div className="grid md:grid-cols-[350px_1fr] h-full">
           {/* Conversations List */}
-          <div className="border-r">
+          <div className={cn(
+            "border-r h-full flex flex-col",
+            selectedConversationId ? "hidden md:flex" : "flex"
+          )}>
             <CardHeader>
               <CardTitle className="text-lg">Conversations</CardTitle>
               <div className="relative mt-4">
@@ -89,7 +105,7 @@ export default function Conversations() {
               </div>
             </CardHeader>
 
-            <ScrollArea className="h-[calc(100%-120px)]">
+            <ScrollArea className="flex-1">
               <div className="space-y-1 p-4 pt-0">
                 {filteredConversations.length === 0 ? (
                   <div className="text-center py-12">
@@ -151,12 +167,38 @@ export default function Conversations() {
           </div>
 
           {/* Messages Panel */}
-          <div className="flex flex-col">
+          <div className={cn(
+            "flex-col h-full",
+            !selectedConversationId ? "hidden md:flex" : "flex"
+          )}>
             {selectedConversationId ? (
               <>
                 {/* Chat Header */}
-                <CardHeader className="border-b">
-                  <CardTitle className="text-lg">
+                <CardHeader className="border-b flex flex-row items-center gap-3 py-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden -ml-2"
+                    onClick={() => setSelectedConversationId(null)}
+                  >
+                    <Search className="h-5 w-5 rotate-180" style={{ transform: 'none' }} />
+                    <span className="sr-only">Back</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-5 w-5"
+                    >
+                      <path d="m15 18-6-6 6-6" />
+                    </svg>
+                  </Button>
+                  <CardTitle className="text-lg m-0">
                     {(() => {
                       const conv = conversationsList.find((c: any) => c.id === selectedConversationId);
                       const participant = conv?.participants && conv.participants.length > 0 ? conv.participants[0] : null;
@@ -178,7 +220,8 @@ export default function Conversations() {
                       {(() => {
                         const messagesList = Array.isArray(messages) ? messages : (messages as any)?.results || [];
                         return messagesList.map((message: any) => {
-                          const isOwn = message.sender === message.conversation; // Simplified - adjust based on actual user ID
+                          // TODO: Replace with actual user ID check
+                          const isOwn = message.sender?.id === 'me' || message.sender === message.conversation; // 'me' is from optimistic update
 
                           return (
                             <div
@@ -193,13 +236,27 @@ export default function Conversations() {
                                   'max-w-[70%] rounded-lg p-3',
                                   isOwn
                                     ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted'
+                                    : 'bg-muted',
+                                  message.isOptimistic && 'opacity-70'
                                 )}
                               >
+                                {message.attachments && message.attachments.length > 0 && (
+                                  <div className="mb-2">
+                                    {message.attachments.map((att: any, idx: number) => (
+                                      <div key={idx} className="bg-background/20 p-2 rounded text-xs flex items-center gap-2">
+                                        <Paperclip className="h-3 w-3" />
+                                        <span>Attachment</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                                 <p className="text-sm">{message.content}</p>
-                                <span className="text-xs opacity-70 mt-1 block">
-                                  {format(new Date(message.created_at), 'h:mm a')}
-                                </span>
+                                <div className="flex items-center gap-1 justify-end mt-1">
+                                  <span className="text-xs opacity-70">
+                                    {format(new Date(message.created_at), 'h:mm a')}
+                                  </span>
+                                  {message.isOptimistic && <Loader2 className="h-3 w-3 animate-spin" />}
+                                </div>
                               </div>
                             </div>
                           );
@@ -211,7 +268,32 @@ export default function Conversations() {
 
                 {/* Message Input */}
                 <div className="border-t p-4">
-                  <form onSubmit={handleSendMessage} className="flex gap-2">
+                  {selectedFile && (
+                    <div className="mb-2 p-2 bg-muted rounded flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground truncate max-w-[200px]">{selectedFile.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFile(null)}>
+                        <span className="sr-only">Remove</span>
+                        ×
+                      </Button>
+                    </div>
+                  )}
+                  <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    // accept="image/*,application/pdf" // Optional: restrict types if needed
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-shrink-0"
+                    >
+                      <Paperclip className="h-5 w-5 text-muted-foreground" />
+                    </Button>
                     <Input
                       placeholder="Type your message..."
                       value={messageText}
@@ -223,7 +305,7 @@ export default function Conversations() {
                         }
                       }}
                     />
-                    <Button type="submit" disabled={!messageText.trim() || sendMessage.isPending}>
+                    <Button type="submit" disabled={(!messageText.trim() && !selectedFile) || sendMessage.isPending}>
                       <Send className="h-4 w-4" />
                     </Button>
                   </form>

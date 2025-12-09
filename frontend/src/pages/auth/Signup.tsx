@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Loader2 } from 'lucide-react';
+import { Building2, Loader2, Eye, EyeOff, Check, X } from 'lucide-react';
 import { register, firebaseLogin, getCurrentUser, getUserRole } from '@/api/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { signInWithPopup } from 'firebase/auth';
@@ -25,6 +25,15 @@ export default function Signup() {
   });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordsMatch, setPasswordsMatch] = useState(true);
+  const [passwordStrength, setPasswordStrength] = useState(false);
+
+  useEffect(() => {
+    setPasswordsMatch(formData.password === formData.confirmPassword);
+    setPasswordStrength(formData.password.length >= 8);
+  }, [formData.password, formData.confirmPassword]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -174,14 +183,73 @@ export default function Signup() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('form.password')}</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="sr-only">
+                    {showPassword ? t('auth.hide_password') : t('auth.show_password')}
+                  </span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">{t('form.confirm_password')}</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="sr-only">
+                    {showConfirmPassword ? t('auth.hide_password') : t('auth.show_password')}
+                  </span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className={`flex items-center gap-2 ${passwordStrength ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {passwordStrength ? <Check className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border border-current" />}
+                <span>{t('auth.password_strength')}</span>
+              </div>
+              <div className={`flex items-center gap-2 ${passwordsMatch && formData.confirmPassword ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {passwordsMatch && formData.confirmPassword ? <Check className="h-4 w-4" /> : <div className="h-4 w-4 rounded-full border border-current" />}
+                <span>{t('auth.passwords_match')}</span>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading || googleLoading}>
               {loading ? (

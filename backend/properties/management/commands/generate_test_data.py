@@ -14,7 +14,8 @@ from django.contrib.auth.models import User, Group
 from django.core.files import File
 from django.conf import settings
 from django.utils import timezone
-from properties.models import Property, MediaProperty, AgentProfile, Feature, SubscriptionPlan
+from properties.models import Property, MediaProperty, AgentProfile
+from features.models import Feature, SubscriptionPlan
 from accounts.models import Profile
 from datetime import timedelta
 import requests
@@ -43,6 +44,10 @@ class Command(BaseCommand):
         num_properties = options['properties']
 
         self.stdout.write(self.style.SUCCESS('=== SmartDalali Test Data Generator ===\n'))
+        
+        # Suppress insecure request warnings
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         # Step 1: Download images
         self.stdout.write('Step 1: Downloading images...')
@@ -74,7 +79,8 @@ class Command(BaseCommand):
         self.stdout.write(f'  Scraping {url}...')
         
         try:
-            html = requests.get(url, timeout=10).text
+            # Added verify=False to handle potential SSL issues in local/dev environments
+            html = requests.get(url, timeout=10, verify=False).text
             soup = BeautifulSoup(html, 'html.parser')
             
             image_urls = []
@@ -94,7 +100,7 @@ class Command(BaseCommand):
             downloaded = []
             for i, img_url in enumerate(image_urls[:max_images]):
                 try:
-                    response = requests.get(img_url, timeout=10)
+                    response = requests.get(img_url, timeout=10, verify=False)
                     if response.status_code == 200:
                         filename = f'{category}_{i+1}.jpg'
                         filepath = os.path.join(save_dir, filename)
@@ -107,10 +113,35 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f'    Failed to download image {i+1}: {e}'))
             
             self.stdout.write(self.style.SUCCESS(f'  ✓ Downloaded {len(downloaded)} images'))
+            # Fallback if no images downloaded
+            if not downloaded:
+                self.stdout.write(self.style.WARNING("  ! No images downloaded. Generating placeholders..."))
+                return self.generate_placeholders(save_dir, category, max_images)
+                
             return downloaded
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'  ✗ Failed to scrape images: {e}'))
-            return []
+            return self.generate_placeholders(os.path.join(settings.MEDIA_ROOT, f'test_data/{category}'), category, max_images)
+
+    def generate_placeholders(self, save_dir, category, count):
+        """Generate placeholder images when download fails"""
+        os.makedirs(save_dir, exist_ok=True)
+        paths = []
+        # 1x1 gray pixel JPEG
+        placeholder_data = b'/9j/4AAQSkZJRgABAQEASABIAAD/2wBDCAgKCgoKCgsKCgoICgoKCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AH8AL//Z'
+        
+        import base64
+        data = base64.b64decode(placeholder_data)
+        
+        for i in range(count):
+            filename = f'{category}_placeholder_{i+1}.jpg'
+            filepath = os.path.join(save_dir, filename)
+            with open(filepath, 'wb') as f:
+                f.write(data)
+            paths.append(filepath)
+            
+        self.stdout.write(self.style.SUCCESS(f'  ✓ Generated {count} placeholder images'))
+        return paths
 
     def create_agents(self, count, image_paths):
         """Create agent user accounts with profiles"""

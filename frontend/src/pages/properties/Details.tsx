@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Bed, Bath, Square, Mail, Phone, ArrowLeft, MessageSquare, Heart, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Bed, Bath, Square, Mail, Phone, ArrowLeft, MessageSquare, Heart, Eye, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { RateAgentDialog } from '@/components/agent/RateAgentDialog';
 import { Star } from 'lucide-react';
 import { BookVisitDialog } from '@/components/properties/BookVisitDialog';
 import { formatTZS } from '@/lib/currency';
+import { ShareButton } from '@/components/common/ShareButton';
 
 export default function PropertyDetails() {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +36,13 @@ export default function PropertyDetails() {
 
         // Track view
         await trackPropertyView(id);
+
+        // For guests, store in localStorage
+        if (!user) {
+          const viewed = JSON.parse(localStorage.getItem('recently_viewed') || '[]');
+          const newViewed = [id, ...viewed.filter((item: string) => item !== id)].slice(0, 10);
+          localStorage.setItem('recently_viewed', JSON.stringify(newViewed));
+        }
       } catch (error) {
         toast({
           title: 'Error',
@@ -228,6 +236,10 @@ export default function PropertyDetails() {
                   >
                     <Heart className={`mr-2 h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
                     {isLiked ? 'Liked' : 'Like'} ({likeCount})
+                  </Button>
+                  <ShareButton url={window.location.href} title={property.title} />
+                  <Button variant="outline" size="sm" onClick={() => window.open(`/properties/${id}/print`, '_blank')}>
+                    <Printer className="h-4 w-4 mr-2" /> Print
                   </Button>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Eye className="h-4 w-4" />

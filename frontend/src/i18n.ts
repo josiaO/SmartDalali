@@ -43,6 +43,8 @@ i18n
                         messages: 'Messages',
                         support: 'Support',
                         list_property: 'List Property',
+                        create_property: 'Create Property',
+                        analytics: 'Analytics',
                         soon: 'Soon',
                         settings: 'Settings',
                     },
@@ -137,6 +139,7 @@ i18n
                         step: 'Step',
                         of: 'of',
                         review: 'Review',
+                        how_it_works: 'How It Works',
                         uploaded: 'uploaded',
                         locating: 'Locating...',
                         publishing: 'Publishing...',
@@ -356,6 +359,10 @@ i18n
                         login_profile_error: 'Login successful but failed to load profile',
                         login_desc: 'Sign in to access your account',
                         google_login: 'Sign in with Google',
+                        password_strength: 'Password must be at least 8 characters',
+                        passwords_match: 'Passwords match',
+                        show_password: 'Show password',
+                        hide_password: 'Hide password',
                     },
                     // Forms
                     form: {
@@ -584,6 +591,22 @@ i18n
                         days_remaining: '{{count}} days remaining',
                         view_upgrade_options: 'View Upgrade Options',
                     },
+                    // Not Found
+                    not_found: {
+                        title: '404',
+                        subtitle: 'Page Not Found',
+                        description: "The page you're looking for doesn't exist or has been moved.",
+                        back_home: 'Back to Home',
+                    },
+                    // Create Property Guide
+                    create_property_guide: {
+                        step1_title: 'Fill Basic Info',
+                        step1_desc: 'Give your property a catchy title and clear description.',
+                        step2_title: 'Add Media',
+                        step2_desc: 'Upload high-quality images to attract more interest.',
+                        step3_title: 'Review & Publish',
+                        step3_desc: 'Double check details and make it live instantly.',
+                    },
                 },
             },
             sw: {
@@ -689,6 +712,8 @@ i18n
                         messages: 'Ujumbe',
                         support: 'Msaada',
                         list_property: 'Tangaza Mali',
+                        create_property: 'Unda Mali',
+                        analytics: 'Uchambuzi',
                         soon: 'Hivi Karibuni',
                         settings: 'Mipangilio',
                     },
@@ -707,6 +732,7 @@ i18n
                         step: 'Hatua',
                         of: 'ya',
                         review: 'Kagua',
+                        how_it_works: 'Jinsi Inavyofanya Kazi',
                         uploaded: 'Imepakiwa',
                         locating: 'Inatafuta mahali...',
                         publishing: 'Inachapisha...',
@@ -918,6 +944,10 @@ i18n
                         login_profile_error: 'Umeingia kikamilifu lakini imeshindikana kupakia wasifu',
                         login_desc: 'Ingia kufikia akaunti yako',
                         google_login: 'Ingia na Google',
+                        password_strength: 'Nenosiri lazima liwe na angalau herufi 8',
+                        passwords_match: 'Maneno ya siri yanafanana',
+                        show_password: 'Onyesha nenosiri',
+                        hide_password: 'Ficha nenosiri',
                     },
                     // Forms
                     form: {
@@ -1146,6 +1176,22 @@ i18n
                         started_days_ago: 'Ilianza siku {{count}} zilizopita',
                         days_remaining: 'Siku {{count}} zimesalia',
                         view_upgrade_options: 'Tazama Chaguzi za Kuboresha',
+                    },
+                    // Not Found
+                    not_found: {
+                        title: '404',
+                        subtitle: 'Ukurasa Haupatikani',
+                        description: "Ukurasa unaoutafuta haupo au umehamishwa.",
+                        back_home: 'Rudi Nyumbani',
+                    },
+                    // Create Property Guide
+                    create_property_guide: {
+                        step1_title: 'Jaza Taarifa za Msingi',
+                        step1_desc: 'Weka kichwa cha kuvutia na maelezo wazi ya mali yako.',
+                        step2_title: 'Ongeza Picha na Video',
+                        step2_desc: 'Pakia picha za ubora wa juu kuvutia wateja zaidi.',
+                        step3_title: 'Kagua na Chapisha',
+                        step3_desc: 'Hakiki maelezo na uchapishe mara moja.',
                     },
                 },
             },

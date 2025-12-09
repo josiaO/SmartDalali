@@ -8,6 +8,7 @@ import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import { FeatureGate } from '../common/FeatureGate';
 
 export function PublicHeader() {
   const { isAuthenticated, user, logout } = useAuth();
@@ -97,23 +98,33 @@ export function PublicHeader() {
                                 {t('dashboard.add_property')}
                               </Button>
                             </Link>
-                            <Link to="/communication" onClick={() => setIsOpen(false)}>
-                              <Button variant="ghost" className="w-full justify-start">
-                                <Building2 className="mr-2 h-4 w-4" />
-                                {t('sidebar.messages')}
-                              </Button>
-                            </Link>
+                            <FeatureGate feature="messaging">
+                              <Link to="/communication" onClick={() => setIsOpen(false)}>
+                                <Button variant="ghost" className="w-full justify-start">
+                                  <Building2 className="mr-2 h-4 w-4" />
+                                  {t('sidebar.messages')}
+                                </Button>
+                              </Link>
+                            </FeatureGate>
                           </>
                         )}
 
                         {/* User Specific Links */}
                         {user?.role === 'user' && (
-                          <Link to="/saved" onClick={() => setIsOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
-                              <Building2 className="mr-2 h-4 w-4" />
-                              {t('dashboard.saved_properties')}
-                            </Button>
-                          </Link>
+                          <>
+                            <Link to="/saved" onClick={() => setIsOpen(false)}>
+                              <Button variant="ghost" className="w-full justify-start">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                {t('dashboard.saved_properties')}
+                              </Button>
+                            </Link>
+                            <Link to="/pricing" onClick={() => setIsOpen(false)}>
+                              <Button variant="ghost" className="w-full justify-start text-primary">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                {t('sidebar.become_agent')}
+                              </Button>
+                            </Link>
+                          </>
                         )}
                         <div className="text-sm text-muted-foreground text-center">
                           {user?.first_name} {user?.last_name}

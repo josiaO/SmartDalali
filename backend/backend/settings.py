@@ -48,7 +48,9 @@ if not SECRET_KEY:
         )
 
 # DEBUG should be False in production. Control via environment variable.
-DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
+# Default to True in development to ensure static/media files are served correctly.
+default_debug = 'False' if os.getenv('DJANGO_ENV') == 'production' else 'True'
+DEBUG = os.getenv('DEBUG', default_debug).lower() in ('1', 'true', 'yes')
 
 # 1. Get the string of hosts from your environment (which came from .env)
 HOSTS_STRING = os.environ.get('ALLOWED_HOSTS', '') 
@@ -97,6 +99,7 @@ SESSION_SAVE_EVERY_REQUEST = False
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'corsheaders',
     'whitenoise.runserver_nostatic',
     'django.contrib.admin',
@@ -129,6 +132,7 @@ INSTALLED_APPS = [
     'communications',
     'insights',
     'features',
+    'shortlinks',
 ]
 
 SITE_ID = 1

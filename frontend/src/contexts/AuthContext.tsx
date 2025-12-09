@@ -61,7 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const userProfile = await getCurrentUser();
       setUser(userProfile);
-      setUser(userProfile);
     } catch (err: any) {
       console.error('Auth check failed:', err);
       // If token is invalid, clear it
@@ -77,6 +76,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
       await checkAuth();
+
+      // Redirect to role-specific dashboard after successful login
+      const userProfile = await getCurrentUser();
+      const role = userProfile.role || (userProfile.is_superuser ? 'admin' : userProfile.groups?.includes('agent') ? 'agent' : 'user');
+
+      switch (role) {
+        case 'admin':
+          navigate('/admin/dashboard');
+          break;
+        case 'agent':
+          navigate('/agent/dashboard');
+          break;
+        case 'user':
+        default:
+          navigate('/dashboard');
+          break;
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed');
       throw err;
@@ -107,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user?.is_superuser) return true; // Superusers have all features
 
     const feature = allFeatures.find(f => f.code === code);
-    if (!feature || !feature.is_active) {
+    if (!feature || (feature.status !== 'active' && !feature.is_active)) {
       return false; // Feature does not exist or is inactive globally
     }
 
@@ -122,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const accessibleFeatures = userFeatureCodes.filter(code => {
     const feature = allFeatures.find(f => f.code === code);
-    return feature?.is_active;
+    return feature?.status === 'active' || feature?.is_active;
   });
 
   const clearError = () => setError(null);

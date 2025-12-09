@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
   id: number;
@@ -86,17 +88,22 @@ interface Conversation {
 }
 
 export default function AgentMessages() {
+  const { user } = useAuth();
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [messageText, setMessageText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: conversations, isLoading: loadingConversations } = useConversations();
   const { data: messages, isLoading: loadingMessages } = useMessages(selectedConversationId || 0);
@@ -105,47 +112,84 @@ export default function AgentMessages() {
   const conversationsList = Array.isArray(conversations) ? conversations : (conversations as any)?.results || [];
   const selectedConversation = conversationsList.find((c: Conversation) => c.id === selectedConversationId);
 
-  // WebSocket connection
+  // WebSocket connection with reconnection logic
   useEffect(() => {
-    if (!selectedConversationId) return;
+    if (!selectedConversationId) {
+      setIsConnected(false);
+      return;
+    }
 
     const token = localStorage.getItem('access_token');
     if (!token) return;
 
-    const ws = new WebSocket(
-      `ws://localhost:8000/ws/chat/${selectedConversationId}/?token=${token}`
-    );
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+    let ws: WebSocket;
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
+    const connect = () => {
+      ws = new WebSocket(
+        `${wsUrl}/ws/chat/${selectedConversationId}/?token=${token}`
+      );
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setIsConnected(true);
+        reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'message') {
+          // Invalidate queries to refetch messages instead of reloading page
+          queryClient.invalidateQueries({ queryKey: ['messages', selectedConversationId] });
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        } else if (data.type === 'typing') {
+          setIsTyping(data.is_typing);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        setIsConnected(false);
+
+        // Attempt to reconnect with exponential backoff
+        const maxAttempts = 5;
+        if (reconnectAttemptsRef.current < maxAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxAttempts})`);
+
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current += 1;
+            connect();
+          }, delay);
+        } else {
+          toast({
+            title: 'Connection Lost',
+            description: 'Unable to reconnect to chat. Please refresh the page.',
+            variant: 'destructive',
+          });
+        }
+      };
+
+      wsRef.current = ws;
     };
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type === 'message') {
-        // Refetch messages to update UI
-        // In production, you'd update the local state directly
-        window.location.reload(); // Temporary - replace with proper state update
-      } else if (data.type === 'typing') {
-        setIsTyping(data.is_typing);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-
-    wsRef.current = ws;
+    connect();
 
     return () => {
-      ws.close();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (ws) {
+        ws.close();
+      }
     };
-  }, [selectedConversationId]);
+  }, [selectedConversationId, queryClient, toast]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -430,7 +474,7 @@ export default function AgentMessages() {
                   ) : (
                     <div className="space-y-4">
                       {messages?.map((message: Message) => {
-                        const currentUserId = 1; // TODO: Get from auth context
+                        const currentUserId = user?.id ? parseInt(user.id) : 0;
                         const isOwn = message.sender === currentUserId;
 
                         return (

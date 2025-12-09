@@ -2,11 +2,17 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.core.validators import FileExtensionValidator, MinValueValidator
+from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
 import uuid
 from features.models import SubscriptionPlan
+from .validators import FileTypeValidator
+
+# Allowed file types
+validate_image = FileTypeValidator(allowed_mimetypes=['image/jpeg', 'image/png', 'image/gif'])
+validate_video = FileTypeValidator(allowed_mimetypes=['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'])
+
 
 PROPERTY_TYPES = (
         ('House', _('House')),
@@ -124,10 +130,18 @@ class Property(models.Model):
         
 class MediaProperty(models.Model):
     property = models.ForeignKey(Property, related_name="MediaProperty", on_delete=models.CASCADE, null=True, blank=True)
-    Images = models.ImageField(upload_to='property_images/', null=True, blank=False)
-    videos = models.FileField(upload_to='property_videos', null=True, blank=True,
-                              validators=[FileExtensionValidator(allowed_extensions=['mp4', 'mov', 'avi', 'webm'])]
-                              )
+    Images = models.ImageField(
+        upload_to='property_images/',
+        null=True,
+        blank=False,
+        validators=[validate_image]
+    )
+    videos = models.FileField(
+        upload_to='property_videos',
+        null=True,
+        blank=True,
+        validators=[validate_video]
+    )
     caption = models.TextField(max_length=100, blank=True)
     class Meta:
         app_label = 'properties'
@@ -156,6 +170,9 @@ class PropertyVisit(models.Model):
 
     def __str__(self):
         return f"Visit to {self.property.title} by {self.visitor.username} on {self.scheduled_time}"
+
+    class Meta:
+        ordering = ['-created_at']
 
 class PropertyView(models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='unique_views')

@@ -10,5 +10,5 @@ router.register(r'subscription-plans', SubscriptionPlanViewSet, basename='subscr
 router.register(r'subscriptions', SubscriptionViewSet, basename='subscription')
 
 urlpatterns = [
-    path("v1/", include(router.urls)),  # Version 1 API
+    path("", include(router.urls)),  # Version 1 API (prefix already in backend/urls.py)
 ]

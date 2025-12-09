@@ -9,7 +9,8 @@ export interface Feature {
     name: string;
     code: string;
     description: string;
-    is_active: boolean;
+    status: 'active' | 'coming_soon' | 'disabled';
+    is_active?: boolean; // deprecated
     created_at: string;
 }
 
@@ -77,7 +78,7 @@ export interface AssignPlanResponse {
  * Admins see all plans, regular users see only active plans
  */
 export async function fetchSubscriptionPlans(): Promise<SubscriptionPlan[]> {
-    const res = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/plans/');
+    const res = await api.get<SubscriptionPlan[] | { results: SubscriptionPlan[] }>('/api/v1/features/plans/');
     // Handle both direct array and paginated response
     return Array.isArray(res.data) ? res.data : res.data.results || [];
 }
@@ -86,7 +87,7 @@ export async function fetchSubscriptionPlans(): Promise<SubscriptionPlan[]> {
  * Fetch a single subscription plan by ID
  */
 export async function fetchSubscriptionPlan(planId: number): Promise<SubscriptionPlan> {
-    const res = await api.get(`/api/v1/plans/${planId}/`);
+    const res = await api.get(`/api/v1/features/plans/${planId}/`);
     return res.data;
 }
 
@@ -101,7 +102,7 @@ export async function createSubscriptionPlan(data: {
     feature_ids: number[];
     is_active?: boolean;
 }): Promise<SubscriptionPlan> {
-    const res = await api.post('/api/v1/plans/', data);
+    const res = await api.post('/api/v1/features/plans/', data);
     return res.data;
 }
 
@@ -119,7 +120,7 @@ export async function updateSubscriptionPlan(
         is_active: boolean;
     }>
 ): Promise<SubscriptionPlan> {
-    const res = await api.patch(`/api/v1/plans/${planId}/`, data);
+    const res = await api.patch(`/api/v1/features/plans/${planId}/`, data);
     return res.data;
 }
 
@@ -127,7 +128,7 @@ export async function updateSubscriptionPlan(
  * Delete a subscription plan (Admin only)
  */
 export async function deleteSubscriptionPlan(planId: number): Promise<void> {
-    await api.delete(`/api/v1/plans/${planId}/`);
+    await api.delete(`/api/v1/features/plans/${planId}/`);
 }
 
 /**
@@ -137,7 +138,7 @@ export async function assignPlanToAgent(
     planId: number,
     agentId: number
 ): Promise<AssignPlanResponse> {
-    const res = await api.post(`/api/v1/plans/${planId}/assign_to_agent/`, {
+    const res = await api.post(`/api/v1/features/plans/${planId}/assign_to_agent/`, {
         agent_id: agentId,
     });
     return res.data;
@@ -150,7 +151,7 @@ export async function removePlanFromAgent(
     planId: number,
     agentId: number
 ): Promise<{ message: string }> {
-    const res = await api.post(`/api/v1/plans/${planId}/remove_from_agent/`, {
+    const res = await api.post(`/api/v1/features/plans/${planId}/remove_from_agent/`, {
         agent_id: agentId,
     });
     return res.data;
@@ -164,7 +165,7 @@ export async function fetchPlanSubscribers(planId: number): Promise<{
     total_subscribers: number;
     subscribers: AgentSubscription[];
 }> {
-    const res = await api.get(`/api/v1/plans/${planId}/subscribers/`);
+    const res = await api.get(`/api/v1/features/plans/${planId}/subscribers/`);
     return res.data;
 }
 
@@ -172,7 +173,7 @@ export async function fetchPlanSubscribers(planId: number): Promise<{
  * Get subscription plan statistics (Admin only)
  */
 export async function fetchSubscriptionStats(): Promise<SubscriptionStats> {
-    const res = await api.get('/api/v1/plans/stats/');
+    const res = await api.get('/api/v1/features/plans/stats/');
     return res.data;
 }
 
@@ -184,8 +185,8 @@ export async function fetchSubscriptionStats(): Promise<SubscriptionStats> {
  * Fetch all features
  */
 export async function fetchFeatures(): Promise<Feature[]> {
-    const res = await api.get('/api/v1/features/?page_size=100');
-    return res.data;
+    const res = await api.get('/api/v1/features/features/?page_size=100');
+    return Array.isArray(res.data) ? res.data : res.data.results || [];
 }
 
 /**

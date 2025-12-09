@@ -13,7 +13,6 @@ from properties.models import (
     Property,
     PropertyVisit,
     SupportTicket,
-    TicketReply,
 )
 
 pytestmark = pytest.mark.django_db
@@ -79,7 +78,7 @@ def test_payment_str_representation(payment):
 def test_support_ticket_generates_ticket_number(user):
     ticket = SupportTicket.objects.create(
         user=user,
-        title="Connectivity",
+        subject="Connectivity",
         description="Help",
         category="technical",
         priority="medium",
@@ -91,21 +90,10 @@ def test_support_ticket_preserves_existing_ticket_number(user):
     ticket = SupportTicket.objects.create(
         ticket_number="SD-CUSTOM",
         user=user,
-        title="Custom",
+        subject="Custom",
         description="Help",
         category="technical",
         priority="low",
     )
     ticket.save()
     assert ticket.ticket_number == "SD-CUSTOM"
-
-
-def test_ticket_reply_str_contains_ticket_number(support_ticket, admin_user):
-    reply = TicketReply.objects.create(
-        ticket=support_ticket,
-        user=admin_user,
-        message="We are on it",
-        is_admin_reply=True,
-    )
-    assert support_ticket.ticket_number in str(reply)
-

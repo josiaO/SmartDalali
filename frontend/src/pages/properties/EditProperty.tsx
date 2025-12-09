@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ArrowLeft, Upload, X, MapPin, Loader2, Video } from 'lucide-react';
 import { PROPERTY_TYPES, PROPERTY_STATUS } from '@/lib/constants';
 import { SubscriptionGuard } from '@/components/common/SubscriptionGuard';
+import { MediaUpload } from '@/components/common/MediaUpload';
 import { FEATURES } from '@/lib/permissions';
 import { useTranslation } from 'react-i18next';
 
@@ -472,132 +473,34 @@ export default function EditProperty() {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">{t('properties.media')}</h3>
 
-                {/* Existing Images */}
-                {existingImages.length > 0 && (
-                  <div>
-                    <Label>{t('properties.images')}</Label>
-                    <div className="grid grid-cols-3 gap-4 mt-2">
-                      {existingImages.map((img, index) => (
-                        <div key={index} className="relative group">
-                          <img src={img} alt={`Existing ${index + 1}`} className="w-full h-32 object-cover rounded" />
-                          <button
-                            type="button"
-                            onClick={() => removeExistingImage(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* New Images */}
                 <div className="space-y-2">
-                  <Label htmlFor="images">{t('form.upload_images_max', { count: 10 })}</Label>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      id="images"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('images')?.click()}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      {t('properties.upload_images')}
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {existingImages.length + images.length} / 10 {t('properties.images')}
-                    </span>
-                  </div>
-
-                  {imagePreviews.length > 0 && (
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group">
-                          <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded" />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <Label>{t('properties.images')}</Label>
+                  <MediaUpload
+                    type="image"
+                    files={images}
+                    previews={imagePreviews}
+                    maxFiles={10}
+                    onFilesChange={setImages}
+                    onPreviewsChange={setImagePreviews}
+                    onRemove={removeImage}
+                    existingMedia={existingImages}
+                    onRemoveExisting={removeExistingImage}
+                  />
                 </div>
 
-                {/* Existing Videos */}
-                {existingVideos.length > 0 && (
-                  <div>
-                    <Label>{t('properties.videos')}</Label>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      {existingVideos.map((vid, index) => (
-                        <div key={index} className="relative group">
-                          <video src={vid} className="w-full h-32 object-cover rounded" controls />
-                          <button
-                            type="button"
-                            onClick={() => removeExistingVideo(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* New Videos */}
                 <div className="space-y-2">
-                  <Label htmlFor="videos">{t('form.upload_videos_max', { count: 2 })}</Label>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      id="videos"
-                      type="file"
-                      accept="video/*"
-                      multiple
-                      onChange={handleVideoChange}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('videos')?.click()}
-                    >
-                      <Video className="mr-2 h-4 w-4" />
-                      {t('properties.upload_videos')}
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {existingVideos.length + videos.length} / 2 {t('properties.videos')}
-                    </span>
-                  </div>
-
-                  {videoPreviews.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      {videoPreviews.map((preview, index) => (
-                        <div key={index} className="relative group">
-                          <video src={preview} className="w-full h-32 object-cover rounded" controls />
-                          <button
-                            type="button"
-                            onClick={() => removeVideo(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <Label>{t('properties.videos')}</Label>
+                  <MediaUpload
+                    type="video"
+                    files={videos}
+                    previews={videoPreviews}
+                    maxFiles={2}
+                    onFilesChange={setVideos}
+                    onPreviewsChange={setVideoPreviews}
+                    onRemove={removeVideo}
+                    existingMedia={existingVideos}
+                    onRemoveExisting={removeExistingVideo}
+                  />
                 </div>
               </div>
 

@@ -27,6 +27,18 @@ export default defineConfig(({ mode }) => {
       host: "::", // Allows access from any interface (IPv4 or IPv6)
       port: 5173,
       hmr: hmrConfig, // Apply the dynamic HMR host setting
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/media': {
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
     // Only include react() plugin for a working setup.
     plugins: [react()],

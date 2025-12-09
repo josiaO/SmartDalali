@@ -34,7 +34,7 @@ class UserManagementViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAdmin]
     
     def get_queryset(self):
-        queryset = User.objects.all().select_related('profile')
+        queryset = User.objects.all().select_related('profile').prefetch_related('groups')
         
         # Filter by role
         role = self.request.query_params.get('role')

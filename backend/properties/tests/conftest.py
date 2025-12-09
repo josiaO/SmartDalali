@@ -184,7 +184,7 @@ def support_ticket(user):
     return SupportTicket.objects.create(
         ticket_number="SD-0001",
         user=user,
-        title="Need help",
+        subject="Need help",
         description="Details",
         category="technical",
         priority="medium",

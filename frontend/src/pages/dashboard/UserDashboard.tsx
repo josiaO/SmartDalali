@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { BecomeAgentCard } from '@/components/user/BecomeAgentCard';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { SubscriptionTimer } from '@/components/subscription/SubscriptionTimer';
+import { RecentlyViewed } from '@/components/properties/RecentlyViewed';
 
 export default function UserDashboard() {
   const { t } = useTranslation();
@@ -146,6 +147,9 @@ export default function UserDashboard() {
             )}
           </CardContent>
         </Card>
+      </div>
+      <div className="mt-8">
+        <RecentlyViewed />
       </div>
     </div>
   );

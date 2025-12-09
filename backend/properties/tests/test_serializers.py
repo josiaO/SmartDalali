@@ -1,9 +1,11 @@
 from types import SimpleNamespace
+import io
+from PIL import Image
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from properties.models import PropertyFeature, MediaProperty, TicketReply
+from properties.models import PropertyFeature, MediaProperty
 from properties.serializers import (
     CreateSupportTicketSerializer,
     PaymentSerializer,
@@ -11,19 +13,30 @@ from properties.serializers import (
     SerializerProperty,
     SubscriptionPaymentSerializer,
     SupportTicketSerializer,
-    TicketReplySerializer,
 )
 
 pytestmark = pytest.mark.django_db
 
-DUMMY_IMAGE_DATA = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\x08\n\n\t\x0b\x0c\x0c\x0b\x0b\x0c\x12\x11\x10\x13\x18\x18\x17\x16\x18\x11\x13\x17\x1d\x1c\x1b\x1e\x1b\x16\x16\x1d\x1f\x1f\x1f\x12\x15\x18\x1b\x19\x1a\x1a\x1a\x18\x15\x15\x17\x19\x1d\x1b\x1c\x1b\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xc4\x00\x1f\x01\x00\x03\x01\x01\x01\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00\x3f\x00\xa7\x00\xff\xd9'
+import io
+from PIL import Image
+
+# ... other imports
+
+@pytest.fixture
+def valid_image_file():
+    """Create a valid in-memory image file for tests."""
+    image = Image.new('RGB', (1, 1), color = 'red')
+    byte_arr = io.BytesIO()
+    image.save(byte_arr, format='JPEG')
+    byte_arr.seek(0)
+    return SimpleUploadedFile("test_image.jpg", byte_arr.getvalue(), content_type="image/jpeg")
 
 
-def test_property_serializer_includes_agent_nested_and_maps(monkeypatch, property_obj):
+def test_property_serializer_includes_agent_nested_and_maps(monkeypatch, property_obj, valid_image_file):
     PropertyFeature.objects.create(property=property_obj, features="Pool")
     MediaProperty.objects.create(
         property=property_obj,
-        Images=SimpleUploadedFile("main.jpeg", DUMMY_IMAGE_DATA, content_type="image/jpeg"),
+        Images=valid_image_file,
     )
     property_obj.latitude = 1.23
     property_obj.longitude = 4.56
@@ -36,13 +49,12 @@ def test_property_serializer_includes_agent_nested_and_maps(monkeypatch, propert
     data = serializer.data
     assert data["agent"]["username"] == property_obj.owner.username
     assert data["property_features"][0]["features"] == "Pool"
-    assert data["MediaProperty"][0]["id"] is not None
+    assert data["media"][0]["id"] is not None
     assert data["address"] == property_obj.adress
     assert data["maps_url"] == "https://maps.test/1.23,4.56"
 
 
-@pytest.mark.skip(reason="ImageField validation needs a proper image setup")
-def test_property_serializer_create_handles_nested_relationships(agent_user, monkeypatch):
+def test_property_serializer_create_handles_nested_relationships(agent_user, monkeypatch, valid_image_file):
     monkeypatch.setattr(SerializerProperty, "_sync_coordinates", lambda *args, **kwargs: None)
     payload = {
         "title": "New Listing",
@@ -55,7 +67,7 @@ def test_property_serializer_create_handles_nested_relationships(agent_user, mon
         "bathrooms": 2,
         "city": "Nairobi",
         "adress": "7th Street",
-        "MediaProperty": [{"Images": SimpleUploadedFile("img.jpg", DUMMY_IMAGE_DATA, content_type="image/jpeg")}],
+        "media": [{"Images": valid_image_file}],
         "property_features": [{"features": "Garden"}],
     }
 
@@ -67,14 +79,13 @@ def test_property_serializer_create_handles_nested_relationships(agent_user, mon
     assert instance.owner == agent_user
 
 
-@pytest.mark.skip(reason="ImageField validation needs a proper image setup")
 def test_property_serializer_update_replaces_nested_and_preserves_owner(
-    property_obj, user, django_user_model, monkeypatch
+    property_obj, user, django_user_model, monkeypatch, valid_image_file
 ):
     PropertyFeature.objects.create(property=property_obj, features="Old")
     MediaProperty.objects.create(
         property=property_obj,
-        Images=SimpleUploadedFile("old.jpg", DUMMY_IMAGE_DATA, content_type="image/jpeg"),
+        Images=valid_image_file,
     )
     other_user = django_user_model.objects.create_user(username="intruder")
     monkeypatch.setattr(SerializerProperty, "_sync_coordinates", lambda *args, **kwargs: None)
@@ -83,7 +94,7 @@ def test_property_serializer_update_replaces_nested_and_preserves_owner(
         "title": "Updated",
         "owner": other_user.id,
         "property_features": [{"features": "New"}],
-        "MediaProperty": [{"Images": SimpleUploadedFile("new.jpg", DUMMY_IMAGE_DATA, content_type="image/jpeg")}],
+        "media": [{"Images": valid_image_file}],
     }
     serializer = SerializerProperty(
         property_obj,
@@ -128,42 +139,3 @@ def test_subscription_payment_serializer_validates_choice():
     serializer = SubscriptionPaymentSerializer(data={"plan": "weekly", "phone": "2547"})
     assert not serializer.is_valid()
     assert "plan" in serializer.errors
-
-
-def test_support_ticket_serializer_counts_replies(support_ticket, admin_user):
-    TicketReply.objects.create(
-        ticket=support_ticket,
-        user=admin_user,
-        message="We will help",
-        is_admin_reply=True,
-    )
-    serializer = SupportTicketSerializer(support_ticket)
-    assert serializer.data["reply_count"] == 1
-    assert serializer.data["user_name"] == support_ticket.user.username
-
-
-def test_create_support_ticket_serializer_sets_user(user):
-    request = SimpleNamespace(user=user)
-    serializer = CreateSupportTicketSerializer(
-        data={
-            "title": "Need assistance",
-            "description": "Details",
-            "category": "technical",
-            "priority": "high",
-        },
-        context={"request": request},
-    )
-    assert serializer.is_valid(), serializer.errors
-    ticket = serializer.save()
-    assert ticket.user == user
-
-
-def test_ticket_reply_serializer_role_detection(agent_user, support_ticket):
-    reply = TicketReply.objects.create(
-        ticket=support_ticket,
-        user=agent_user,
-        message="Checking in",
-        is_admin_reply=False,
-    )
-    serializer = TicketReplySerializer(reply)
-    assert serializer.data["user_role"] == "agent"

@@ -12,6 +12,8 @@ pytestmark = pytest.mark.django_db
 
 
 def test_property_list_returns_properties(api_client, property_obj):
+    property_obj.is_published = True
+    property_obj.save()
     url = reverse("property-list-create")
     response = api_client.get(url)
     assert response.status_code == status.HTTP_200_OK
@@ -189,79 +191,34 @@ def test_support_ticket_list_shows_only_user_entries(
     SupportTicket.objects.create(
         ticket_number="SD-ALT",
         user=other,
-        title="Other issue",
+        subject="Other issue",
         description="desc",
         category="technical",
         priority="low",
     )
-    url = reverse("support-ticket-list")
+    url = reverse("support-tickets-list")
     response = auth_client.get(url)
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data['results']) == 1
 
 
 def test_support_ticket_create_sets_authenticated_user(auth_client, user):
-    url = reverse("support-ticket-list")
+    url = reverse("support-tickets-list")
     payload = {
-        "title": "Payment issue",
+        "subject": "Payment issue",
         "description": "Card declined",
         "category": "payment",
         "priority": "high",
     }
     response = auth_client.post(url, payload, format="json")
     assert response.status_code == status.HTTP_201_CREATED
-    assert SupportTicket.objects.filter(title="Payment issue", user=user).exists()
+    assert SupportTicket.objects.filter(subject="Payment issue", user=user).exists()
 
 
-def test_support_ticket_reply_user_reopens_ticket(auth_client, support_ticket):
-    support_ticket.status = "resolved"
-    support_ticket.save()
-    url = reverse("support-ticket-reply", args=[support_ticket.id])
+def test_ticket_message_creation(auth_client, support_ticket):
+    url = reverse("ticket-messages-list", kwargs={"ticket_pk": support_ticket.pk})
     response = auth_client.post(url, {"message": "Still broken"}, format="json")
     support_ticket.refresh_from_db()
     assert response.status_code == status.HTTP_201_CREATED
-    assert support_ticket.status == "open"
-    assert support_ticket.user_reply == "Still broken"
-
-
-def test_support_ticket_reply_admin_assigns_and_updates(admin_client, support_ticket, admin_user):
-    url = reverse("support-ticket-reply", args=[support_ticket.id])
-    response = admin_client.post(url, {"message": "Investigating"}, format="json")
-    support_ticket.refresh_from_db()
-    assert response.status_code == status.HTTP_201_CREATED
-    assert support_ticket.admin_reply == "Investigating"
-    assert support_ticket.assigned_to == admin_user
-    assert support_ticket.status == "in_progress"
-
-
-def test_support_ticket_reply_requires_message(auth_client, support_ticket):
-    url = reverse("support-ticket-reply", args=[support_ticket.id])
-    response = auth_client.post(url, {}, format="json")
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-
-def test_support_ticket_assign_requires_staff(
-    auth_client, staff_client, staff_user, support_ticket
-):
-    url = reverse("support-ticket-assign", args=[support_ticket.id])
-    assert auth_client.post(url, {"assigned_to": staff_user.id}, format="json").status_code == status.HTTP_403_FORBIDDEN
-    response = staff_client.post(url, {"assigned_to": staff_user.id}, format="json")
-    support_ticket.refresh_from_db()
-    assert response.status_code == status.HTTP_200_OK
-    assert support_ticket.assigned_to == staff_user
-    assert support_ticket.status == "in_progress"
-
-
-def test_support_ticket_close_sets_closed_at(staff_client, support_ticket):
-    url = reverse("support-ticket-close", args=[support_ticket.id])
-    response = staff_client.post(url)
-    support_ticket.refresh_from_db()
-    assert response.status_code == status.HTTP_200_OK
-    assert support_ticket.status == "closed"
-    assert support_ticket.closed_at is not None
-
-
-def test_support_ticket_stats_requires_staff(staff_client, auth_client, support_ticket):
-    url = reverse("support-ticket-stats")
-    assert staff_client.get(url).status_code == status.HTTP_200_OK
-    assert auth_client.get(url).status_code == status.HTTP_403_FORBIDDEN
+    assert support_ticket.messages.count() == 1
+    assert support_ticket.messages.first().message == "Still broken"

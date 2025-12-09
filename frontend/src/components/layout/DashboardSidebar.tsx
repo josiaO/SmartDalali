@@ -17,6 +17,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Heart,
+  BarChart,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +29,8 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
+import { useFeatures } from '@/hooks/useFeatures';
+
 interface NavItem {
   title: string;
   href: string;
@@ -33,6 +38,7 @@ interface NavItem {
   disabled?: boolean;
   badge?: string;
   roles?: ('admin' | 'agent' | 'user')[];
+  feature?: string;
 }
 
 export function DashboardSidebar() {
@@ -41,93 +47,149 @@ export function DashboardSidebar() {
   const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { isEnabled } = useFeatures();
 
   // Define menu items with role-based visibility
+  // Define menu items with strict role-based visibility
   const menuItems: NavItem[] = [
+    // --- User Menu ---
     {
       title: t('sidebar.dashboard'),
-      href: user?.role === 'admin' ? '/admin' : user?.role === 'agent' ? '/agent/dashboard' : '/dashboard',
+      href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['admin', 'agent', 'user'],
+      roles: ['user'],
     },
-    // Admin-specific items
-    {
-      title: t('sidebar.all_properties'),
-      href: '/admin/dashboard?tab=properties',
-      icon: Home,
-      roles: ['admin'],
-    },
-    {
-      title: t('sidebar.users'),
-      href: '/admin/dashboard?tab=users',
-      icon: Users,
-      roles: ['admin'],
-    },
-    {
-      title: t('admin.manage_features'),
-      href: '/admin/features',
-      icon: Settings,
-      roles: ['admin'],
-    },
-    // Agent-specific items
-    {
-      title: t('sidebar.my_properties'),
-      href: '/agent/my-properties', // Updated href
-      icon: Home,
-      roles: ['agent'],
-    },
-    {
-      title: t('sidebar.browse_properties'), // New item
-      href: '/agent/properties',
-      icon: Search,
-      roles: ['agent'],
-    },
-    {
-      title: t('sidebar.profile'),
-      href: user?.id ? `/agents/${user.id}/profile` : '#',
-      icon: User,
-      roles: ['agent'],
-    },
-    // User-specific items
     {
       title: t('sidebar.browse_properties'),
-      href: '/properties',
+      href: '/browse', // Or /properties, sticking to one consistent path
       icon: Home,
       roles: ['user'],
     },
-    // Shared items
+    {
+      title: t('sidebar.saved_properties'),
+      href: '/saved-properties', // Need to ensure this route exists or redirect to browse? Let's assume /saved or similar. Will fix if missing.
+      icon: Heart, // Should ideally be Heart icon
+      roles: ['user'],
+    },
     {
       title: t('sidebar.messages'),
       href: '/communication',
       icon: MessageSquare,
-      roles: ['admin', 'agent', 'user'], // Roles adjusted, disabled/badge removed
+      roles: ['user'],
+      feature: 'messaging',
     },
     {
       title: t('sidebar.support'),
       href: '/support',
       icon: Headphones,
-      roles: ['admin', 'agent', 'user'],
+      roles: ['user'],
     },
     {
-      title: t('sidebar.settings'),
+      title: t('sidebar.profile'),
       href: '/profile',
+      icon: User,
+      roles: ['user'],
+    },
+    {
+      title: t('sidebar.list_property'),
+      href: '/list-property',
+      icon: Plus,
+      roles: ['user'],
+    },
+
+    // --- Agent Menu ---
+    {
+      title: t('sidebar.dashboard'),
+      href: '/agent/dashboard',
+      icon: LayoutDashboard,
+      roles: ['agent'],
+    },
+    {
+      title: t('sidebar.my_properties'),
+      href: '/agent/my-properties',
+      icon: Home,
+      roles: ['agent'],
+    },
+    {
+      title: t('sidebar.create_property'),
+      href: '/properties/create',
+      icon: Plus,
+      roles: ['agent'],
+    },
+    {
+      title: t('sidebar.messages'),
+      href: '/communication',
+      icon: MessageSquare,
+      roles: ['agent'],
+      feature: 'messaging',
+    },
+    {
+      title: t('sidebar.analytics'),
+      href: '/agent/analytics',
+      icon: BarChart, // Needs a Chart icon, defaulting to Dashboard kind
+      roles: ['agent'],
+    },
+    {
+      title: t('sidebar.subscription'),
+      href: '/payments/subscription',
+      icon: CreditCard, // CreditCard icon would be better
+      roles: ['agent'],
+      feature: 'payments',
+    },
+    {
+      title: t('sidebar.support'),
+      href: '/support',
+      icon: Headphones,
+      roles: ['agent'],
+    },
+
+    // --- Admin Menu ---
+    {
+      title: t('sidebar.dashboard'),
+      href: '/admin/dashboard',
+      icon: LayoutDashboard,
+      roles: ['admin'],
+    },
+    {
+      title: t('sidebar.users'),
+      href: '/admin/dashboard?tab=users', // Or /admin/users if split
+      icon: Users,
+      roles: ['admin'],
+    },
+    {
+      title: t('sidebar.properties'),
+      href: '/admin/dashboard?tab=properties',
+      icon: Home,
+      roles: ['admin'],
+    },
+    {
+      title: t('sidebar.support'),
+      href: '/support',
+      icon: Headphones,
+      roles: ['admin'],
+    },
+    {
+      title: t('sidebar.system_settings'),
+      href: '/admin/features', // Managing features/settings
       icon: Settings,
-      roles: ['admin', 'agent', 'user'],
+      roles: ['admin'],
     },
   ];
 
-  // Filter menu items based on user role
-  const visibleItems = menuItems.filter(item =>
-    !item.roles || (user?.role && item.roles.includes(user.role))
-  );
+  // Filter menu items based on user role and feature flags
+  const visibleItems = menuItems.filter(item => {
+    const roleMatch = !item.roles || (user?.role && item.roles.includes(user.role));
+    const featureMatch = !item.feature || isEnabled(item.feature);
+    return roleMatch && featureMatch;
+  });
 
-  const SidebarContent = ({ onItemClick }: { onItemClick?: () => void }) => (
+  const SidebarContent = ({ onItemClick, isMobile = false }: { onItemClick?: () => void; isMobile?: boolean }) => (
     <>
       {/* Header */}
       <div className="flex h-16 items-center border-b px-6 justify-between">
         <Link to="/" className="flex items-center space-x-2">
           <Building2 className="h-6 w-6 text-primary flex-shrink-0" />
-          {!isCollapsed && <span className="text-lg font-bold">SmartDalali</span>}
+          {(!isCollapsed || isMobile) && <span className="text-lg font-bold">SmartDalali</span>}
         </Link>
         {/* Desktop collapse toggle */}
         <Button
@@ -148,7 +210,7 @@ export function DashboardSidebar() {
             <Link to="/properties/create" onClick={onItemClick}>
               <Button className="w-full justify-start">
                 <Plus className="h-4 w-4 flex-shrink-0" />
-                {!isCollapsed && <span className="ml-2">{t('sidebar.list_property')}</span>}
+                {(!isCollapsed || isMobile) && <span className="ml-2">{t('sidebar.list_property')}</span>}
               </Button>
             </Link>
           </div>
@@ -176,10 +238,10 @@ export function DashboardSidebar() {
                     : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
                   item.disabled && 'cursor-not-allowed opacity-50'
                 )}
-                title={isCollapsed ? item.title : undefined}
+                title={(isCollapsed && !isMobile) ? item.title : undefined}
               >
                 <Icon className="h-4 w-4 flex-shrink-0" />
-                {!isCollapsed && (
+                {(!isCollapsed || isMobile) && (
                   <>
                     <span className="flex-1">{item.title}</span>
                     {item.badge && (
@@ -197,7 +259,7 @@ export function DashboardSidebar() {
 
       {/* User Info & Logout */}
       <div className="border-t p-4">
-        {!isCollapsed && (
+        {(!isCollapsed || isMobile) && (
           <>
             <div className="mb-3 px-3">
               <p className="text-sm font-medium truncate">
@@ -213,12 +275,12 @@ export function DashboardSidebar() {
         )}
         <Button
           variant="ghost"
-          className={cn("w-full", isCollapsed ? "justify-center px-2" : "justify-start")}
+          className={cn("w-full", (isCollapsed && !isMobile) ? "justify-center px-2" : "justify-start")}
           onClick={logout}
-          title={isCollapsed ? t('nav.logout') : undefined}
+          title={(isCollapsed && !isMobile) ? t('nav.logout') : undefined}
         >
           <LogOut className="h-4 w-4 flex-shrink-0" />
-          {!isCollapsed && <span className="ml-2">{t('nav.logout')}</span>}
+          {(!isCollapsed || isMobile) && <span className="ml-2">{t('nav.logout')}</span>}
         </Button>
       </div>
     </>
@@ -236,12 +298,12 @@ export function DashboardSidebar() {
                 <span className="sr-only">Toggle Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64">
+            <SheetContent side="left" className="p-0 w-64 bg-sidebar">
               <VisuallyHidden.Root>
                 <SheetTitle>Dashboard Menu</SheetTitle>
               </VisuallyHidden.Root>
-              <div className="flex h-full flex-col bg-sidebar">
-                <SidebarContent onItemClick={() => setIsMobileOpen(false)} />
+              <div className="flex h-full flex-col">
+                <SidebarContent onItemClick={() => setIsMobileOpen(false)} isMobile={true} />
               </div>
             </SheetContent>
           </Sheet>

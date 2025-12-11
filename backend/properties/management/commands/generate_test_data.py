@@ -29,14 +29,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--agents',
             type=int,
-            default=15,
-            help='Number of agent profiles to create (default: 15)'
+            default=100,
+            help='Number of agent profiles to create (default: 30)'
         )
         parser.add_argument(
             '--properties',
             type=int,
-            default=40,
-            help='Number of properties to create (default: 40)'
+            default=150,
+            help='Number of properties to create (default: 100)'
         )
 
     def handle(self, *args, **options):

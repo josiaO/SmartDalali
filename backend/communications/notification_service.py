@@ -187,6 +187,7 @@ class NotificationService:
         user, 
         sender_name: str, 
         message_preview: str,
+        conversation_id: int = None,
         channels: Optional[List[str]] = None
     ):
         """
@@ -195,7 +196,40 @@ class NotificationService:
         """
         if channels is None:
             channels = ['email', 'push']
+            
+        # 1. Create DB Notification
+        from communications.models import Notification
+        from communications.serializers import NotificationSerializer
         
+        try:
+            db_notification = Notification.objects.create(
+                user=user,
+                type='message',
+                title=f"New Message from {sender_name}",
+                message=message_preview,
+                data={'sender_name': sender_name},
+                related_object_id=conversation_id,
+                related_object_type='conversation'
+            )
+            
+            # 2. Broadcast to WebSocket
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"notifications_{user.id}",
+                    {
+                        "type": "notification.message",
+                        "message": NotificationSerializer(db_notification).data
+                    }
+                )
+                
+        except Exception as e:
+            logger.error(f"Error creating DB notification: {e}")
+
+        # 3. Send External Notifications
         try:
             if 'email' in channels and user.email:
                 self.email.send_message_notification(
@@ -213,7 +247,7 @@ class NotificationService:
                         token.token, sender_name, message_preview
                     )
         except Exception as e:
-            logger.error(f"Error sending notifications: {e}")
+            logger.error(f"Error sending external notifications: {e}")
     
     def notify_new_conversation(
         self,
@@ -225,6 +259,36 @@ class NotificationService:
         """Send notification for new conversation"""
         if channels is None:
             channels = ['email', 'push']
+            
+        # 1. Create DB Notification
+        from communications.models import Notification
+        from communications.serializers import NotificationSerializer
+        
+        try:
+            db_notification = Notification.objects.create(
+                user=user,
+                type='message', # Using 'message' type or generic 'update'
+                title=f"New Inquiry: {property_title}",
+                message=f"{participant_name} started a new conversation about {property_title}",
+                data={'property_title': property_title, 'participant_name': participant_name}
+            )
+            
+             # 2. Broadcast to WebSocket
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"notifications_{user.id}",
+                    {
+                        "type": "notification.message",
+                        "message": NotificationSerializer(db_notification).data
+                    }
+                )
+
+        except Exception as e:
+             logger.error(f"Error creating DB notification: {e}")
         
         try:
             if 'email' in channels and user.email:
@@ -244,6 +308,49 @@ class NotificationService:
                     )
         except Exception as e:
             logger.error(f"Error sending conversation notifications: {e}")
+            
+    def notify_generic(
+        self,
+        user,
+        title: str,
+        message: str,
+        notification_type: str = 'update',
+        related_object_id: int = None,
+        related_object_type: str = None
+    ):
+        """Send a generic notification"""
+        from communications.models import Notification
+        from communications.serializers import NotificationSerializer
+        
+        try:
+            db_notification = Notification.objects.create(
+                user=user,
+                type=notification_type,
+                title=title,
+                message=message,
+                related_object_id=related_object_id,
+                related_object_type=related_object_type
+            )
+            
+            # Broadcast
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"notifications_{user.id}",
+                    {
+                        "type": "notification.message",
+                        "message": NotificationSerializer(db_notification).data
+                    }
+                )
+                
+            return db_notification
+            
+        except Exception as e:
+            logger.error(f"Error sending generic notification: {e}")
+            return None
 
 
 # Singleton instance

@@ -44,6 +44,7 @@ i18n
                         support: 'Support',
                         list_property: 'List Property',
                         create_property: 'Create Property',
+                        saved_properties: 'Saved Properties',
                         analytics: 'Analytics',
                         soon: 'Soon',
                         settings: 'Settings',
@@ -59,10 +60,42 @@ i18n
                     home: {
                         hero: {
                             badge: 'Tanzania\'s Leading Property Platform',
-                            title: 'Welcome to',
-                            subtitle: 'Discover your perfect property in Tanzania. Browse thousands of verified listings from trusted agents across the country.',
+                            title: 'Find Houses, Plots & Rentals Across Tanzania — Fast, Easy, Smart.',
+                            subtitle: 'SmartDalali helps you discover properties instantly with advanced filters, real-time updates, and trusted agents.',
                             browse: 'Browse Properties',
-                            getStarted: 'Get Started'
+                            getStarted: 'Get Started',
+                            search_title: 'Mali Zinazotamba',
+                        },
+                        search_bar: {
+                            keyword: 'Keyword (e.g. Pool)',
+                            location: 'Location (e.g. Arusha)',
+                            type: 'Property Type',
+                            min_price: 'Min Price',
+                            max_price: 'Max Price',
+                            search_btn: 'Search Properties',
+                        },
+                        categories: {
+                            houses: 'Houses',
+                            apartments: 'Apartments',
+                            plots: 'Plots & Land',
+                            rentals: 'Rentals',
+                            commercial: 'Commercial',
+                            offices: 'Offices',
+                            villas: 'Villas',
+                            shops: 'Shops',
+                            warehouses: 'Warehouses',
+                        },
+                        trust: {
+                            verified: '2000+ Verified Properties',
+                            agents: 'Trusted by 500+ Agents',
+                            updated: 'Updated Daily',
+                            fastest: 'Tanzania’s Fastest Platform',
+                        },
+                        seo: {
+                            line1: 'SmartDalali is a modern real estate platform designed for Tanzania.',
+                            line2: 'Browse thousands of houses, plots, apartments, commercial spaces, and rental properties.',
+                            line3: 'Whether you’re buying, selling, or renting, our platform gives you real-time updates, advanced search filters, and verified agent listings.',
+                            featured_properties: 'Featured Properties',
                         },
                         stats: {
                             properties: 'Properties Listed',
@@ -614,10 +647,42 @@ i18n
                     home: {
                         hero: {
                             badge: "Jukwaa la Mali la Tanzania",
-                            title: "Karibu",
-                            subtitle: "Gundua mali yako bora nchini Tanzania. Tazama maelfu ya orodha zilizo sahihi kutoka kwa mawakala wa kuaminika.",
-                            browse: "Tazama Mali",
-                            getStarted: "Anza"
+                            title: "Pata Nyumba, Viwanja na Wapangaji Tanzania — Haraka, Rahisi, na Kijanja.",
+                            subtitle: "SmartDalali inakuwezesha kupata mali chapchap kwa vichujio vya kisasa, updates za muda, na madalali wa uhakika.",
+                            browse: "Vinjari Mali",
+                            getStarted: "Anza",
+                            search_title: 'Mali Zinazotamba',
+                        },
+                        search_bar: {
+                            keyword: 'Neno kuu (mf. Bwawa)',
+                            location: 'Eneo (mf. Arusha)',
+                            type: 'Aina ya Mali',
+                            min_price: 'Bei ya chini',
+                            max_price: 'Bei ya juu',
+                            search_btn: 'Tafuta Mali',
+                        },
+                        categories: {
+                            houses: 'Nyumba',
+                            apartments: 'Fleti/Apartment',
+                            plots: 'Viwanja',
+                            rentals: 'Kupanga',
+                            commercial: 'Biashara',
+                            offices: 'Ofisi',
+                            villas: 'Majumba (Villas)',
+                            shops: 'Maduka',
+                            warehouses: 'Maghala',
+                        },
+                        trust: {
+                            verified: 'Mali 2000+ Zilizohakikiwa',
+                            agents: 'Madalali 500+ Wa Uhakika',
+                            updated: 'Inasasishwa Kila Siku',
+                            fastest: 'Mtandao wenye Kasi Zaidi Tanzania',
+                        },
+                        seo: {
+                            line1: 'SmartDalali ni mtandao wa kisasa wa mali isiyohamishika ulioundwa kwa ajili ya Tanzania.',
+                            line2: 'Tafuta maelfu ya nyumba, viwanja, apartments, na fremu za biashara.',
+                            line3: 'Kama unanunua, unauza, au unapanga, tunakupa taarifa za uhakika, utafutaji rahisi, na madalali waliohakikiwa.',
+                            featured_properties: 'Mali Zinazotamba',
                         },
                         stats: {
                             properties: "Mali Zilizotolewa",
@@ -679,7 +744,6 @@ i18n
                         cta: {
                             title: "Uko tayari kupata mali yako ya ndoto?",
                             subtitle: "Jiunge na maelfu ya Watanzania walio kupata nyumba zao kamili kupitia SmartDalali",
-
                             signup: "Jisajili Bure",
                             explore: "Gundua Mali"
                         },
@@ -713,6 +777,7 @@ i18n
                         support: 'Msaada',
                         list_property: 'Tangaza Mali',
                         create_property: 'Unda Mali',
+                        saved_properties: 'Mali Zilizohifadhiwa',
                         analytics: 'Uchambuzi',
                         soon: 'Hivi Karibuni',
                         settings: 'Mipangilio',

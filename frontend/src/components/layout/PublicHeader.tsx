@@ -9,8 +9,9 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { FeatureGate } from '../common/FeatureGate';
+import NotificationBell from '../ui/NotificationBell';
 
-export function PublicHeader() {
+export function PublicHeader() { // Recompile trigger
   const { isAuthenticated, user, logout } = useAuth();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -42,7 +43,7 @@ export function PublicHeader() {
   );
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center space-x-2">
           <Building2 className="h-6 w-6 text-primary" />
@@ -57,6 +58,8 @@ export function PublicHeader() {
         <div className="flex items-center space-x-4">
           <LanguageSwitcher />
           <ThemeToggle />
+
+          {isAuthenticated && <NotificationBell />}
 
           {/* Mobile Menu Trigger */}
           <div className="md:hidden">
@@ -118,12 +121,12 @@ export function PublicHeader() {
                                 {t('dashboard.saved_properties')}
                               </Button>
                             </Link>
-                            <Link to="/pricing" onClick={() => setIsOpen(false)}>
+                            {/* <Link to="/pricing" onClick={() => setIsOpen(false)}>
                               <Button variant="ghost" className="w-full justify-start text-primary">
                                 <Building2 className="mr-2 h-4 w-4" />
                                 {t('sidebar.become_agent')}
                               </Button>
-                            </Link>
+                            </Link> */}
                           </>
                         )}
                         <div className="text-sm text-muted-foreground text-center">

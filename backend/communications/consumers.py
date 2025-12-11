@@ -5,7 +5,6 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from communications.models import Conversation, Message, MessageNotification
 from communications.serializers import MessageSerializer
-from utils.encryption import get_encryption
 from communications.notification_service import get_notification_service
 
 logger = logging.getLogger(__name__)
@@ -26,23 +25,58 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         self.group_name = f"notifications_{user.id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
+        
+        # Set User Online
+        await self.set_user_status(user, True)
 
     async def disconnect(self, close_code):
+        user = self.scope["user"]
         # Remove user from their notification group
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(
                 self.group_name,
                 self.channel_name
             )
+        
+        # Set User Offline
+        if not user.is_anonymous:
+            await self.set_user_status(user, False)
 
     async def notification_message(self, event):
         """Send notification to WebSocket"""
         message = event["message"]
         await self.send(text_data=json.dumps(message))
+    
+    @database_sync_to_async
+    def set_user_status(self, user, is_online):
+        try:
+            profile = user.profile
+            profile.is_online = is_online
+            profile.save()
+            
+            # Broadcast to active conversations (Simplified logic)
+            # Find conversations where this user is a participant
+            conversations = Conversation.objects.filter(
+                Q(user=user) | Q(agent=user),
+                is_active=True
+            )
+            
+            channel_layer = get_channel_layer()
+            for conv in conversations:
+                async_to_sync(channel_layer.group_send)(
+                    f'chat_{conv.id}',
+                    {
+                        'type': 'user_status',
+                        'user_id': user.id,
+                        'is_online': is_online
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Error setting user status: {e}")
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
-    """WebSocket consumer for real-time chat with encryption and notifications"""
+    """WebSocket consumer for real-time chat"""
     
     async def connect(self):
         """Handle WebSocket connection"""
@@ -70,6 +104,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         # Mark conversation as active
         await self.mark_conversation_active()
+        
+        # Send initial status of other participant
+        status_data = await self.get_initial_status()
+        if status_data:
+            await self.send(text_data=json.dumps({
+                'type': 'user_status',
+                'user_id': status_data['user_id'],
+                'is_online': status_data['is_online']
+            }))
         
         logger.info(f"User {self.user.username} connected to conversation {self.conversation_id}")
     
@@ -103,16 +146,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def handle_message(self, data):
         """Handle new message"""
         try:
-            content = data.get('content', '').strip()
-            if not content:
+            text = data.get('text', '').strip()
+            # If front-end sends 'content', support that too for compatibility
+            if not text:
+                 text = data.get('content', '').strip()
+
+            if not text:
                 return
             
             # Save message to database
-            message = await self.save_message(content)
+            message = await self.save_message(text)
             
             # Serialize and broadcast
-            serializer = MessageSerializer(message)
-            message_data = serializer.data
+            # We need to manually serialize simple data to avoid sync calls in serializer if possible, 
+            # or wrap serializer in sync_to_async.
+            message_data = await self.serialize_message(message)
             
             # Broadcast to group
             await self.channel_layer.group_send(
@@ -128,7 +176,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.notify_participants(message)
             
         except Exception as e:
-            logger.error(f"Error handling message: {e}")
+            logger.error(f"Error handling message: {e}", exc_info=True)
             await self.send_error("Failed to send message")
     
     async def handle_typing(self, data):
@@ -178,6 +226,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
             'severity': event.get('severity', 'info'),
         }))
+
+    async def user_status(self, event):
+        """Send user status update to WebSocket"""
+        await self.send(text_data=json.dumps({
+            'type': 'user_status',
+            'user_id': event['user_id'],
+            'is_online': event['is_online']
+        }))
     
     # Database operations
     @database_sync_to_async
@@ -185,23 +241,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Verify user is a participant in the conversation"""
         try:
             conversation = Conversation.objects.get(id=self.conversation_id)
-            return self.user in conversation.participants.all()
+            return self.user == conversation.user or self.user == conversation.agent
         except Conversation.DoesNotExist:
             return False
     
     @database_sync_to_async
-    def save_message(self, content):
-        """Save message to database with encryption"""
-        encryption = get_encryption()
-        encrypted_content = encryption.encrypt_message(content)
-        
+    def save_message(self, text):
+        """Save message to database"""
         message = Message.objects.create(
             conversation_id=self.conversation_id,
             sender=self.user,
-            content=encrypted_content,
-            is_read=False,
+            text=text,
         )
         return message
+
+    @database_sync_to_async
+    def serialize_message(self, message):
+         return MessageSerializer(message).data
     
     @database_sync_to_async
     def mark_conversation_active(self):
@@ -217,14 +273,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def mark_message_read(self, message_id):
         """Mark message as read"""
         try:
-            notification = MessageNotification.objects.get(
+            # We are marking a message as read by THIS user.
+            # So updating notification OR setting read_at if not set?
+            # Model has read_at on message (single time?) or MessageNotification per user.
+            # strict Message model has read_at.
+            # I should update read_at if I am the recipient.
+            
+            message = Message.objects.get(id=message_id)
+            if message.sender != self.user and not message.read_at:
+                from django.utils import timezone
+                message.read_at = timezone.now()
+                message.save()
+                return True
+                
+            notification = MessageNotification.objects.filter(
                 message_id=message_id,
                 user=self.user
-            )
-            notification.is_read = True
-            notification.save()
-            return True
-        except MessageNotification.DoesNotExist:
+            ).first()
+            
+            if notification:
+                notification.is_read = True
+                notification.save()
+                return True
+            return False
+        except Message.DoesNotExist:
             return False
     
     async def broadcast_read_receipt(self, message_id):
@@ -247,38 +319,60 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
     
     @database_sync_to_async
-    def get_conversation_participants(self):
-        """Get other participants in conversation"""
+    def get_other_participant(self):
+        """Get other participant in conversation"""
         try:
             conversation = Conversation.objects.get(id=self.conversation_id)
-            return list(conversation.participants.exclude(id=self.user.id))
+            return conversation.agent if conversation.user == self.user else conversation.user
         except Conversation.DoesNotExist:
-            return []
+            return None
     
     async def notify_participants(self, message):
         """Send notifications to other participants"""
         try:
-            participants = await self.get_conversation_participants()
+            other_participant = await self.get_other_participant()
+            if not other_participant:
+                return
+
             notification_service = get_notification_service()
             
-            # Decrypt for notification
-            encryption = get_encryption()
-            decrypted_content = encryption.decrypt_message(message.content)
+            # Create notification record - wrap in async
+            await self._create_notification(other_participant, message)
             
-            for participant in participants:
-                # Create notification record - wrap in async
-                await self._create_notification(participant, message)
-                
-                # Send multi-channel notification
+            # Send multi-channel notification
+            if notification_service:
+                content_preview = message.text[:100] if message.text else "Attachment"
                 notification_service.notify_new_message(
-                    participant,
+                    other_participant,
                     self.user.get_full_name() or self.user.username,
-                    decrypted_content[:100],
+                    content_preview,
                     channels=['push', 'email']
                 )
         except Exception as e:
             logger.error(f"Error notifying participants: {e}")
     
+    @database_sync_to_async
+    def get_initial_status(self):
+        try:
+            conversation = Conversation.objects.get(id=self.conversation_id)
+            other = conversation.agent if conversation.user == self.user else conversation.user
+            
+            # Check profile status
+            is_online = False
+            if hasattr(other, 'profile'):
+                is_online = other.profile.is_online
+                
+            # Send to self (sync wrapper needed if calling async send from sync context? No, this is async method called from async)
+            # But wait, send_initial_status is decorated with database_sync_to_async, so it runs in thread.
+            # I cannot call await self.send() from inside it easily without async_to_sync which is messy.
+            # Better: make it return status, then send in connect.
+            return {
+                'user_id': other.id,
+                'is_online': is_online
+            }
+        except Exception:
+            return None
+
     @database_sync_to_async
     def _create_notification(self, participant, message):
         """Create notification record"""

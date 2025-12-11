@@ -22,7 +22,7 @@ from .models import (
 )
 from .serializers import (
     PropertyVisitSerializer, SerializerProperty, PaymentSerializer,
-    SubscriptionPaymentSerializer, SupportTicketSerializer,
+    SubscriptionPaymentSerializer, SupportTicketSerializer, SupportTicketListSerializer,
     CreateSupportTicketSerializer, TicketMessageSerializer, TicketAttachmentSerializer,
     AgentRatingSerializer, CreateAgentRatingSerializer
 )
@@ -34,24 +34,22 @@ class PropertyListCreateView(generics.ListCreateAPIView):
     serializer_class = SerializerProperty
     # Allow anyone to list properties, but creating requires agent or admin
     permission_classes = [permissions.AllowAny]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = {
-        'city': ['exact', 'icontains'],
-        'type': ['exact'],
-        'status': ['exact'],
-        'is_published': ['exact'],
-        'price': ['exact', 'gte', 'lte'],
-        'owner': ['exact'],
-    }
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    from .filters import PropertyFilter
+    filterset_class = PropertyFilter
+    search_fields = ['title', 'description', 'city', 'adress', 'owner__first_name', 'owner__last_name']
+    ordering_fields = ['price', 'created_at', 'view_count']
 
     def get_queryset(self):
         """Filter properties based on user role and archived status."""
         user = self.request.user
         owner_filter = self.request.query_params.get('owner')
         
+        base_qs = Property.objects.select_related('owner', 'owner__profile').prefetch_related('MediaProperty', 'property_features')
+        
         # Admins see all properties including archived
         if user.is_authenticated and user.is_superuser:
-            return Property.objects.all().order_by('-created_at')
+            return base_qs.all().order_by('-created_at')
         
         # If owner filter is explicitly set, show only that owner's properties (for agent dashboard)
         if owner_filter:
@@ -59,12 +57,12 @@ class PropertyListCreateView(generics.ListCreateAPIView):
                 owner_id = int(owner_filter)
                 # Only allow agents to filter their own properties, or admins to filter any
                 if user.is_authenticated and (user.is_superuser or user.id == owner_id):
-                    return Property.objects.filter(owner_id=owner_id).order_by('-created_at')
+                    return base_qs.filter(owner_id=owner_id).order_by('-created_at')
             except (ValueError, TypeError):
                 pass
         
         # Default: show all non-archived, published properties (public browse)
-        return Property.objects.filter(
+        return base_qs.filter(
             archived_at__isnull=True,
             is_published=True
         ).order_by('-created_at')
@@ -88,7 +86,7 @@ class PropertyListCreateView(generics.ListCreateAPIView):
 
 
 class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Property.objects.all()
+    queryset = Property.objects.select_related('owner', 'owner__profile').prefetch_related('MediaProperty', 'property_features')
     serializer_class = SerializerProperty
     # Allow anyone to retrieve, but updates/deletes require owner or admin
     permission_classes = [permissions.AllowAny]
@@ -290,12 +288,12 @@ class PropertyVisitListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser or user.is_staff:
-            return PropertyVisit.objects.all()
+            return PropertyVisit.objects.all().select_related('visitor', 'property')
         # Agents can view visits for properties they own
         if user.groups.filter(name='agent').exists():
-            return PropertyVisit.objects.filter(Q(property__owner=user) | Q(visitor=user))
+            return PropertyVisit.objects.filter(Q(property__owner=user) | Q(visitor=user)).select_related('visitor', 'property')
         # Regular users only see their own visits
-        return PropertyVisit.objects.filter(visitor=user)
+        return PropertyVisit.objects.filter(visitor=user).select_related('visitor', 'property')
     
     def perform_create(self, serializer):
         """Automatically set the visitor to the current user"""
@@ -303,7 +301,7 @@ class PropertyVisitListCreateView(generics.ListCreateAPIView):
 
 
 class PropertyVisitRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PropertyVisit.objects.all()
+    queryset = PropertyVisit.objects.all().select_related('visitor', 'property')
     serializer_class = PropertyVisitSerializer
     permission_classes = [IsAuthenticated]
 
@@ -318,16 +316,16 @@ class PaymentViewSet(viewsets.ModelViewSet):
         """Filter payments based on user role."""
         user = self.request.user
         if user.is_superuser:
-            return Payment.objects.all().order_by('-created_at')
+            return Payment.objects.all().select_related('user', 'property').order_by('-created_at')
         elif user.groups.filter(name='agent').exists():
             # Agents see payments related to their properties
             return Payment.objects.filter(
                 Q(user=user) |  # Their own payments
                 Q(property__owner=user)  # Payments for properties they own
-            ).order_by('-created_at')
+            ).select_related('user', 'property').order_by('-created_at')
         else:
             # Regular users see only their own payments
-            return Payment.objects.filter(user=user).order_by('-created_at')
+            return Payment.objects.filter(user=user).select_related('user', 'property').order_by('-created_at')
 
     def get_permissions(self):
         if getattr(self, 'action', None) in {'admin_list', 'retry', 'receipt'}:
@@ -867,6 +865,8 @@ def agent_stats(request):
     })
 
 
+
+
 class SupportTicketViewSet(viewsets.ModelViewSet):
     serializer_class = SupportTicketSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -877,9 +877,14 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = SupportTicket.objects.select_related('user', 'assigned_to').annotate(annotated_message_count=Count('messages'))
+        
+        if self.action == 'retrieve':
+             queryset = queryset.prefetch_related('messages', 'messages__sender', 'messages__attachments')
+             
         if user.is_staff or user.is_superuser:
-            return SupportTicket.objects.all()
-        return SupportTicket.objects.filter(user=user)
+            return queryset.all()
+        return queryset.filter(user=user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -887,6 +892,8 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return CreateSupportTicketSerializer
+        if self.action == 'list':
+            return SupportTicketListSerializer
         return SupportTicketSerializer
 
     @action(detail=True, methods=['post'])
@@ -947,9 +954,12 @@ class TicketMessageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         ticket_id = self.kwargs.get('ticket_pk')
         user = self.request.user
+        
+        queryset = TicketMessage.objects.filter(ticket_id=ticket_id).select_related('sender').prefetch_related('attachments')
+        
         if user.is_staff or user.is_superuser:
-            return TicketMessage.objects.filter(ticket_id=ticket_id)
-        return TicketMessage.objects.filter(ticket_id=ticket_id, ticket__user=user)
+            return queryset
+        return queryset.filter(ticket__user=user)
 
     def perform_create(self, serializer):
         ticket_id = self.kwargs.get('ticket_pk')

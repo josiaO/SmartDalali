@@ -90,13 +90,6 @@ export function DashboardSidebar() {
       icon: User,
       roles: ['user'],
     },
-    {
-      title: t('sidebar.list_property'),
-      href: '/list-property',
-      icon: Plus,
-      roles: ['user'],
-    },
-
     // --- Agent Menu ---
     {
       title: t('sidebar.dashboard'),
@@ -123,12 +116,7 @@ export function DashboardSidebar() {
       roles: ['agent'],
       feature: 'messaging',
     },
-    {
-      title: t('sidebar.analytics'),
-      href: '/agent/analytics',
-      icon: BarChart, // Needs a Chart icon, defaulting to Dashboard kind
-      roles: ['agent'],
-    },
+    /*
     {
       title: t('sidebar.subscription'),
       href: '/payments/subscription',
@@ -136,6 +124,7 @@ export function DashboardSidebar() {
       roles: ['agent'],
       feature: 'payments',
     },
+    */
     {
       title: t('sidebar.support'),
       href: '/support',
@@ -186,7 +175,7 @@ export function DashboardSidebar() {
   const SidebarContent = ({ onItemClick, isMobile = false }: { onItemClick?: () => void; isMobile?: boolean }) => (
     <>
       {/* Header */}
-      <div className="flex h-16 items-center border-b px-6 justify-between">
+      <div className={cn("flex h-16 items-center border-b justify-between", isMobile ? "px-4" : "px-6")}>
         <Link to="/" className="flex items-center space-x-2">
           <Building2 className="h-6 w-6 text-primary flex-shrink-0" />
           {(!isCollapsed || isMobile) && <span className="text-lg font-bold">SmartDalali</span>}
@@ -298,7 +287,7 @@ export function DashboardSidebar() {
                 <span className="sr-only">Toggle Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 bg-sidebar">
+            <SheetContent side="left" className="p-0 w-64 bg-sidebar text-sidebar-foreground">
               <VisuallyHidden.Root>
                 <SheetTitle>Dashboard Menu</SheetTitle>
               </VisuallyHidden.Root>
@@ -316,7 +305,7 @@ export function DashboardSidebar() {
 
       {/* Desktop Sidebar */}
       <div className={cn(
-        "hidden lg:flex h-screen flex-col border-r bg-sidebar transition-all duration-300",
+        "hidden lg:flex h-screen flex-col border-r bg-sidebar transition-all duration-300 flex-shrink-0",
         isCollapsed ? "w-16" : "w-64"
       )}>
         <SidebarContent />

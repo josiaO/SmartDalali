@@ -6,13 +6,16 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
     BarChart3, Users, DollarSign, Eye, ArrowUpRight, Loader2,
     Building2, MessageSquare, TrendingUp, Plus, Settings, Heart,
-    Sparkles, Home
+    Sparkles, Home, Calendar, Check, X, Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getAgentStats } from '@/api/properties';
+import { getAgentStats, getPropertyVisits } from '@/api/properties';
+import { updateVisit, deleteVisit, Visit } from '@/api/visits';
 import { getDashboardInsights } from '@/api/insights';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts';
@@ -29,6 +32,36 @@ export default function AgentDashboard() {
     const { data: insights, isLoading: insightsLoading } = useQuery({
         queryKey: ['dashboard-insights'],
         queryFn: getDashboardInsights,
+    });
+
+    const queryClient = useQueryClient();
+
+    const { data: visits, isLoading: visitsLoading } = useQuery({
+        queryKey: ['agent-visits'],
+        queryFn: getPropertyVisits,
+    });
+
+    const updateVisitMutation = useMutation({
+        mutationFn: ({ id, status }: { id: string, status: Visit['status'] }) =>
+            updateVisit(id, { status }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['agent-visits'] });
+            toast.success(t('dashboard.visit_updated') || 'Visit status updated');
+        },
+        onError: () => {
+            toast.error(t('common.error') || 'Failed to update visit');
+        }
+    });
+
+    const deleteVisitMutation = useMutation({
+        mutationFn: deleteVisit,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['agent-visits'] });
+            toast.success(t('dashboard.visit_deleted') || 'Visit deleted');
+        },
+        onError: () => {
+            toast.error(t('common.error') || 'Failed to delete visit');
+        }
     });
 
     const isLoading = statsLoading || insightsLoading;
@@ -272,32 +305,88 @@ export default function AgentDashboard() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">{t('dashboard.recent_activity')}</CardTitle>
+                                <CardTitle className="text-base">{t('dashboard.upcoming_visits') || "Upcoming Visits"}</CardTitle>
                                 <Button variant="ghost" size="sm" className="text-xs">{t('dashboard.view_all')}</Button>
                             </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {stats?.recent_viewers?.slice(0, 3).map((viewer: any) => (
-                                    <div key={viewer.id} className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0">
-                                        <Avatar className="h-8 w-8">
-                                            <AvatarFallback>{viewer.visitor_name[0]}</AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1">
-                                            <p className="text-sm">
-                                                <span className="font-medium">{viewer.visitor_name}</span> viewed <span className="font-medium">{viewer.property_title}</span>
-                                            </p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                {new Date(viewer.date).toLocaleDateString()} • {viewer.status}
-                                            </p>
-                                        </div>
+                                {visitsLoading ? (
+                                    <div className="flex justify-center py-4">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                     </div>
-                                ))}
-                                {!stats?.recent_viewers?.length && (
+                                ) : visits && visits.length > 0 ? (
+                                    visits.slice(0, 5).map((visit: any) => (
+                                        <div key={visit.id} className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0">
+                                            <div className={`p-2 rounded-full ${visit.status === 'confirmed' ? 'bg-green-100 text-green-600' :
+                                                visit.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                                                    'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                <Calendar className="h-4 w-4" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <p className="text-sm font-medium">
+                                                            {visit.visitor_name}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {t('dashboard.visit_for')} <span className="font-medium text-foreground">{visit.property.title}</span>
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-5">
+                                                                {new Date(visit.scheduled_time).toLocaleDateString()}
+                                                            </Badge>
+                                                            <Badge className={`text-[10px] px-1 py-0 h-5 ${visit.status === 'confirmed' ? 'bg-green-500 hover:bg-green-600' :
+                                                                visit.status === 'pending' ? 'bg-yellow-500 hover:bg-yellow-600' :
+                                                                    'bg-gray-500 hover:bg-gray-600'
+                                                                }`}>
+                                                                {visit.status}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        {visit.status === 'pending' && (
+                                                            <>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                                    onClick={() => updateVisitMutation.mutate({ id: visit.id, status: 'confirmed' })}
+                                                                    disabled={updateVisitMutation.isPending}
+                                                                >
+                                                                    <Check className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={() => updateVisitMutation.mutate({ id: visit.id, status: 'cancelled' })}
+                                                                    disabled={updateVisitMutation.isPending}
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                                            onClick={() => deleteVisitMutation.mutate(visit.id)}
+                                                            disabled={deleteVisitMutation.isPending}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
                                     <div className="text-center py-8 text-muted-foreground">
-                                        <Users className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                                        <p className="text-sm font-medium">{t('dashboard.no_recent_activity')}</p>
-                                        <p className="text-xs mt-1">{t('dashboard.activity_desc')}</p>
+                                        <Calendar className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                                        <p className="text-sm font-medium">{t('dashboard.no_visits') || "No upcoming visits"}</p>
+                                        <p className="text-xs mt-1">{t('dashboard.visits_desc') || "Make sure your properties are published."}</p>
                                     </div>
                                 )}
                             </div>

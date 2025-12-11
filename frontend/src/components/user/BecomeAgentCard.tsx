@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -72,44 +73,11 @@ export function BecomeAgentCard() {
                         </div>
                     </div>
 
-                    <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="w-full" size="lg">
-                                {t('profile.upgrade_now')}
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>{t('profile.become_agent_title')}</DialogTitle>
-                                <DialogDescription>
-                                    {t('profile.upgrade_dialog_desc')}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="agency_name">{t('profile.agency_name')}</Label>
-                                    <Input
-                                        id="agency_name"
-                                        placeholder={t('profile.agency_name_placeholder')}
-                                        value={formData.agency_name}
-                                        onChange={(e) => setFormData({ ...formData, agency_name: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">{t('profile.phone_number')}</Label>
-                                    <Input
-                                        id="phone"
-                                        placeholder={t('profile.phone_placeholder')}
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    />
-                                </div>
-                                <Button type="submit" className="w-full" disabled={loading}>
-                                    {loading ? t('common.processing') : t('profile.confirm_upgrade')}
-                                </Button>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                    <Link to="/become-agent">
+                        <Button className="w-full" size="lg">
+                            {t('profile.upgrade_now')}
+                        </Button>
+                    </Link>
                 </div>
             </CardContent>
         </Card>

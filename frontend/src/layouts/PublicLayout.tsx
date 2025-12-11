@@ -5,7 +5,7 @@ export function PublicLayout() {
   return (
     <div className="min-h-screen flex flex-col pb-20 md:pb-0">
       <PublicHeader />
-      <main className="flex-1">
+      <main className="flex-1 pt-16">
         <Outlet />
       </main>
       <footer className="border-t py-6 md:py-0">

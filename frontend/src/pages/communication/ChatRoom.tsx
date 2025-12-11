@@ -4,7 +4,7 @@ import { MessageSquare } from 'lucide-react';
 
 export default function ChatRoom() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="max-w-4xl mx-auto py-8">
       <Card>
         <CardHeader>
           <CardTitle>Chat Room</CardTitle>

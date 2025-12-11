@@ -31,6 +31,11 @@ STATUS_CHOICES = (
         ('rented', _('Rented')),
 )
 
+LISTING_TYPES = (
+    ('for_sale', _('For Sale')),
+    ('for_rent', _('For Rent')),
+)
+
 
 
 class AgentProfile(models.Model):
@@ -55,20 +60,21 @@ class Property(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='properties')
     title = models.CharField(max_length=200)
     description = models.TextField()
-    price = models.DecimalField(max_digits=12, decimal_places=2)
+    price = models.DecimalField(max_digits=12, decimal_places=2, db_index=True)
     
     #Property details
-    type = models.CharField(max_length=20, choices=PROPERTY_TYPES)
+    listing_type = models.CharField(max_length=20, choices=LISTING_TYPES, default='for_rent', db_index=True)
+    type = models.CharField(max_length=20, choices=PROPERTY_TYPES, db_index=True)
     area = models.FloatField(help_text="In square meters", null=True, blank=False)
     rooms = models.IntegerField(null=False, blank=False)
-    bedrooms = models.IntegerField(null=False, blank=False)
-    bathrooms = models.IntegerField(null=False, blank=False)
+    bedrooms = models.IntegerField(null=False, blank=False, db_index=True)
+    bathrooms = models.IntegerField(null=False, blank=False, db_index=True)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='active')
     parking = models.BooleanField(default=False)
     year_built = models.DateTimeField(null=True, blank=True)
     
     #location
-    city = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, db_index=True)
     adress = models.CharField(max_length=300, blank=True)
     latitude = models.DecimalField(max_digits=20, decimal_places=12, null=True, blank=True)
     longitude = models.DecimalField(max_digits=20, decimal_places=12, null=True, blank=True)

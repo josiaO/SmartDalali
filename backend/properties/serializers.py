@@ -379,7 +379,27 @@ class SupportTicketSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'ticket_number', 'created_at', 'updated_at', 'closed_at', 'ai_summary', 'ai_topic', 'ai_sentiment']
     
     def get_message_count(self, obj):
+        # Use annotated value if available to avoid extra query
+        if hasattr(obj, 'annotated_message_count'):
+            return obj.annotated_message_count
         return obj.messages.count()
+
+
+class SupportTicketListSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.username', read_only=True)
+    message_count = serializers.IntegerField(source='annotated_message_count', read_only=True)
+    
+    class Meta:
+        model = SupportTicket
+        fields = [
+            'id', 'ticket_number', 'user', 'user_name', 'user_email',
+            'subject', 'category', 'priority', 'status',
+            'assigned_to', 'assigned_to_name', 'created_at', 'updated_at', 
+            'closed_at', 'message_count'
+        ]
+        read_only_fields = fields
 
 
 class CreateSupportTicketSerializer(serializers.ModelSerializer):

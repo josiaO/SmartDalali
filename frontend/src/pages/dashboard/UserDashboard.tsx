@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, Eye, FileText, Loader2 } from 'lucide-react';
+import { Heart, Eye, FileText, Loader2, Calendar, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getLikedProperties, getViewedProperties } from '@/api/properties';
+import { fetchVisits, Visit } from '@/api/visits';
 import { getSupportTickets } from '@/api/support';
 import { useTranslation } from 'react-i18next';
 import { BecomeAgentCard } from '@/components/user/BecomeAgentCard';
@@ -28,7 +29,14 @@ export default function UserDashboard() {
     queryFn: getSupportTickets,
   });
 
-  const isLoading = loadingLiked || loadingViewed || loadingTickets;
+  const { data: visitsData, isLoading: loadingVisits } = useQuery({
+    queryKey: ['user-visits'],
+    queryFn: fetchVisits,
+  });
+
+  const visits = visitsData?.results || [];
+
+  const isLoading = loadingLiked || loadingViewed || loadingTickets || loadingVisits;
 
   return (
     <div className="space-y-8">
@@ -48,21 +56,23 @@ export default function UserDashboard() {
       {/* Agent Upgrade Card */}
       <BecomeAgentCard />
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('dashboard.saved_properties')}</CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loadingLiked ? <Loader2 className="h-4 w-4 animate-spin" /> : likedProperties?.length || 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('dashboard.saved_desc')}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Link to="/saved-properties">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('dashboard.saved_properties')}</CardTitle>
+              <Heart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loadingLiked ? <Loader2 className="h-4 w-4 animate-spin" /> : likedProperties?.length || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('dashboard.saved_desc')}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -79,42 +89,25 @@ export default function UserDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('sidebar.support')}</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loadingTickets ? <Loader2 className="h-4 w-4 animate-spin" /> : tickets?.length || 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('dashboard.open_tickets')}
-            </p>
-          </CardContent>
-        </Card>
+        <Link to="/support">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('sidebar.support')}</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loadingTickets ? <Loader2 className="h-4 w-4 animate-spin" /> : tickets?.length || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('dashboard.open_tickets')}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('dashboard.quick_actions')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Link to="/properties">
-              <Button className="w-full" variant="outline">
-                {t('sidebar.browse_properties')}
-              </Button>
-            </Link>
-            <Link to="/support">
-              <Button className="w-full" variant="outline">
-                <FileText className="mr-2 h-4 w-4" />
-                {t('sidebar.support')}
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>{t('dashboard.recent_activity')}</CardTitle>
@@ -148,6 +141,60 @@ export default function UserDashboard() {
           </CardContent>
         </Card>
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium">{t('dashboard.scheduled_visits') || 'Scheduled Visits'}</CardTitle>
+            <Link to="/communication">
+              <Button variant="outline" size="sm" className="gap-2">
+                <MessageSquare className="h-4 w-4" />
+                {t('dashboard.messages') || 'Messages'}
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {loadingVisits ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {visits && visits.length > 0 ? (
+                  visits.slice(0, 5).map((visit: any) => (
+                    <div key={visit.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                      <div>
+                        <p className="font-medium text-sm">
+                          {/* @ts-ignore - property might be an object or string depending on API */}
+                          {visit.property?.title || visit.property || 'Property Visit'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(visit.scheduled_date || visit.scheduled_time || visit.created_at).toLocaleDateString()}
+                          </p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize ${visit.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                              visit.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                            }`}>
+                            {visit.status}
+                          </span>
+                        </div>
+                      </div>
+                      <Link to={typeof visit.property === 'object' ? `/properties/${visit.property.id}` : '#'}>
+                        <Button variant="ghost" size="sm">{t('common.view')}</Button>
+                      </Link>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    {t('dashboard.no_visits') || 'No scheduled visits'}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="mt-8">
         <RecentlyViewed />
       </div>

@@ -24,21 +24,21 @@ def trigger_twilio_on_new_message(sender, instance, created, **kwargs):
     
     try:
         notification_service = get_notification_service()
-        recipients = instance.conversation.participants.exclude(id=instance.sender_id)
+        # Recipient is the other person in conversation
+        recipient = instance.conversation.agent if instance.conversation.user == instance.sender else instance.conversation.user
         
-        for user in recipients:
-            # Check if user has SMS enabled in their profile
-            if (hasattr(user, 'profile') and 
-                user.profile.phone_number and 
-                getattr(user.profile, 'sms_notifications_enabled', False)):
-                
-                # Send SMS notification
-                notification_service.sms.send_message_alert(
-                    user.profile.phone_number,
-                    instance.sender.get_full_name() or instance.sender.username,
-                    instance.content[:100]
-                )
-                logger.info(f"Twilio SMS sent to {user.username} for message {instance.id}")
+        # Check if user has SMS enabled in their profile
+        if (hasattr(recipient, 'profile') and 
+            recipient.profile.phone_number and 
+            getattr(recipient.profile, 'sms_notifications_enabled', False)):
+            
+            # Send SMS notification
+            notification_service.sms.send_message_alert(
+                recipient.profile.phone_number,
+                instance.sender.get_full_name() or instance.sender.username,
+                instance.text[:100]
+            )
+            logger.info(f"Twilio SMS sent to {recipient.username} for message {instance.id}")
     
     except Exception as e:
         logger.error(f"Error sending Twilio notification: {e}")
@@ -56,8 +56,11 @@ def trigger_twilio_on_new_conversation(sender, instance, created, **kwargs):
     try:
         notification_service = get_notification_service()
         
-        # Notify all participants except the creator
-        for participant in instance.participants.all():
+        # Notify both user and agent (or just agent usually)
+        # Typically new conversation = user contacting agent. So notify agent.
+        participants = [instance.user, instance.agent]
+        
+        for participant in participants:
             if (hasattr(participant, 'profile') and 
                 participant.profile.phone_number and
                 getattr(participant.profile, 'sms_notifications_enabled', False)):
@@ -77,69 +80,51 @@ def check_agent_response_timeout():
     """
     Celery task to check for agent response timeouts
     Should be called periodically (e.g., every 5 minutes)
-    
-    Usage in celery beat:
-    @periodic_task(run_every=timedelta(minutes=5))
-    def check_timeouts():
-        from communications.signals import check_agent_response_timeout
-        check_agent_response_timeout()
     """
     from accounts.roles import get_user_role
     
     timeout_threshold = timezone.now() - timedelta(minutes=5)
     notification_service = get_notification_service()
     
-    # Find conversations where last message was from user and no agent response
+    # Find active conversations updated before threshold
     conversations = Conversation.objects.filter(
         is_active=True,
         updated_at__lt=timeout_threshold
-    ).prefetch_related('participants', 'messages')
+    ).prefetch_related('messages')
     
     for conversation in conversations:
-        last_message = conversation.get_last_message()
+        # Check last message
+        last_message = conversation.messages.order_by('-created_at').first()
         
         if not last_message:
             continue
         
-        # Check if last message was from a user (not agent)
-        sender_role = get_user_role(last_message.sender)
+        # Check if last message was from a user (requester)
+        # Assuming conversation.user is requester, conversation.agent is agent.
         
-        if sender_role == 'user':
-            # Find agents in conversation
-            for participant in conversation.participants.all():
-                if get_user_role(participant) == 'agent':
-                    # Send urgent SMS to agent
-                    if (hasattr(participant, 'profile') and 
-                        participant.profile.phone_number and
-                        getattr(participant.profile, 'sms_notifications_enabled', False)):
-                        
-                        property_title = conversation.property.title if conversation.property else "a property"
-                        message = f"⚠️ Urgent: User waiting for response on {property_title}. Reply now!"
-                        
-                        notification_service.sms.send_message_alert(
-                            participant.profile.phone_number,
-                            "SmartDalali Alert",
-                            message
-                        )
-                        logger.info(f"Timeout alert sent to agent {participant.username}")
+        if last_message.sender == conversation.user:
+            # User sent last message, agent hasn't replied.
+            participant = conversation.agent
+            
+             # Send urgent SMS to agent
+            if (hasattr(participant, 'profile') and 
+                participant.profile.phone_number and
+                getattr(participant.profile, 'sms_notifications_enabled', False)):
+                
+                property_title = conversation.property.title if conversation.property else "a property"
+                message = f"⚠️ Urgent: User waiting for response on {property_title}. Reply now!"
+                
+                notification_service.sms.send_message_alert(
+                    participant.profile.phone_number,
+                    "SmartDalali Alert",
+                    message
+                )
+                logger.info(f"Timeout alert sent to agent {participant.username}")
 
 
 def send_booking_confirmation(user, booking_details):
     """
     Send booking confirmation via Twilio
-    
-    Args:
-        user: User object
-        booking_details: dict with 'property', 'time', 'date', 'agent'
-    
-    Usage:
-        from communications.signals import send_booking_confirmation
-        send_booking_confirmation(user, {
-            'property': 'Modern 3BR Apartment',
-            'time': '2:00 PM',
-            'date': 'Tomorrow',
-            'agent': 'John Doe'
-        })
     """
     try:
         if (hasattr(user, 'profile') and 
@@ -171,11 +156,6 @@ def send_booking_confirmation(user, booking_details):
 def send_price_negotiation_alert(user, property_title, offer_amount):
     """
     Send SMS alert when price offer is made
-    
-    Args:
-        user: User object (property owner or agent)
-        property_title: str
-        offer_amount: str or number
     """
     try:
         if (hasattr(user, 'profile') and 

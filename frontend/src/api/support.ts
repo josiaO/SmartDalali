@@ -3,7 +3,7 @@ import api from '@/lib/axios';
 export interface TicketMessage {
   id: number;
   ticket: number;
-  sender_type: 'admin' | 'user';
+  sender_type: 'admin' | 'user' | 'agent';
   sender_name: string;
   sender_email: string;
   message: string;
@@ -37,6 +37,7 @@ export interface SupportTicket {
   closed_at: string | null;
   messages: TicketMessage[];
   message_count: number;
+  attachments?: any[];
 }
 
 export interface CreateTicketData {
@@ -47,9 +48,9 @@ export interface CreateTicketData {
   attachments?: File[];
 }
 
-export const getSupportTickets = async () => {
+export const getSupportTickets = async (params?: Record<string, any>) => {
   try {
-    const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/');
+    const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/', { params });
     console.log('Support tickets response:', response.data);
     return response.data;
   } catch (error: unknown) {

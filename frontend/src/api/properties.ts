@@ -98,20 +98,22 @@ export async function fetchProperty(id: string) {
   return response.data;
 }
 
-export async function createProperty(formData: FormData) {
+export async function createProperty(formData: FormData, onUploadProgress?: (progressEvent: any) => void) {
   const response = await api.post<Property>('/api/v1/properties/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    onUploadProgress,
   });
   return response.data;
 }
 
-export async function updateProperty(id: string, formData: FormData) {
+export async function updateProperty(id: string, formData: FormData, onUploadProgress?: (progressEvent: any) => void) {
   const response = await api.patch<Property>(`/api/v1/properties/${id}/`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    onUploadProgress,
   });
   return response.data;
 }
@@ -123,6 +125,21 @@ export async function geocodeAddress(address: string) {
   return response.data;
 }
 
+export interface PropertyVisit {
+  id: number;
+  property: {
+    id: number;
+    title: string;
+    city: string;
+  };
+  visitor: number;
+  visitor_name: string;
+  scheduled_time: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  notes?: string;
+  created_at: string;
+}
+
 export interface PropertyVisitData {
   property: number;
   scheduled_time: string;
@@ -131,6 +148,11 @@ export interface PropertyVisitData {
 
 export async function createPropertyVisit(data: PropertyVisitData) {
   const response = await api.post('/api/v1/properties/visits/', data);
+  return response.data;
+}
+
+export async function getPropertyVisits() {
+  const response = await api.get<PropertyVisit[]>('/api/v1/properties/visits/');
   return response.data;
 }
 

@@ -55,7 +55,7 @@ export function RoleGuard({
 function getDashboardRouteForRole(role: UserRole): string {
   switch (role) {
     case 'admin':
-      return '/admin';
+      return '/admin/dashboard';
     case 'agent':
       return '/agent/dashboard';
     case 'user':
@@ -117,7 +117,8 @@ export function GuestGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    const dashboardRoute = getDashboardRouteForRole(user.role);
+    return <Navigate to={dashboardRoute} replace />;
   }
 
   return <>{children}</>;

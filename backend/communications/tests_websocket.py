@@ -8,7 +8,7 @@ from channels.testing import WebsocketCommunicator
 from channels.db import database_sync_to_async
 from communications.models import Conversation, Message, MessageNotification
 from communications.consumers import ChatConsumer, NotificationConsumer
-from accounts.models import AgentProfile
+from properties.models import AgentProfile
 from backend.asgi import application
 
 

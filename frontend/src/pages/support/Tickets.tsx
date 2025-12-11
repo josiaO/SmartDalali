@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Headphones, Plus, Trash2, MessageSquare, AlertCircle } from 'lucide-react';
+import { Headphones, Plus, Trash2, MessageSquare, AlertCircle, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupportTickets, closeTicket, type SupportTicket as Ticket } from '@/api/support';
@@ -26,13 +26,25 @@ export default function Tickets() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const [filters, setFilters] = useState({
+    status: 'all',
+    priority: 'all',
+    search: '',
+  });
+
   useEffect(() => {
     loadTickets();
-  }, []);
+  }, [filters]);
 
   async function loadTickets() {
+    setLoading(true);
     try {
-      const data = await getSupportTickets();
+      const params: Record<string, any> = {};
+      if (filters.status && filters.status !== 'all') params.status = filters.status;
+      if (filters.priority && filters.priority !== 'all') params.priority = filters.priority;
+      if (filters.search) params.search = filters.search;
+
+      const data = await getSupportTickets(params);
       const results = Array.isArray(data) ? data : (data as any).results || [];
       setTickets(results);
     } catch (error) {
@@ -83,14 +95,6 @@ export default function Tickets() {
       default: return 'text-muted-foreground';
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center p-12">
-        <LoadingSpinner className="h-8 w-8 text-primary" />
-      </div>
-    );
-  }
 
   const openTickets = tickets.filter(t => t.status === 'open').length;
   const inProgressTickets = tickets.filter(t => t.status === 'in_progress').length;
@@ -147,11 +151,52 @@ export default function Tickets() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {isAdmin ? t('support.all_tickets') : t('support.my_tickets')}
-        </h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {isAdmin ? t('support.all_tickets') : t('support.my_tickets')}
+          </h2>
 
-        {tickets.length === 0 ? (
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder={t('common.search') + "..."}
+                className="pl-9 h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+              />
+            </div>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={filters.status}
+              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+            >
+              <option value="all">{t('common.all_statuses')}</option>
+              <option value="open">{t('support.status_types.open')}</option>
+              <option value="in_progress">{t('support.status_types.in_progress')}</option>
+              <option value="resolved">{t('support.status_types.resolved')}</option>
+              <option value="closed">{t('support.status_types.closed')}</option>
+            </select>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={filters.priority}
+              onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
+            >
+              <option value="all">{t('common.all_priorities')}</option>
+              <option value="low">{t('support.priority_levels.low')}</option>
+              <option value="medium">{t('support.priority_levels.medium')}</option>
+              <option value="high">{t('support.priority_levels.high')}</option>
+              <option value="urgent">{t('support.priority_levels.urgent')}</option>
+            </select>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center p-12">
+            <LoadingSpinner className="h-8 w-8 text-primary" />
+          </div>
+        ) : tickets.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <div className="rounded-full bg-muted p-4 mb-4">
@@ -159,7 +204,9 @@ export default function Tickets() {
               </div>
               <h3 className="text-lg font-semibold">{t('support.no_tickets')}</h3>
               <p className="text-sm text-muted-foreground max-w-sm mt-2 mb-6">
-                {t('support.no_tickets_desc')}
+                {filters.search || filters.status !== 'all' || filters.priority !== 'all'
+                  ? t('support.no_tickets_found_filter')
+                  : t('support.no_tickets_desc')}
               </p>
               <Button onClick={() => navigate('/support/create')} variant="outline">
                 {t('support.create_first_ticket')}

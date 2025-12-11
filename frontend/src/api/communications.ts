@@ -124,6 +124,7 @@ export async function sendMessage(
   parentMessageId?: number
 ): Promise<Message> {
   const formData = new FormData();
+  formData.append('conversation', conversationId.toString());
   formData.append('content', content);
 
   if (parentMessageId) {
@@ -132,12 +133,12 @@ export async function sendMessage(
 
   if (attachments && attachments.length > 0) {
     attachments.forEach((file) => {
-      formData.append('attachments', file);
+      formData.append('attachment', file);
     });
   }
 
   const res = await api.post(
-    `/api/v1/communications/conversations/${conversationId}/send_message/`,
+    `/api/v1/communications/messages/`,
     formData,
     {
       headers: {

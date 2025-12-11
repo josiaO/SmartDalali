@@ -11,8 +11,10 @@ from .serializers import (
     NotificationSerializer
 )
 from communications.notification_service import get_notification_service
-from utils.encryption import get_encryption
 import logging
+from django.utils import timezone
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +24,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['participants__username', 'property__title']
+    search_fields = ['user__username', 'agent__username', 'property__title']
     ordering_fields = ['created_at', 'updated_at']
     ordering = ['-updated_at']
+    pagination_class = None
     http_method_names = ['get', 'head', 'options', 'post']
     
     def create(self, request, *args, **kwargs):
@@ -36,32 +39,45 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         raise MethodNotAllowed('PATCH')
 
-    def destroy(self, request, *args, **kwargs):
-        raise MethodNotAllowed('DELETE')
+
     
     def get_queryset(self):
         user = self.request.user
-        return Conversation.objects.filter(participants=user).prefetch_related('participants', 'messages')
+        queryset = Conversation.objects.filter(
+            Q(user=user) | Q(agent=user)
+        ).select_related('user', 'agent', 'property').prefetch_related('messages')
+        
+        if self.action == 'list':
+            queryset = queryset.exclude(hidden_by=user)
+            
+        return queryset
     
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
     
+    def _is_participant(self, user, conversation):
+        return user == conversation.user or user == conversation.agent
+    
+    def _get_other_participant(self, user, conversation):
+        return conversation.agent if conversation.user == user else conversation.user
+
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
         """Get messages in a conversation"""
         try:
             conversation = self.get_object()
+            if not self._is_participant(request.user, conversation):
+                 return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
             messages = conversation.messages.all().order_by('created_at')
             serializer = MessageSerializer(messages, many=True)
             
-            # Mark messages as read for the current user
-            MessageNotification.objects.filter(
-                user=request.user,
-                message__conversation=conversation,
-                is_read=False
-            ).update(is_read=True)
+            # Mark messages as read for the current user (messages sent by OTHER party)
+            conversation.messages.filter(
+                read_at__isnull=True
+            ).exclude(sender=request.user).update(read_at=timezone.now())
             
             return Response(serializer.data)
         except Exception as e:
@@ -78,7 +94,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             conversation = self.get_object()
             
             # Ensure sender is a participant in the conversation
-            if request.user not in conversation.participants.all():
+            if not self._is_participant(request.user, conversation):
                 return Response(
                     {'error': 'Permission denied'},
                     status=status.HTTP_403_FORBIDDEN
@@ -92,25 +108,46 @@ class ConversationViewSet(viewsets.ModelViewSet):
             if serializer.is_valid():
                 message = serializer.save()
                 
-                # Send notifications to other participants
-                notification_service = get_notification_service()
-                encryption = get_encryption()
-                decrypted_content = encryption.decrypt_message(message.content)
+                # Unhide conversation for both participants
+                conversation.hidden_by.clear()
                 
-                for participant in conversation.participants.exclude(id=request.user.id):
-                    if participant not in conversation.muted_by.all():
-                        notification_service.notify_new_message(
-                            participant,
-                            request.user.get_full_name() or request.user.username,
-                            decrypted_content[:100],
-                            channels=['push', 'email']
-                        )
-                    
-                    # Create notification
-                    MessageNotification.objects.create(
-                        user=participant,
-                        message=message
+                # Send notifications to other participant
+                notification_service = get_notification_service()
+                
+                other_participant = self._get_other_participant(request.user, conversation)
+                
+                # We removed encryption for now based on strict model requirements
+                content_preview = message.text[:100] if message.text else "Attachment"
+
+                if notification_service:
+                    notification_service.notify_new_message(
+                        other_participant,
+                        request.user.get_full_name() or request.user.username,
+                        content_preview,
+                        conversation_id=conversation.id,
+                        channels=['push', 'email']
                     )
+                    
+                # Create notification
+                MessageNotification.objects.create(
+                    user=other_participant,
+                    message=message
+                )
+
+                # Broadcast to WebSocket group
+                # This ensures real-time updates for clients connected via WebSocket
+                try:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f'chat_{conversation.id}',
+                        {
+                            'type': 'chat.message',
+                            'message': MessageSerializer(message).data,
+                            'sender_id': request.user.id,
+                        }
+                    )
+                except Exception as ws_error:
+                    logger.error(f"WebSocket broadcast failed: {ws_error}")
                 
                 return Response(
                     MessageSerializer(message).data,
@@ -119,7 +156,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Error sending message: {e}")
+            logger.error(f"Error sending message: {e}", exc_info=True)
             return Response(
                 {'error': 'Failed to send message'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -130,11 +167,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Mark all messages in conversation as read"""
         try:
             conversation = self.get_object()
-            MessageNotification.objects.filter(
-                user=request.user,
-                message__conversation=conversation,
-                is_read=False
-            ).update(is_read=True)
+            conversation.messages.filter(
+                read_at__isnull=True
+            ).exclude(sender=request.user).update(read_at=timezone.now())
+            
             return Response({
                 'status': 'success',
                 'message': 'Conversation marked as read'
@@ -146,111 +182,91 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    @action(detail=True, methods=['post'])
-    def mute(self, request, pk=None):
-        """Mute/unmute conversation notifications"""
-        try:
-            conversation = self.get_object()
-            muted = request.data.get('muted', True)
-            if muted:
-                conversation.muted_by.add(request.user)
-            else:
-                conversation.muted_by.remove(request.user)
-            return Response({
-                'status': 'success',
-                'message': 'Conversation notifications muted' if muted else 'Conversation notifications unmuted'
-            })
-        except Exception as e:
-            logger.error(f"Error muting conversation: {e}")
-            return Response(
-                {'error': 'Failed to mute conversation'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
     @action(detail=False, methods=['post'])
     def start_conversation(self, request):
         """Start a new conversation with another user"""
         try:
-            user_id = request.data.get('user_id')
+            # For phase 1: 'user_id' in body is the AGENT (or target user).
+            # The requester is the CLIENT (or initiator).
+            # However, looking at the requirements, 'user visits property page'.
+            # Requester = User. Target = Agent.
+            
+            agent_id = request.data.get('agent_id') or request.data.get('user_id') # Handle both for compatibility or mistakes
             property_id = request.data.get('property_id')
             
-            if not user_id:
+            if not agent_id:
                 return Response(
-                    {'error': 'user_id is required'},
+                    {'error': 'agent_id (or user_id) is required'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Validate user_id
+            # Validate IDs
             try:
-                user_id = int(user_id)
+                agent_id = int(agent_id)
             except (ValueError, TypeError):
-                return Response(
-                    {'error': 'Invalid user_id format'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({'error': 'Invalid ID format'}, status=status.HTTP_400_BAD_REQUEST)
+
+             # Check for self-chat
+            if agent_id == request.user.id:
+                 return Response({'error': 'Cannot start conversation with yourself'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Check if user exists and is not the current user
             from django.contrib.auth import get_user_model
             User = get_user_model()
             try:
-                other_user = User.objects.get(id=user_id)
-                if other_user == request.user:
-                    return Response(
-                        {'error': 'Cannot start conversation with yourself'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                agent_user = User.objects.get(id=agent_id)
             except User.DoesNotExist:
-                return Response(
-                    {'error': 'User not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({'error': 'Agent/User not found'}, status=status.HTTP_404_NOT_FOUND)
             
-            # Check if conversation already exists
-            existing_conversation = Conversation.objects.filter(
-                participants=request.user
-            ).filter(
-                participants=other_user
-            ).first()
+            # Determine who is user and who is agent? 
+            # The model has 'user' and 'agent'.
+            # Requirement: "user sends message to agent".
+            # Assume requester is 'user', target is 'agent'.
+            # But what if agent contacts user?
+            # Ideally verify roles. For now, strict adherence to flow: User visits property -> contacts agent.
+            # So requester = user, target = agent.
             
-            if existing_conversation:
-                return Response(
-                    ConversationSerializer(
-                        existing_conversation,
-                        context={'request': request}
-                    ).data
-                )
+            # Check if exists
+            # We need to check if a conversation exists between these two people on this property.
+            # Or just between these two people?
+            # Requirement: "If no conversation exists for this property + user + agent → create a new one."
             
-            # Create new conversation
-            conversation = Conversation.objects.create()
-            conversation.participants.add(request.user, other_user)
+            # So unique tuple is (user, agent, property).
             
-            # Add property if specified
+            property_obj = None
             if property_id:
-                try:
-                    property_id = int(property_id)
-                except (ValueError, TypeError):
-                    return Response(
-                        {'error': 'Invalid property_id format'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
                 from properties.models import Property
                 try:
                     property_obj = Property.objects.get(id=property_id)
-                    conversation.property = property_obj
-                    conversation.save()
                 except Property.DoesNotExist:
                     pass
-            
-            # Send notification
-            notification_service = get_notification_service()
-            property_title = conversation.property.title if conversation.property else "New Message"
-            notification_service.notify_new_conversation(
-                other_user,
-                property_title,
-                request.user.get_full_name() or request.user.username,
-                channels=['email', 'push']
-            )
+
+            # Check for existing
+            conversation = Conversation.objects.filter(
+                user=request.user,
+                agent=agent_user,
+                property=property_obj
+            ).first()
+
+            if not conversation:
+                # Try swapped roles just in case existing logic differs? 
+                # Strict requirement says "property + user + agent". 
+                # So we stick to requester=user, target=agent.
+                conversation = Conversation.objects.create(
+                    user=request.user,
+                    agent=agent_user,
+                    property=property_obj
+                )
+                
+                # Send notification
+                notification_service = get_notification_service()
+                if notification_service:
+                    property_title = conversation.property.title if conversation.property else "New Inquiry"
+                    notification_service.notify_new_conversation(
+                        agent_user,
+                        property_title,
+                        request.user.get_full_name() or request.user.username,
+                        channels=['email', 'push']
+                    )
             
             return Response(
                 ConversationSerializer(
@@ -260,7 +276,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_201_CREATED
             )
         except Exception as e:
-            logger.error(f"Error starting conversation: {e}")
+            logger.error(f"Error starting conversation: {e}", exc_info=True)
             return Response(
                 {'error': 'Failed to start conversation'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -285,32 +301,186 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Get total unread message count for the user"""
         try:
             user = request.user
-            unread_count = MessageNotification.objects.filter(
-                user=user,
-                is_read=False
-            ).count()
-            return Response({'unread_count': unread_count})
+            # Count messages where user is a participant but NOT sender, and read_at is Null
+            # This requires joining Conversation.
+            # OR simple approach:
+            
+            count = Message.objects.filter(
+                Q(conversation__user=user) | Q(conversation__agent=user),
+                read_at__isnull=True
+            ).exclude(sender=user).count()
+            
+            
+            return Response({'unread_count': count})
         except Exception as e:
             logger.error(f"Error getting unread count: {e}")
             return Response(
                 {'error': 'Failed to get unread count'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+            
+    @action(detail=True, methods=['post'])
+    def clear_history(self, request, pk=None):
+        """Clear conversation history for the current user"""
+        try:
+            conversation = self.get_object()
+            if not self._is_participant(request.user, conversation):
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Get all messages visible to user (not yet hidden)
+            # We want to add user to hidden_by of ALL messages in conversation
+            # Using bulk create for M2M is tricky because it's a through table implicit model usually, 
+            # but standard .add() on queryset is not supported directly for many-to-many reverse
+            
+            # Efficient way: 
+            # messages = conversation.messages.exclude(hidden_by=request.user)
+            # for msg in messages: msg.hidden_by.add(request.user) -> Slow loop
+            
+            # Correct Bulk way:
+            messages = conversation.messages.exclude(hidden_by=request.user)
+            
+            # We can use the through model directly
+            MessageHiddenBy = Message.hidden_by.through
+            new_relations = []
+            for msg in messages:
+                new_relations.append(MessageHiddenBy(message_id=msg.id, user_id=request.user.id))
+            
+            MessageHiddenBy.objects.bulk_create(new_relations, ignore_conflicts=True)
+            
+            # 2. Hide the conversation itself from the list
+            conversation.hidden_by.add(request.user)
+            
+            return Response({'status': 'Conversation history cleared and hidden'})
+        except Exception as e:
+            logger.error(f"Error clearing history: {e}")
+            return Response(
+                {'error': 'Failed to clear history'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
-class MessageViewSet(viewsets.ReadOnlyModelViewSet):
+class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['conversation']
     ordering_fields = ['created_at']
+    ordering_fields = ['created_at']
     ordering = ['created_at']
+    pagination_class = None
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_anonymous:
+            return Message.objects.none()
+        return Message.objects.filter(
+            Q(conversation__user=user) | Q(conversation__agent=user)
+        ).exclude(hidden_by=user).select_related('sender', 'conversation')
+
+    def create(self, request, *args, **kwargs):
+        """Create a new message"""
+        try:
+            conversation_id = request.data.get('conversation')
+            if not conversation_id:
+                return Response({'error': 'conversation field is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                conversation = Conversation.objects.get(id=conversation_id)
+            except Conversation.DoesNotExist:
+                return Response({'error': 'Conversation not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Check permissions
+            if request.user != conversation.user and request.user != conversation.agent:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+            serializer = CreateMessageSerializer(
+                data=request.data,
+                context={'conversation': conversation, 'request': request}
+            )
+
+            if serializer.is_valid():
+                message = serializer.save()
+                
+                # Unhide conversation for both participants
+                conversation.hidden_by.clear()
+
+                # Send external notifications (Email/Push)
+                # Note: DB notifications are handled by custom logic in views/serializers usually,
+                # but CreateMessageSerializer puts basic MessageNotification.
+                
+                notification_service = get_notification_service()
+                
+                other_participant = conversation.agent if conversation.user == request.user else conversation.user
+                
+                content_preview = message.text[:100] if message.text else "Attachment"
+                
+                if notification_service:
+                    notification_service.notify_new_message(
+                        other_participant,
+                        request.user.get_full_name() or request.user.username,
+                        content_preview,
+                        channels=['push', 'email']
+                    )
+
+                # Broadcast to WebSocket group
+                try:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f'chat_{conversation.id}',
+                        {
+                            'type': 'chat.message',
+                            'message': MessageSerializer(message).data,
+                            'sender_id': request.user.id,
+                        }
+                    )
+                except Exception as ws_error:
+                    logger.error(f"WebSocket broadcast failed: {ws_error}")
+
+                return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error creating message: {e}")
+            return Response({'error': 'Failed to create message'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        """Soft delete a message"""
+        try:
+            message = self.get_object()
+            
+            # Only sender can delete their message
+            if message.sender != request.user:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Soft delete
+            message.is_deleted = True
+            message.save()
+            
+            # Broadcast deletion
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f'chat_{message.conversation.id}',
+                    {
+                        'type': 'chat.message',
+                        'message': MessageSerializer(message).data,
+                        'sender_id': request.user.id,
+                     }
+                )
+            except Exception as e:
+                logger.error(f"Error broadcasting deletion: {e}")
+                
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+             logger.error(f"Error deleting message: {e}")
+             return Response({'error': 'Failed to delete message'}, status=status.HTTP_400_BAD_REQUEST)
     
     def get_queryset(self):
         user = self.request.user
         return Message.objects.filter(
-            conversation__participants=user
-        ).select_related('sender', 'conversation')
+            Q(conversation__user=user) | Q(conversation__agent=user)
+        ).exclude(hidden_by=user).select_related('sender', 'conversation')
     
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -318,18 +488,17 @@ class MessageViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             message = self.get_object()
             
-            # Check if user is a participant in the conversation
-            if request.user not in message.conversation.participants.all():
+            is_participant = (request.user == message.conversation.user) or (request.user == message.conversation.agent)
+            
+            if not is_participant:
                 return Response(
                     {'error': 'Permission denied'},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # Mark notification as read
-            MessageNotification.objects.filter(
-                user=request.user,
-                message=message
-            ).update(is_read=True)
+            if not message.read_at:
+                message.read_at = timezone.now()
+                message.save()
             
             return Response({'status': 'Message marked as read'})
         except Exception as e:
@@ -338,49 +507,24 @@ class MessageViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': 'Failed to mark message as read'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
-    @action(detail=True, methods=['post'])
-    def react(self, request, pk=None):
-        """Add emoji reaction to message"""
+
+    @action(detail=True, methods=['delete'])
+    def delete_for_me(self, request, pk=None):
+        """Hidden a message for the current user only"""
         try:
             message = self.get_object()
-            emoji = request.data.get('emoji')
-            if not emoji:
-                return Response(
-                    {'error': 'Emoji required'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
             
-            # Check if user is a participant
-            if request.user not in message.conversation.participants.all():
-                return Response(
-                    {'error': 'Permission denied'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+            # Check if participant
+            is_participant = (request.user == message.conversation.user) or (request.user == message.conversation.agent)
+            if not is_participant:
+                return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
             
-            return Response({'status': 'Reaction added'})
+            message.hidden_by.add(request.user)
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
-            logger.error(f"Error reacting to message: {e}")
-            return Response(
-                {'error': 'Failed to add reaction'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
-    @action(detail=False, methods=['get'])
-    def unread_count(self, request):
-        """Get unread message count"""
-        try:
-            count = MessageNotification.objects.filter(
-                user=request.user,
-                is_read=False
-            ).count()
-            return Response({'unread_count': count})
-        except Exception as e:
-            logger.error(f"Error getting unread count: {e}")
-            return Response(
-                {'error': 'Failed to get unread count'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            logger.error(f"Error deleting message for me: {e}")
+            return Response({'error': 'Failed to delete message'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Views from notifications app
@@ -388,14 +532,34 @@ class NotificationViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows notifications to be viewed or edited.
     """
-    queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+    
     def get_queryset(self):
         """
         This view should return a list of all the notifications
         for the currently authenticated user.
         """
-        return self.request.user.notifications.all()
+        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark a single notification as read"""
+        try:
+            notification = self.get_object()
+            notification.is_read = True
+            notification.save()
+            return Response({'status': 'Notification marked as read'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='mark-all-read')
+    def mark_all_read(self, request):
+        """Mark all notifications as read for the current user"""
+        try:
+            self.get_queryset().filter(is_read=False).update(is_read=True)
+            return Response({'status': 'All notifications marked as read'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 

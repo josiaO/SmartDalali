@@ -1,156 +1,69 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CreditCard, Check, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useState } from 'react';
-import { fetchSubscriptionPlans as fetchPlans, type SubscriptionPlan } from '@/api/subscriptions';
-import { useToast } from '@/hooks/use-toast';
+import { Check, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Subscription() {
   const { user } = useAuth();
   const isAgent = user?.role === 'agent' || user?.role === 'admin';
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    async function loadPlans() {
-      try {
-        const data = await fetchPlans();
-        const results = Array.isArray(data) ? data : (data as any).results || [];
-        setPlans(results);
-      } catch (error) {
-        console.error('Failed to load plans:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadPlans();
-  }, []);
-
-  if (loading) {
-    return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Subscription</h1>
-        <p className="text-muted-foreground">
-          Choose the perfect plan for your needs
-        </p>
-      </div>
+    <div className="container mx-auto px-4 py-16 flex items-center justify-center">
+      <Card className="w-full max-w-2xl text-center border-primary/20 shadow-2xl">
+        <CardHeader>
+          <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
+            <ShieldCheck className="h-12 w-12 text-primary" />
+          </div>
+          <CardTitle className="text-3xl font-bold mb-2">SmartDalali v1 Early Access</CardTitle>
+          <CardDescription className="text-lg">
+            We are currently in our early access period. All features are completely free for our early adopters.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          <div className="bg-muted/30 p-6 rounded-xl text-left border">
+            <h3 className="font-semibold mb-4 text-lg">What you get for free:</h3>
+            <ul className="space-y-3">
+              {[
+                'Unlimited Property Listings',
+                'Verified Agent Badge',
+                'Direct In-App Messaging',
+                'Analytics Dashboard',
+                'Priority Support'
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-3">
+                  <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-      {!isAgent && (
-        <Card className="mb-8 border-accent">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground mb-6">
-              Agent subscription is required to list properties. Please contact support to upgrade your account.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {!isAgent ? (
+              <Link to="/become-agent">
+                <Button size="lg" className="w-full sm:w-auto">
+                  Become an Agent - It's Free
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/properties/create">
+                <Button size="lg" className="w-full sm:w-auto">
+                  List a New Property
+                </Button>
+              </Link>
+            )}
 
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        {plans.map((plan) => (
-          <Card key={plan.id} className={plan.name.toLowerCase().includes('annual') ? 'border-primary shadow-card-lg' : ''}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-xl">{plan.name}</CardTitle>
-                {plan.name.toLowerCase().includes('annual') && (
-                  <Badge variant="default">Best Value</Badge>
-                )}
-              </div>
-              <div className="mt-4">
-                <span className="text-4xl font-bold">TZS {Number(plan.price).toLocaleString()}</span>
-                <span className="text-muted-foreground ml-2">/ {plan.duration_days} days</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 mb-6">
-                {plan.features.map((feature) => {
-                  const isActive = feature.status === 'active';
-                  const isComingSoon = feature.status === 'coming_soon';
-
-                  return (
-                    <li key={feature.id} className="flex items-start gap-2">
-                      <Check className={`h-5 w-5 shrink-0 mt-0.5 ${isActive ? 'text-accent' : 'text-muted-foreground'}`} />
-                      <div className="flex-1 flex items-center gap-2">
-                        <span className={`text-sm ${!isActive ? 'text-muted-foreground' : ''}`}>{feature.name}</span>
-                        {isComingSoon && (
-                          <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
-                        )}
-                        {!isActive && !isComingSoon && (
-                          <Badge variant="outline" className="text-xs">Disabled</Badge>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-                {plan.features.length === 0 && (
-                  <li className="text-sm text-muted-foreground italic">No specific features listed</li>
-                )}
-              </ul>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  toast({
-                    title: 'Success',
-                    description: 'Subscription request sent! An admin will review it shortly.',
-                  });
-                }}
-              >
-                Subscribe via M-Pesa
+            <Link to="/">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                Back to Home
               </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <CardContent className="pt-6 text-center">
-          <div className="mb-6">
-            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <CreditCard className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Payments Coming Soon</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              We're integrating M-Pesa STK Push for seamless payments. Soon you'll be able to:
-            </p>
+            </Link>
           </div>
 
-          <div className="space-y-3 text-left max-w-md mx-auto mb-6">
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2" />
-              <p className="text-sm text-muted-foreground">
-                Subscribe to agent plans directly
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2" />
-              <p className="text-sm text-muted-foreground">
-                Pay securely via M-Pesa
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2" />
-              <p className="text-sm text-muted-foreground">
-                Automatic subscription renewal
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2" />
-              <p className="text-sm text-muted-foreground">
-                View payment history and invoices
-              </p>
-            </div>
-          </div>
-
-          <Button variant="outline" className="w-full">
-            Get Notified When Available
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            * Future premium features may be introduced, but early adopters will receive special perks.
+          </p>
         </CardContent>
       </Card>
     </div>

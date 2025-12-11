@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,9 +12,17 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 
+// Background images for the slider
+const BACKGROUND_IMAGES = [
+  "https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1973&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1600596542815-e25fa1108638?q=80&w=2075&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1626177138729-379e95ce36c9?q=80&w=2072&auto=format&fit=crop",
+];
+
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, error: authError, clearError } = useAuth();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -23,6 +31,16 @@ export default function Login() {
     email: '',
     password: '',
   });
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Background slider effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % BACKGROUND_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Clear any existing auth errors when component mounts
   useEffect(() => {
@@ -51,9 +69,11 @@ export default function Login() {
       toast.success(t('auth.login_success'));
 
       const { getDashboardPath } = await import('@/utils/authUtils');
-      const dashboardPath = getDashboardPath(role);
-      navigate(dashboardPath, { replace: true });
+      const params = new URLSearchParams(location.search);
+      const redirectPath = params.get('redirect');
 
+      const dashboardPath = redirectPath || getDashboardPath(role);
+      navigate(dashboardPath, { replace: true });
     } catch (error) {
       console.error('Error during post-login redirect:', error);
       toast.error(t('auth.login_profile_error'));
@@ -111,112 +131,130 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
-            <Building2 className="h-12 w-12 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">{t('auth.welcome_back')}</CardTitle>
-          <CardDescription>
-            {t('auth.login_desc')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full py-6"
-            onClick={handleGoogleLogin}
-            disabled={googleLoading || loading}
-          >
-            {googleLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
-              </svg>
-            )}
-            {t('auth.google_login')}
-          </Button>
+    <div className="flex min-h-screen relative overflow-hidden">
+      {/* Background Slider */}
+      {BACKGROUND_IMAGES.map((img, index) => (
+        <div
+          key={img}
+          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+            }`}
+          style={{ backgroundImage: `url(${img})` }}
+        />
+      ))}
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                {t('auth.or_email')}
-              </span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">{t('form.email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">{t('form.password')}</Label>
-                <Link
-                  to="/auth/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
-                  {t('auth.forgot_password')}
-                </Link>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className="sr-only">
-                    {showPassword ? t('auth.hide_password') : t('auth.show_password')}
-                  </span>
-                </Button>
+      <div className="relative z-10 w-full flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-white/95 dark:bg-slate-950/95 backdrop-blur shadow-2xl border-0">
+          <CardHeader className="space-y-4 text-center">
+            <div className="flex justify-center">
+              <div className="p-3 bg-primary/10 rounded-full">
+                <Building2 className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-              {loading ? (
+            <CardTitle className="text-2xl font-bold tracking-tight">{t('auth.welcome_back')}</CardTitle>
+            <CardDescription className="text-base">
+              {t('auth.login_desc')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full py-6 text-foreground"
+              onClick={handleGoogleLogin}
+              disabled={googleLoading || loading}
+            >
+              {googleLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                t('nav.login')
+                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                  <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                </svg>
               )}
+              {t('auth.google_login')}
             </Button>
-          </form>
 
-          <div className="mt-4 text-center text-sm">
-            <span className="text-muted-foreground">{t('auth.no_account')} </span>
-            <Link to="/auth/signup" className="text-primary hover:underline">
-              {t('nav.signup')}
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground font-medium">
+                  {t('auth.or_email')}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">{t('form.email')}</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">{t('form.password')}</Label>
+                  <Link
+                    to="/auth/forgot-password"
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    {t('auth.forgot_password')}
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    className="bg-background/50"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="sr-only">
+                      {showPassword ? t('auth.hide_password') : t('auth.show_password')}
+                    </span>
+                  </Button>
+                </div>
+              </div>
+              <Button type="submit" className="w-full py-6 font-semibold" disabled={loading || googleLoading}>
+                {loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  t('nav.login')
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-4 text-center text-sm">
+              <span className="text-muted-foreground">{t('auth.no_account')} </span>
+              <Link to="/auth/signup" className="text-primary hover:underline font-medium">
+                {t('nav.signup')}
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

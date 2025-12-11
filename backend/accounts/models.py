@@ -14,6 +14,8 @@ class Profile(models.Model):
     code = models.CharField(max_length=8, default=generate_code)
     firebase_uid = models.CharField(max_length=255, blank=True, null=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_online = models.BooleanField(default=False)
+    last_seen = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.user.username

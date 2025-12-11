@@ -1,11 +1,10 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, X, Video, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, X, Video, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/use-toast';
-import { Progress } from '@/components/ui/progress';
 
 interface MediaUploadProps {
     type: 'image' | 'video';
@@ -18,10 +17,6 @@ interface MediaUploadProps {
     className?: string;
     existingMedia?: string[];
     onRemoveExisting?: (index: number) => void;
-}
-
-interface UploadProgress {
-    [key: string]: number; // fileName -> 0-100
 }
 
 export function MediaUpload({
@@ -38,7 +33,6 @@ export function MediaUpload({
 }: MediaUploadProps) {
     const { t } = useTranslation();
     const inputRef = useRef<HTMLInputElement>(null);
-    const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
     const [dragActive, setDragActive] = useState(false);
 
     // Max size in MB
@@ -79,16 +73,6 @@ export function MediaUpload({
 
             const newPreviews = validFiles.map(file => URL.createObjectURL(file));
             onPreviewsChange([...previews, ...newPreviews]);
-
-            // Simulate progress
-            validFiles.forEach(file => {
-                let progress = 0;
-                const interval = setInterval(() => {
-                    progress += 10;
-                    setUploadProgress(prev => ({ ...prev, [file.name]: Math.min(progress, 100) }));
-                    if (progress >= 100) clearInterval(interval);
-                }, 150);
-            });
 
             // Reset input
             if (inputRef.current) inputRef.current.value = '';
@@ -184,43 +168,26 @@ export function MediaUpload({
                     ))}
 
                     {/* New Media */}
-                    {previews.map((src, i) => {
-                        const file = files[i];
-                        const progress = uploadProgress[file?.name] || 0;
-                        const isComplete = progress >= 100;
+                    {previews.map((src, i) => (
+                        <div key={`new-${i}`} className="relative group aspect-square rounded-lg overflow-hidden border bg-background shadow-sm">
+                            {type === 'image' ? (
+                                <img src={src} alt="Preview" className="w-full h-full object-cover" />
+                            ) : (
+                                <video src={src} className="w-full h-full object-cover" controls />
+                            )}
 
-                        return (
-                            <div key={`new-${i}`} className="relative group aspect-square rounded-lg overflow-hidden border bg-background shadow-sm">
-                                {type === 'image' ? (
-                                    <img src={src} alt="Preview" className={cn("w-full h-full object-cover transition-opacity", !isComplete && "opacity-50")} />
-                                ) : (
-                                    <video src={src} className="w-full h-full object-cover" controls={isComplete} />
-                                )}
-
-                                {!isComplete && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
-                                        <div className="w-3/4 space-y-2 text-center">
-                                            <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                                            <Progress value={progress} className="h-1.5 w-full" />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {isComplete && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); onRemove(i); }}
-                                        className="absolute top-1 right-1 bg-destructive/90 hover:bg-destructive text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 hover:scale-100 shadow-sm"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                )}
-                                <div className="absolute top-2 left-2 bg-primary/90 text-primary-foreground text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-sm">
-                                    New
-                                </div>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+                                className="absolute top-1 right-1 bg-destructive/90 hover:bg-destructive text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 hover:scale-100 shadow-sm"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                            <div className="absolute top-2 left-2 bg-primary/90 text-primary-foreground text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                New
                             </div>
-                        );
-                    })}
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

@@ -52,9 +52,13 @@ export default function CreateProperty() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [videos, setVideos] = useState<File[]>([]);
   const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const createPropertyMutation = useMutation({
-    mutationFn: createProperty,
+    mutationFn: (data: FormData) => createProperty(data, (progressEvent) => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      setUploadProgress(percentCompleted);
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['properties'] });
       toast({
@@ -64,6 +68,7 @@ export default function CreateProperty() {
       navigate('/agent/my-properties');
     },
     onError: () => {
+      setUploadProgress(0);
       toast({
         title: t('common.error'),
         description: t('notifications.error_occurred'),
@@ -245,7 +250,7 @@ export default function CreateProperty() {
                   <Label htmlFor="description">{t('form.description')} *</Label>
                   <Textarea id="description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={4} placeholder={t('form.description_placeholder')} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="type">{t('properties.type')} *</Label>
                     <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v })}>
@@ -276,7 +281,7 @@ export default function CreateProperty() {
             {/* Step 2: Location */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="city">{t('properties.city')} *</Label>
                     <Input id="city" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder={t('properties.city_placeholder')} />
@@ -290,7 +295,7 @@ export default function CreateProperty() {
                   {geocodeAddress.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
                   {geocodeAddress.isPending ? t('common.locating') : t('properties.auto_locate_coordinates')}
                 </Button>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>{t('properties.latitude')}</Label>
                     <Input value={formData.latitude} onChange={e => setFormData({ ...formData, latitude: e.target.value })} placeholder={t('common.optional')} />
@@ -306,7 +311,7 @@ export default function CreateProperty() {
             {/* Step 3: Details */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>{t('properties.bedrooms')}</Label>
                     <Input type="number" value={formData.bedrooms} onChange={e => setFormData({ ...formData, bedrooms: e.target.value })} />
@@ -324,7 +329,7 @@ export default function CreateProperty() {
                     <Input type="number" value={formData.area} onChange={e => setFormData({ ...formData, area: e.target.value })} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>{t('properties.year_built')}</Label>
                     <Input type="date" value={formData.year_built} onChange={e => setFormData({ ...formData, year_built: e.target.value })} />
@@ -374,7 +379,7 @@ export default function CreateProperty() {
                 <div className="bg-muted p-4 rounded-lg space-y-2">
                   <h3 className="font-semibold">{formData.title}</h3>
                   <p className="text-sm text-muted-foreground">{formData.description}</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm mt-4">
+                  <div className="grid grid-cols-1 gap-2 text-sm mt-4 md:grid-cols-2">
                     <div><strong>{t('properties.price')}:</strong> {formData.price}</div>
                     <div><strong>{t('properties.type')}:</strong> {formData.type}</div>
                     <div><strong>{t('properties.location')}:</strong> {formData.city}, {formData.address}</div>
@@ -389,17 +394,32 @@ export default function CreateProperty() {
                   <Check className="h-4 w-4" />
                   <span className="text-sm">{t('properties.ready_to_publish')}</span>
                 </div>
+
+                {createPropertyMutation.isPending && (
+                  <div className="space-y-2 pt-4">
+                    <div className="flex justify-between text-sm">
+                      <span>{t('common.uploading_media')}...</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <Progress value={uploadProgress} className="h-2" />
+                  </div>
+                )}
               </div>
             )}
 
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={prevStep} disabled={currentStep === 1}>{t('common.previous')}</Button>
+            <Button variant="outline" onClick={prevStep} disabled={currentStep === 1 || createPropertyMutation.isPending}>{t('common.previous')}</Button>
             {currentStep < 5 ? (
               <Button onClick={nextStep}>{t('common.next')}</Button>
             ) : (
               <Button onClick={handleSubmit} disabled={createPropertyMutation.isPending}>
-                {createPropertyMutation.isPending ? t('common.publishing') : t('properties.publish_listing')}
+                {createPropertyMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('common.publishing')}
+                  </>
+                ) : t('properties.publish_listing')}
               </Button>
             )}
           </CardFooter>

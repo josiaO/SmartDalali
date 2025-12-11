@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Send, Shield, User, Clock, CheckCircle, AlertOctagon } from 'lucide-react';
+import { ArrowLeft, Send, Shield, User, Clock, CheckCircle, AlertOctagon, Paperclip } from 'lucide-react';
 import { getSupportTicket, replyToTicket, closeTicket, updateSupportTicket } from '@/api/support';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -97,6 +97,26 @@ export default function TicketDetail() {
         }
     };
 
+    const renderAttachments = (attachments?: any[]) => {
+        if (!attachments || attachments.length === 0) return null;
+        return (
+            <div className="flex flex-wrap gap-2 mt-3">
+                {attachments.map((att: any, index: number) => (
+                    <a
+                        key={index}
+                        href={att.file || att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-xs bg-muted/50 hover:bg-muted px-2 py-1.5 rounded transition-colors border"
+                    >
+                        <Paperclip className="h-3 w-3" />
+                        <span className="max-w-[150px] truncate">{att.filename || att.name || 'Attachment'}</span>
+                    </a>
+                ))}
+            </div>
+        );
+    };
+
     if (isLoading) return (
         <div className="flex h-[50vh] items-center justify-center">
             <LoadingSpinner className="h-8 w-8 text-primary" />
@@ -112,7 +132,7 @@ export default function TicketDetail() {
     );
 
     return (
-        <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="max-w-5xl mx-auto py-8">
             <Button variant="ghost" onClick={() => navigate('/support')} className="mb-6 hover:translate-x-[-4px] transition-transform">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 {t('common.back')}
@@ -138,6 +158,7 @@ export default function TicketDetail() {
                         <CardContent className="pt-6">
                             <div className="prose prose-sm max-w-none dark:prose-invert bg-muted/30 p-4 rounded-lg border mb-8">
                                 <p className="whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
+                                {renderAttachments(ticket.attachments)}
                             </div>
 
                             <div className="space-y-8">
@@ -173,6 +194,7 @@ export default function TicketDetail() {
                                                             </span>
                                                         </div>
                                                         <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.message}</p>
+                                                        {renderAttachments(message.attachments)}
                                                     </div>
                                                 </div>
                                             );

@@ -92,8 +92,8 @@ export default function PropertyDetails() {
       });
       return;
     }
-    // Navigate to agent messages page
-    navigate('/agent/messages', { state: { recipientId: property?.agent.id, propertyId: property?.id } });
+    // Navigate to communication page
+    navigate('/communication', { state: { recipientId: property?.agent.id, propertyId: property?.id } });
   };
 
   const nextImage = () => {

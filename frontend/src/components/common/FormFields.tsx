@@ -6,11 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
-// Helper to get nested values safely
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const getNestedValue = (obj: any, path: string) => {
-    return path.split('.').reduce((acc, part) => acc && acc[part], obj);
-};
+
 
 interface BaseFieldProps<T extends FieldValues> {
     name: Path<T>;
@@ -34,10 +30,11 @@ export function FormInputField<T extends FieldValues>({
     className,
     disabled
 }: InputFieldProps<T>) {
-    const { control, formState: { errors, dirtyFields } } = useFormContext<T>();
-    const hasError = !!errors[name];
+    const { control, getFieldState, formState } = useFormContext<T>();
+    const fieldState = getFieldState(name, formState);
+    const hasError = !!fieldState.error;
     // Simple check for "success" state: field is dirty and has no error
-    const isSuccess = dirtyFields[name] && !hasError;
+    const isSuccess = fieldState.isDirty && !hasError;
 
     return (
         <FormField
@@ -81,9 +78,10 @@ export function FormTextareaField<T extends FieldValues>({
     className,
     disabled
 }: TextareaFieldProps<T>) {
-    const { control, formState: { errors, dirtyFields } } = useFormContext<T>();
-    const hasError = !!errors[name];
-    const isSuccess = dirtyFields[name] && !hasError;
+    const { control, getFieldState, formState } = useFormContext<T>();
+    const fieldState = getFieldState(name, formState);
+    const hasError = !!fieldState.error;
+    const isSuccess = fieldState.isDirty && !hasError;
 
     return (
         <FormField
@@ -130,8 +128,9 @@ export function FormSelectField<T extends FieldValues>({
     className,
     disabled
 }: SelectFieldProps<T>) {
-    const { control, formState: { errors } } = useFormContext<T>();
-    const hasError = !!errors[name];
+    const { control, getFieldState, formState } = useFormContext<T>();
+    const fieldState = getFieldState(name, formState);
+    const hasError = !!fieldState.error;
 
     return (
         <FormField

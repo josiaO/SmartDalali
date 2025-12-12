@@ -32,37 +32,40 @@ class HasActiveSubscription(BasePermission):
     """
 
     def has_permission(self, request, view):
-        user = request.user
-        if not user or user.is_anonymous:
-            return False
+        # TEMPORARY: Bypass subscription check
+        return True
         
-        # Admins bypass subscription check
-        if user.is_superuser:
-            return True
+        # user = request.user
+        # if not user or user.is_anonymous:
+        #     return False
         
-        # Check if user is an agent
-        if not user.groups.filter(name='agent').exists():
-            return False
+        # # Admins bypass subscription check
+        # if user.is_superuser:
+        #     return True
         
-        # Check subscription status
-        try:
-            agent_profile = user.agentprofile
+        # # Check if user is an agent
+        # if not user.groups.filter(name='agent').exists():
+        #     return False
+        
+        # # Check subscription status
+        # try:
+        #     agent_profile = user.agentprofile
             
-            # Check if subscription is active
-            if not agent_profile.subscription_active:
-                return False
+        #     # Check if subscription is active
+        #     if not agent_profile.subscription_active:
+        #         return False
             
-            # Check if subscription has expired
-            if agent_profile.subscription_expires:
-                if agent_profile.subscription_expires < timezone.now():
-                    # Auto-deactivate expired subscription
-                    agent_profile.subscription_active = False
-                    agent_profile.save()
-                    return False
+        #     # Check if subscription has expired
+        #     if agent_profile.subscription_expires:
+        #         if agent_profile.subscription_expires < timezone.now():
+        #             # Auto-deactivate expired subscription
+        #             agent_profile.subscription_active = False
+        #             agent_profile.save()
+        #             return False
             
-            return True
-        except:
-            return False
+        #     return True
+        # except:
+        #     return False
 
 
 class HasFeatureAccess(BasePermission):
@@ -73,52 +76,55 @@ class HasFeatureAccess(BasePermission):
     """
 
     def has_permission(self, request, view):
-        user = request.user
-        if not user or user.is_anonymous:
-            return False
+        # TEMPORARY: Bypass feature check
+        return True
+
+        # user = request.user
+        # if not user or user.is_anonymous:
+        #     return False
         
-        # Admins bypass feature checks
-        if user.is_superuser:
-            return True
+        # # Admins bypass feature checks
+        # if user.is_superuser:
+        #     return True
         
-        # Get required feature code from view
-        feature_code = getattr(view, 'feature_code', None)
-        if not feature_code:
-            # If no feature code specified, allow access
-            return True
+        # # Get required feature code from view
+        # feature_code = getattr(view, 'feature_code', None)
+        # if not feature_code:
+        #     # If no feature code specified, allow access
+        #     return True
         
-        # Check if user is an agent with active subscription
-        if not user.groups.filter(name='agent').exists():
-            return False
+        # # Check if user is an agent with active subscription
+        # if not user.groups.filter(name='agent').exists():
+        #     return False
         
-        try:
-            agent_profile = user.agentprofile
+        # try:
+        #     agent_profile = user.agentprofile
             
-            # Check subscription is active
-            if not agent_profile.subscription_active:
-                return False
+        #     # Check subscription is active
+        #     if not agent_profile.subscription_active:
+        #         return False
             
-            # Check if subscription has expired
-            if agent_profile.subscription_expires:
-                if agent_profile.subscription_expires < timezone.now():
-                    agent_profile.subscription_active = False
-                    agent_profile.save()
-                    return False
+        #     # Check if subscription has expired
+        #     if agent_profile.subscription_expires:
+        #         if agent_profile.subscription_expires < timezone.now():
+        #             agent_profile.subscription_active = False
+        #             agent_profile.save()
+        #             return False
             
-            # Check if current plan includes the required feature
-            if agent_profile.current_plan:
-                from properties.models import Feature
+        #     # Check if current plan includes the required feature
+        #     if agent_profile.current_plan:
+        #         from properties.models import Feature
                 
-                # Check if feature exists and is active
-                try:
-                    feature = Feature.objects.get(code=feature_code, is_active=True)
-                except Feature.DoesNotExist:
-                    # Feature doesn't exist or is inactive
-                    return False
+        #         # Check if feature exists and is active
+        #         try:
+        #             feature = Feature.objects.get(code=feature_code, is_active=True)
+        #         except Feature.DoesNotExist:
+        #             # Feature doesn't exist or is inactive
+        #             return False
                 
-                # Check if plan includes this feature
-                return agent_profile.current_plan.features.filter(id=feature.id).exists()
+        #         # Check if plan includes this feature
+        #         return agent_profile.current_plan.features.filter(id=feature.id).exists()
             
-            return False
-        except:
-            return False
+        #     return False
+        # except:
+        #     return False

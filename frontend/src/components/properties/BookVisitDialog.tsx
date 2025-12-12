@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { createPropertyVisit } from '@/api/properties';
+import { scheduleVisit } from '@/api/visits';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -57,9 +57,15 @@ export function BookVisitDialog({ propertyId, propertyTitle, trigger }: BookVisi
 
         setIsLoading(true);
         try {
-            await createPropertyVisit({
+            // Format date as YYYY-MM-DD
+            const dateStr = format(data.scheduled_time, 'yyyy-MM-dd');
+            // Format time as HH:MM
+            const timeStr = format(data.scheduled_time, 'HH:mm');
+
+            await scheduleVisit({
                 property: propertyId,
-                scheduled_time: data.scheduled_time.toISOString(),
+                date: dateStr,
+                time: timeStr,
                 notes: data.notes,
             });
 
@@ -70,6 +76,7 @@ export function BookVisitDialog({ propertyId, propertyTitle, trigger }: BookVisi
             setOpen(false);
             form.reset();
         } catch (error) {
+            console.error(error);
             toast({
                 title: 'Error',
                 description: 'Failed to schedule visit. Please try again.',
@@ -85,10 +92,10 @@ export function BookVisitDialog({ propertyId, propertyTitle, trigger }: BookVisi
             <DialogTrigger asChild>
                 {trigger || <Button>Book a Visit</Button>}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px]" aria-describedby="book-visit-desc">
                 <DialogHeader>
                     <DialogTitle>Book a Visit</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription id="book-visit-desc">
                         Schedule a viewing for {propertyTitle}. The agent will confirm the time.
                     </DialogDescription>
                 </DialogHeader>

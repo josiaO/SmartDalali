@@ -51,14 +51,26 @@ export interface Message {
   sender: number;
   sender_name: string;
   sender_role: string;
-  sender_avatar?: string;
-  content: string;
-  is_read: boolean;
+  sender_avatar?: string | null;
+  text: string;
+  attachment?: string | null;
+  is_read?: boolean;
+  read_at?: string | null;
   created_at: string;
   attachments?: MessageAttachment[];
   reactions?: MessageReaction[];
   reaction_summary?: Record<string, number>;
   thread_info?: ThreadInfo;
+  is_deleted?: boolean;
+  reply_to?: Message;
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  avatar?: string | null;
 }
 
 export interface OtherParticipant {
@@ -66,27 +78,31 @@ export interface OtherParticipant {
   username: string;
   email: string;
   role: string;
-  avatar?: string;
+  avatar?: string | null;
 }
 
 export interface LastMessage {
   id: number;
-  content: string;
+  content?: string;
+  text?: string;
   sender_id: number;
-  sender_name: string;
+  sender_name?: string;
   created_at: string;
-  is_read: boolean;
-  has_attachments: boolean;
+  read_at?: string | null;
+  is_read?: boolean;
+  has_attachments?: boolean;
 }
 
 export interface Conversation {
   id: number;
-  participants: number[];
-  other_participant: OtherParticipant;
-  property?: number;
-  property_title?: string;
-  property_image?: string;
-  last_message?: LastMessage;
+  user?: number;
+  agent?: number;
+  participants?: number[];
+  other_participant: OtherParticipant | User;
+  property?: number | null;
+  property_title?: string | null;
+  property_image?: string | null;
+  last_message?: LastMessage | null;
   unread_count: number;
   created_at: string;
   updated_at: string;
@@ -106,78 +122,133 @@ export interface Notification {
   data?: Record<string, any>;
 }
 
-// API Functions
-export async function fetchConversations(): Promise<Conversation[]> {
-  const res = await api.get('/api/v1/communications/conversations/');
-  return res.data;
-}
+// Unified Service Object (from messaging.ts) + Individual Functions (from communications.ts)
+export const communicationService = {
+  // Get all conversations
+  getConversations: async (): Promise<Conversation[]> => {
+    const response = await api.get<Conversation[]>('/api/v1/communications/conversations/');
+    return response.data;
+  },
 
-export async function fetchMessages(conversationId: number): Promise<Message[]> {
-  const res = await api.get(`/api/v1/communications/conversations/${conversationId}/messages/`);
-  return res.data;
-}
+  // Get active conversations
+  getActiveConversations: async (): Promise<Conversation[]> => {
+    const response = await api.get<Conversation[]>('/api/v1/communications/conversations/active/');
+    return response.data;
+  },
 
-export async function sendMessage(
-  conversationId: number,
-  content: string,
-  attachments?: File[],
-  parentMessageId?: number
-): Promise<Message> {
-  const formData = new FormData();
-  formData.append('conversation', conversationId.toString());
-  formData.append('content', content);
-
-  if (parentMessageId) {
-    formData.append('parent_message_id', parentMessageId.toString());
-  }
-
-  if (attachments && attachments.length > 0) {
-    attachments.forEach((file) => {
-      formData.append('attachment', file);
+  // Start a conversation
+  startConversation: async (recipientId: number, propertyId?: number): Promise<Conversation> => {
+    const response = await api.post<Conversation>('/api/v1/communications/conversations/start_conversation/', {
+      agent_id: recipientId,
+      user_id: recipientId, // Support both field names for compatibility
+      property_id: propertyId
     });
-  }
+    return response.data;
+  },
 
-  const res = await api.post(
-    `/api/v1/communications/messages/`,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  // Get messages for a conversation
+  getMessages: async (conversationId: number): Promise<Message[]> => {
+    const response = await api.get<Message[]>(`/api/v1/communications/conversations/${conversationId}/messages/`);
+    return response.data;
+  },
+
+  // Send a message (supports both styles)
+  sendMessage: async (
+    conversationId: number,
+    data: { text?: string; content?: string; attachment?: File; attachments?: File[] },
+    replyToId?: number
+  ): Promise<Message> => {
+    const formData = new FormData();
+    const text = data.text || data.content || '';
+
+    if (text) formData.append('text', text);
+    formData.append('conversation', conversationId.toString());
+
+    if (replyToId) {
+      formData.append('reply_to_id', replyToId.toString());
     }
-  );
-  return res.data;
-}
 
-export async function markConversationAsRead(conversationId: number): Promise<void> {
-  await api.post(`/api/v1/communications/conversations/${conversationId}/mark_read/`);
-}
+    // Handle single or multiple attachments
+    if (data.attachment) {
+      formData.append('attachment', data.attachment);
+    } else if (data.attachments && data.attachments.length > 0) {
+      data.attachments.forEach((file) => {
+        formData.append('attachment', file);
+      });
+    }
 
-export async function startConversation(
-  userId: number,
-  propertyId?: number
-): Promise<Conversation> {
-  const res = await api.post('/api/v1/communications/conversations/start_conversation/', {
-    user_id: userId,
-    property_id: propertyId,
-  });
-  return res.data;
-}
+    const response = await api.post<Message>(
+      `/api/v1/communications/conversations/${conversationId}/send_message/`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
 
-export async function addReaction(messageId: number, emoji: string): Promise<void> {
-  await api.post(`/api/v1/communications/messages/${messageId}/react/`, { emoji });
-}
+  // Mark conversation as read
+  markRead: async (conversationId: number): Promise<void> => {
+    await api.post(`/api/v1/communications/conversations/${conversationId}/mark_read/`);
+  },
 
-export async function getUnreadCount(): Promise<number> {
-  const res = await api.get('/api/v1/communications/conversations/unread_count/');
-  return res.data.unread_count;
-}
+  // Get total unread count
+  getUnreadCount: async (): Promise<number> => {
+    const response = await api.get<{ unread_count: number }>('/api/v1/communications/conversations/unread_count/');
+    return response.data.unread_count;
+  },
 
-export async function fetchNotifications(): Promise<Notification[]> {
-  const res = await api.get('/api/v1/communications/notifications/');
-  return res.data;
-}
+  // Delete a message (global soft delete)
+  deleteMessage: async (conversationId: number, messageId: number): Promise<void> => {
+    await api.delete(`/api/v1/communications/messages/${messageId}/`);
+  },
 
-export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  await api.patch(`/api/v1/communications/notifications/${notificationId}/`, { read: true });
-}
+  // Delete a message for me only
+  deleteMessageForMe: async (conversationId: number, messageId: number): Promise<void> => {
+    await api.delete(`/api/v1/communications/messages/${messageId}/delete_for_me/`);
+  },
+
+  // Delete for everyone
+  deleteMessageForEveryone: async (messageId: number): Promise<void> => {
+    await api.delete(`/api/v1/communications/messages/${messageId}/delete_for_everyone/`);
+  },
+
+  // Clear conversation history
+  clearConversation: async (conversationId: number): Promise<void> => {
+    await api.post(`/api/v1/communications/conversations/${conversationId}/clear_history/`);
+  },
+
+  // Add reaction
+  addReaction: async (messageId: number, emoji: string): Promise<void> => {
+    await api.post(`/api/v1/communications/messages/${messageId}/react/`, { emoji });
+  },
+
+  // Notifications
+  getNotifications: async (): Promise<Notification[]> => {
+    const response = await api.get('/api/v1/communications/notifications/');
+    return response.data;
+  },
+
+  markNotificationAsRead: async (notificationId: string): Promise<void> => {
+    await api.patch(`/api/v1/communications/notifications/${notificationId}/`, { read: true });
+  },
+};
+
+// Legacy exports for backward compatibility
+export const messagingService = communicationService;
+
+// Individual function exports (for backward compatibility with old imports)
+export const fetchConversations = communicationService.getConversations;
+export const fetchMessages = communicationService.getMessages;
+export const sendMessage = communicationService.sendMessage;
+export const markConversationAsRead = communicationService.markRead;
+export const startConversation = communicationService.startConversation;
+export const addReaction = communicationService.addReaction;
+export const getUnreadCount = communicationService.getUnreadCount;
+export const fetchNotifications = communicationService.getNotifications;
+export const markNotificationAsRead = communicationService.markNotificationAsRead;
+export const deleteConversation = communicationService.clearConversation;
+export const deleteMessageForMe = communicationService.deleteMessageForMe;
+export const deleteMessageForEveryone = communicationService.deleteMessageForEveryone;

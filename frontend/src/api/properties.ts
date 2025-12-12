@@ -125,36 +125,9 @@ export async function geocodeAddress(address: string) {
   return response.data;
 }
 
-export interface PropertyVisit {
-  id: number;
-  property: {
-    id: number;
-    title: string;
-    city: string;
-  };
-  visitor: number;
-  visitor_name: string;
-  scheduled_time: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  notes?: string;
-  created_at: string;
-}
+// PropertyVisit interface moved to api/visits.ts
 
-export interface PropertyVisitData {
-  property: number;
-  scheduled_time: string;
-  notes?: string;
-}
-
-export async function createPropertyVisit(data: PropertyVisitData) {
-  const response = await api.post('/api/v1/properties/visits/', data);
-  return response.data;
-}
-
-export async function getPropertyVisits() {
-  const response = await api.get<PropertyVisit[]>('/api/v1/properties/visits/');
-  return response.data;
-}
+// Visit functions moved to api/visits.ts
 
 export async function togglePropertyLike(propertyId: string) {
   const response = await api.post(`/api/v1/properties/${propertyId}/like/`);

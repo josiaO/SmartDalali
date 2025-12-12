@@ -36,7 +36,7 @@ import Tickets from "@/pages/support/Tickets";
 import CreateTicket from "@/pages/support/CreateTicket";
 import TicketDetail from "@/pages/support/TicketDetail";
 import Conversations from "@/pages/communication/Conversations";
-import Subscription from "@/pages/payments/Subscription";
+// import Subscription from "@/pages/payments/Subscription"; // HIDDEN
 import NotFound from "@/pages/misc/NotFound";
 import PricingPage from "@/pages/dashboard/PricingPage";
 import PrintableProperty from "@/pages/properties/PrintableProperty";
@@ -45,6 +45,9 @@ import ListPropertyGateway from "@/pages/properties/ListPropertyGateway";
 import BecomeAgent from "@/pages/agent/BecomeAgent";
 import Notifications from "@/pages/Notifications";
 
+
+// import MyVisits from "@/pages/dashboard/MyVisits"; // HIDDEN
+// import VisitsPage from "@/pages/agent/VisitsPage"; // HIDDEN
 
 const queryClient = new QueryClient();
 
@@ -93,6 +96,7 @@ const App = () => (
                         <Route path="/communication" element={<Conversations />} />
                         <Route path="/notifications" element={<Notifications />} />
                         <Route path="/profile" element={<Profile />} />
+                        {/* <Route path="/my-visits" element={<MyVisits />} /> */}
                       </Route>
 
                       {/* Agent Routes (Agent role only) */}
@@ -102,12 +106,13 @@ const App = () => (
                         </RoleGuard>
                       }>
                         <Route path="/agent/dashboard" element={<AgentDashboard />} />
+                        {/* <Route path="/agent/visits" element={<VisitsPage />} /> */}
                         <Route path="/agent/properties" element={<Browse />} />
                         <Route path="/agent/analytics" element={<AgentDashboard />} />
                         <Route path="/agent/my-properties" element={<MyProperties />} />
                         <Route path="/properties/create" element={<CreateProperty />} />
                         <Route path="/properties/:id/edit" element={<EditProperty />} />
-                        <Route path="/payments/subscription" element={<Subscription />} />
+                        {/* <Route path="/payments/subscription" element={<Subscription />} /> */}
                         <Route path="/support" element={<Tickets />} />
                         <Route path="/support/create" element={<CreateTicket />} />
                         <Route path="/support/:id" element={<TicketDetail />} />

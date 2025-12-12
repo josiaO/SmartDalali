@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Message } from '../../api/messaging';
+import { Message } from '@/api/communications';
 import { formatDistanceToNow } from 'date-fns';
-import { Check, CheckCheck, Clock, Trash2, Paperclip } from 'lucide-react';
+import { Check, CheckCheck, Clock, Trash2, Paperclip, Reply } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -10,9 +10,10 @@ interface MessageBubbleProps {
     isMe: boolean;
     showAvatar: boolean;
     onDelete: (id: number) => void;
+    onReply: (message: Message) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar, onDelete }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, showAvatar, onDelete, onReply }) => {
     const { user } = useAuth();
     const [isHovered, setIsHovered] = useState(false);
 
@@ -60,6 +61,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, sho
             className={cn("flex w-full mb-4 group relative", isMe ? "justify-end" : "justify-start", animationClass)}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            id={`message-${message.id}`}
         >
             {/* Avatar for 'Other' */}
             {!isMe && (
@@ -76,27 +78,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, sho
 
             {/* Bubble */}
             <div className={cn(
-                "max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 relative transition-all duration-300",
+                "max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 relative transition-all duration-300 flex flex-col",
                 isMe ? myBubbleClass : otherBubbleClass,
                 isHovered && "shadow-lg scale-[1.01]"
             )}>
 
-                {/* Delete Button (Floating) */}
-                {/* For me: Left side. For others: Right side? No, consistent interaction is better. 
-                If isMe (bubbles on right), button on left.
-                If !isMe (bubbles on left), button on right.
-            */}
-                <button
-                    onClick={() => onDelete(message.id)}
-                    className={cn(
-                        "absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200",
-                        isMe ? "-left-8" : "-right-8",
-                        isHovered ? "opacity-100 translate-x-0" : isMe ? "opacity-0 translate-x-4 pointer-events-none" : "opacity-0 -translate-x-4 pointer-events-none"
-                    )}
-                    title={isMe ? "Delete" : "Delete for me"}
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
+                {/* Reply info if any */}
+                {message.reply_to && (
+                    <div className="text-xs mb-2 pl-2 border-l-2 border-primary/50 opacity-80 bg-black/5 dark:bg-white/10 p-1 rounded-sm cursor-pointer"
+                        onClick={() => {
+                            document.getElementById(`message-${message.reply_to?.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                    >
+                        <span className="font-semibold">{message.reply_to.sender_name}</span>
+                        <p className="truncate">{message.reply_to.text}</p>
+                    </div>
+                )}
+
+                {/* Action Buttons (Floating) */}
+                <div className={cn(
+                    "absolute top-1/2 -translate-y-1/2 flex space-x-1 transition-all duration-200",
+                    isMe ? "-left-16" : "-right-16", // Adjusted for 2 buttons
+                    isHovered ? "opacity-100 translate-x-0" : isMe ? "opacity-0 translate-x-4 pointer-events-none" : "opacity-0 -translate-x-4 pointer-events-none"
+                )}>
+                    <button
+                        onClick={() => onReply(message)}
+                        className="p-1.5 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
+                        title="Reply"
+                    >
+                        <Reply className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => onDelete(message.id)}
+                        className="p-1.5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        title={isMe ? "Delete" : "Delete for me"}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
 
                 {/* Content */}
                 {message.attachment && (

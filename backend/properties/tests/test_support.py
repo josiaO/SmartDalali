@@ -39,7 +39,11 @@ class SupportTicketTests(TestCase):
         url = '/api/v1/properties/support/tickets/'
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        # Handle pagination
+        if 'results' in response.data:
+             self.assertEqual(len(response.data['results']), 1)
+        else:
+             self.assertEqual(len(response.data), 1)
 
     def test_reply_ticket(self):
         ticket = SupportTicket.objects.create(

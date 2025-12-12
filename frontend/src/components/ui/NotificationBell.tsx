@@ -27,7 +27,7 @@ const NotificationBell: React.FC = () => {
         if (!isOpen) {
             // Refresh notifications when opening
             fetchNotifications();
-            markAllAsRead();
+            // Don't auto-mark all as read, wait for user interaction
         }
     };
 

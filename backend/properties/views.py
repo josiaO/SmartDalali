@@ -108,6 +108,46 @@ class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
 
     
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def status(self, request, pk=None):
+        visit = self.get_object()
+        
+        # Only the agent (property owner) can update status
+        if request.user != visit.agent:
+            return Response(
+                {'error': 'Only the agent can update visit status'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        new_status = request.data.get('status')
+        if new_status not in dict(PropertyVisit.STATUS_CHOICES):
+            return Response(
+                {'error': 'Invalid status'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        visit.status = new_status
+        visit.save()
+        
+        # Notify user (visitor) about status update
+        # Assuming Notification model exists and is imported or accessible
+        # from notifications.models import Notification
+        # Notification.objects.create(
+        #     recipient=visit.user,
+        #     type='visit_status',
+        #     title='Visit Status Updated',
+        #     message=f'Your visit for {visit.property.title} has been {new_status}.',
+        #     related_object_id=visit.id,
+        #     related_object_type='visit'
+        # )
+        
+        return Response(self.get_serializer(visit).data)
+
+    def perform_create(self, serializer):
+        property_id = self.request.data.get('property')
+        prop = Property.objects.get(pk=property_id)
+        serializer.save(user=self.request.user, agent=prop.owner)
+    
     @action(detail=True, methods=['post'])
     def assign_to_agent(self, request, pk=None):
         """Assign this subscription plan to an agent (admin only)"""
@@ -280,30 +320,7 @@ class PropertyRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
-class PropertyVisitListCreateView(generics.ListCreateAPIView):
-    queryset = PropertyVisit.objects.all()
-    serializer_class = PropertyVisitSerializer
-    permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_superuser or user.is_staff:
-            return PropertyVisit.objects.all().select_related('visitor', 'property')
-        # Agents can view visits for properties they own
-        if user.groups.filter(name='agent').exists():
-            return PropertyVisit.objects.filter(Q(property__owner=user) | Q(visitor=user)).select_related('visitor', 'property')
-        # Regular users only see their own visits
-        return PropertyVisit.objects.filter(visitor=user).select_related('visitor', 'property')
-    
-    def perform_create(self, serializer):
-        """Automatically set the visitor to the current user"""
-        serializer.save(visitor=self.request.user)
-
-
-class PropertyVisitRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PropertyVisit.objects.all().select_related('visitor', 'property')
-    serializer_class = PropertyVisitSerializer
-    permission_classes = [IsAuthenticated]
 
 
 # Views from payments app
@@ -613,7 +630,7 @@ def mpesa_callback(request):
             
             # Store receipt number and transaction details
             payment.raw_payload = {
-                **payment.raw_payload,
+                **(payment.raw_payload or {}),
                 'callback': callback_data,
                 'mpesa_receipt_number': callback_data.get('MpesaReceiptNumber'),
                 'transaction_date': callback_data.get('TransactionDate'),
@@ -647,7 +664,7 @@ def mpesa_callback(request):
             # Payment failed or was cancelled
             payment.status = 'cancelled'
             payment.raw_payload = {
-                **payment.raw_payload,
+                **(payment.raw_payload or {}),
                 'callback': callback_data,
                 'error': result_desc
             }
@@ -792,77 +809,116 @@ def agent_stats(request):
     if not (user.is_superuser or user.groups.filter(name='agent').exists()):
         return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
 
-    agent_properties = Property.objects.filter(owner=user)
-    total_listings = agent_properties.count()
-    total_views = agent_properties.aggregate(total=Sum('view_count'))['total'] or 0
-    total_inquiries = PropertyVisit.objects.filter(property__owner=user).count()
-    total_earnings = Payment.objects.filter(
-        property__owner=user,
-        status='completed'
-    ).aggregate(total=Sum('amount'))['total'] or 0
-
-    # Get recent viewers (visits)
-    recent_visits = PropertyVisit.objects.filter(
-        property__owner=user
-    ).select_related('visitor', 'property').order_by('-created_at')[:5]
+    # Use analytics service for comprehensive stats
+    from properties.analytics_service import AgentAnalyticsService
     
-    recent_viewers = [{
-        'id': visit.id,
-        'visitor_name': f"{visit.visitor.first_name} {visit.visitor.last_name}" if visit.visitor.first_name else visit.visitor.username,
-        'visitor_email': visit.visitor.email,
-        'property_title': visit.property.title,
-        'date': visit.created_at,
-        'status': visit.status
-    } for visit in recent_visits]
+    try:
+        service = AgentAnalyticsService(user.id)
+        overview = service.get_listing_overview()
+        
+        # Get agent properties for most viewed and liked
+        agent_properties = Property.objects.filter(owner=user)
+        
+        # Get recent viewers (visits)
+        recent_visits = PropertyVisit.objects.filter(
+            property__owner=user
+        ).select_related('user', 'property').order_by('-created_at')[:5]
+        
+        recent_viewers = [{
+            'id': visit.id,
+            'visitor_name': f"{visit.user.first_name} {visit.user.last_name}" if visit.user.first_name else visit.user.username,
+            'visitor_email': visit.user.email,
+            'property_title': visit.property.title,
+            'date': visit.date,
+            'time': visit.time,
+            'status': visit.status
+        } for visit in recent_visits]
 
-    # Get recent reviews
-    recent_ratings = AgentRating.objects.filter(
-        agent=user
-    ).select_related('user', 'property').order_by('-created_at')[:5]
+        # Get recent reviews
+        recent_ratings = AgentRating.objects.filter(
+            agent=user
+        ).select_related('user', 'property').order_by('-created_at')[:5]
 
-    recent_reviews = [{
-        'id': rating.id,
-        'reviewer_name': f"{rating.user.first_name} {rating.user.last_name}" if rating.user.first_name else rating.user.username,
-        'rating': rating.rating,
-        'comment': rating.review,
-        'property_title': rating.property.title if rating.property else None,
-        'date': rating.created_at
-    } for rating in recent_ratings]
+        recent_reviews = [{
+            'id': rating.id,
+            'reviewer_name': f"{rating.user.first_name} {rating.user.last_name}" if rating.user.first_name else rating.user.username,
+            'rating': rating.rating,
+            'comment': rating.review,
+            'property_title': rating.property.title if rating.property else None,
+            'date': rating.created_at
+        } for rating in recent_ratings]
 
-    # Get most viewed properties (agent's properties)
-    most_viewed = agent_properties.order_by('-view_count')[:5]
-    most_viewed_data = [{
-        'id': prop.id,
-        'title': prop.title,
-        'view_count': prop.view_count,
-        'price': float(prop.price),
-        'image': prop.MediaProperty.first().Images.url if prop.MediaProperty.exists() and prop.MediaProperty.first().Images else None
-    } for prop in most_viewed]
+        # Get most viewed properties (agent's properties)
+        most_viewed = agent_properties.order_by('-view_count')[:5]
+        most_viewed_data = [{
+            'id': prop.id,
+            'title': prop.title,
+            'view_count': prop.view_count,
+            'price': float(prop.price),
+            'image': prop.MediaProperty.first().Images.url if prop.MediaProperty.exists() and prop.MediaProperty.first().Images else None
+        } for prop in most_viewed]
 
-    # Get most liked properties (agent's properties)
-    from django.db.models import Count
-    most_liked = agent_properties.annotate(
-        like_count=Count('likes')
-    ).order_by('-like_count')[:5]
-    
-    most_liked_data = [{
-        'id': prop.id,
-        'title': prop.title,
-        'like_count': prop.like_count,
-        'price': float(prop.price),
-        'image': prop.MediaProperty.first().Images.url if prop.MediaProperty.exists() and prop.MediaProperty.first().Images else None
-    } for prop in most_liked]
+        # Get most liked properties (agent's properties)
+        most_liked = agent_properties.annotate(
+            like_count=Count('likes')
+        ).order_by('-like_count')[:5]
+        
+        most_liked_data = [{
+            'id': prop.id,
+            'title': prop.title,
+            'like_count': prop.like_count,
+            'price': float(prop.price),
+            'image': prop.MediaProperty.first().Images.url if prop.MediaProperty.exists() and prop.MediaProperty.first().Images else None
+        } for prop in most_liked]
+        
+        # Calculate earnings
+        total_earnings = Payment.objects.filter(
+            property__owner=user,
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
-    return Response({
-        'total_listings': total_listings,
-        'total_views': total_views,
-        'total_inquiries': total_inquiries,
-        'earnings': float(total_earnings),
-        'recent_viewers': recent_viewers,
-        'recent_reviews': recent_reviews,
-        'most_viewed': most_viewed_data,
-        'most_liked': most_liked_data,
-    })
+        return Response({
+            **overview,  # Spread overview data
+            'earnings': float(total_earnings),
+            'recent_viewers': recent_viewers,
+            'recent_reviews': recent_reviews,
+            'most_viewed': most_viewed_data,
+            'most_liked': most_liked_data,
+        })
+        
+    except Exception as e:
+        # Fallback to original implementation if analytics service fails
+        import traceback
+        print(f"Analytics service error: {str(e)}")
+        print(traceback.format_exc())
+        
+        # Original simple implementation as fallback
+        agent_properties = Property.objects.filter(owner=user)
+        total_listings = agent_properties.count()
+        total_views = agent_properties.aggregate(total=Sum('view_count'))['total'] or 0
+        total_inquiries = PropertyVisit.objects.filter(property__owner=user).count()
+        total_earnings = Payment.objects.filter(
+            property__owner=user,
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        return Response({
+            'total_listings': total_listings,
+            'active_listings': agent_properties.filter(is_published=True).count(),
+            'inactive_listings': total_listings - agent_properties.filter(is_published=True).count(),
+            'total_views': total_views,
+            'views_7d': 0,  # Not available in fallback
+            'views_30d': 0,  # Not available in fallback
+            'total_inquiries': total_inquiries,
+            'inquiries_7d': 0,  # Not available in fallback
+            'inquiries_30d': 0,  # Not available in fallback
+            'earnings': float(total_earnings),
+            'recent_viewers': [],
+            'recent_reviews': [],
+            'most_viewed': [],
+            'most_liked': [],
+        })
+
 
 
 
@@ -1221,3 +1277,200 @@ def viewed_properties(request):
     properties = Property.objects.filter(id__in=viewed_ids).order_by('-created_at')
     serializer = SerializerProperty(properties, many=True, context={'request': request})
     return Response(serializer.data)
+
+class PropertyVisitViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for handling property visits.
+    Users can request/cancel visits.
+    Agents can accept/decline visits.
+    """
+    serializer_class = PropertyVisitSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            return PropertyVisit.objects.all()
+        # Return visits where user is requester OR agent
+        return PropertyVisit.objects.filter(Q(user=user) | Q(agent=user)).select_related('property', 'user', 'agent')
+
+    def perform_create(self, serializer):
+        property_id = self.request.data.get('property')
+        prop = Property.objects.get(pk=property_id)
+        serializer.save(user=self.request.user, agent=prop.owner)
+        
+        # Notify agent about new visit request
+        # Notification logic can be added here
+
+    @action(detail=True, methods=['post'])
+    def status(self, request, pk=None):
+        """Update visit status (accept/decline/cancel)"""
+        visit = self.get_object()
+        new_status = request.data.get('status')
+        
+        if new_status not in ['confirmed', 'cancelled', 'declined', 'completed']:
+             return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Logic for who can do what
+        if request.user == visit.agent:
+            if new_status in ['confirmed', 'declined', 'completed']:
+                visit.status = new_status
+                visit.save()
+                # TODO: Notify user
+                return Response(self.get_serializer(visit).data)
+            else:
+                return Response({'error': 'Agents cannot perform this action'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if request.user == visit.user:
+            if new_status == 'cancelled':
+                visit.status = new_status
+                visit.save()
+                # TODO: Notify agent
+                return Response(self.get_serializer(visit).data)
+            else:
+                 return Response({'error': 'Users can only cancel visits'}, status=status.HTTP_403_FORBIDDEN)
+                 
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+
+class AgentAnalyticsViewSet(viewsets.ViewSet):
+    """
+    ViewSet for agent analytics endpoints.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def _check_agent_permission(self, request):
+        """Check if user is an agent or admin"""
+        if not (request.user.is_superuser or request.user.groups.filter(name='agent').exists()):
+            raise PermissionDenied("Only agents can access analytics")
+    
+    @action(detail=False, methods=['get'])
+    def property_performance(self, request):
+        """
+        Get detailed per-property performance metrics.
+        Query params:
+            - property_id (optional): Specific property ID
+            - days (optional): Number of days to analyze (default: 30)
+        """
+        self._check_agent_permission(request)
+        
+        from properties.analytics_service import AgentAnalyticsService
+        
+        service = AgentAnalyticsService(request.user.id)
+        property_id = request.query_params.get('property_id')
+        days = int(request.query_params.get('days', 30))
+        
+        try:
+            data = service.get_property_performance(property_id=property_id, days=days)
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def lead_insights(self, request):
+        """
+        Get lead and buyer behavior metrics.
+        Query params:
+            - days (optional): Number of days to analyze (default: 30)
+        """
+        self._check_agent_permission(request)
+        
+        from properties.analytics_service import AgentAnalyticsService
+        
+        service = AgentAnalyticsService(request.user.id)
+        days = int(request.query_params.get('days', 30))
+        
+        try:
+            data = service.get_lead_insights(days=days)
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def geographic(self, request):
+        """
+        Get location-based insights.
+        Query params:
+            - days (optional): Number of days to analyze (default: 30)
+        """
+        self._check_agent_permission(request)
+        
+        from properties.analytics_service import AgentAnalyticsService
+        
+        service = AgentAnalyticsService(request.user.id)
+        days = int(request.query_params.get('days', 30))
+        
+        try:
+            data = service.get_geographic_insights(days=days)
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def engagement_heatmap(self, request):
+        """
+        Get weekly engagement pattern heatmap.
+        """
+        self._check_agent_permission(request)
+        
+        from properties.analytics_service import AgentAnalyticsService
+        
+        service = AgentAnalyticsService(request.user.id)
+        
+        try:
+            data = service.get_engagement_heatmap()
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def optimization_suggestions(self, request):
+        """
+        Get automatic listing improvement suggestions.
+        """
+        self._check_agent_permission(request)
+        
+        from properties.analytics_service import AgentAnalyticsService
+        
+        service = AgentAnalyticsService(request.user.id)
+        
+        try:
+            data = service.get_optimization_suggestions()
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def quick_wins(self, request):
+        """
+        Get actionable quick-win items.
+        """
+        self._check_agent_permission(request)
+        
+        from properties.analytics_service import AgentAnalyticsService
+        
+        service = AgentAnalyticsService(request.user.id)
+        
+        try:
+            data = service.get_quick_wins()
+            return Response(data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

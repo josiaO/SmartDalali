@@ -9,6 +9,12 @@ import uuid
 from features.models import SubscriptionPlan
 from .validators import FileTypeValidator
 
+# Import analytics models to register them with Django
+from .analytics_models import (
+    PropertyViewEvent, PropertyEngagement, AgentLeadMetrics,
+    GeographicInsight, WeeklyEngagementPattern
+)
+
 # Allowed file types
 validate_image = FileTypeValidator(allowed_mimetypes=['image/jpeg', 'image/png', 'image/gif'])
 validate_video = FileTypeValidator(allowed_mimetypes=['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'])
@@ -98,6 +104,36 @@ class Property(models.Model):
         """Return persisted latitude and longitude, if available."""
         if self.latitude is not None and self.longitude is not None:
             return str(self.latitude), str(self.longitude)
+
+
+class PropertyVisit(models.Model):
+    """
+    Model for tracking property visit requests
+    """
+    STATUS_CHOICES = (
+        ('pending', _('Pending')),
+        ('confirmed', _('Confirmed')),
+        ('cancelled', _('Cancelled')),
+        ('declined', _('Declined')),
+        ('completed', _('Completed')),
+    )
+
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='visits')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='visits_requested')
+    agent = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='visits_scheduled')
+    date = models.DateField()
+    time = models.TimeField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-time']
+        app_label = 'properties'
+
+    def __str__(self):
+        return f"Visit: {self.property.title} by {self.user.username} on {self.date}"
         return None, None
     
     def should_be_archived(self):
@@ -159,26 +195,7 @@ class PropertyFeature(models.Model):
     class Meta:
         app_label = 'properties'
 
-class PropertyVisit(models.Model):
-    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='visits')
-    visitor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='property_visits')
-    scheduled_time = models.DateTimeField()
-    status_choices = [
-        ('pending', 'Pending'),
-        ('confirmed', 'Confirmed'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-    ]
-    status = models.CharField(max_length=20, choices=status_choices, default='pending')
-    notes = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return f"Visit to {self.property.title} by {self.visitor.username} on {self.scheduled_time}"
-
-    class Meta:
-        ordering = ['-created_at']
 
 class PropertyView(models.Model):
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='unique_views')

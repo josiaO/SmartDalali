@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from accounts.models import Profile
-from properties.models import AgentProfile, Property, Features
+from properties.models import AgentProfile, Property, PropertyFeature
 from properties.serializers import SerializerProperty
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIRequestFactory
@@ -32,15 +32,15 @@ class PropertySerializerTest(TestCase):
 			bathrooms=1,
 			city='TestCity'
 		)
-		Features.objects.create(property=prop, features='Garden')
+		PropertyFeature.objects.create(property=prop, features='Garden')
 
 		serializer = SerializerProperty(prop, context={'request': None})
 		data = serializer.data
 
 		# Basic assertions
 		self.assertEqual(data['title'], 'Unit Test Property')
-		self.assertIn('Features_Property', data)
-		self.assertTrue(any(f.get('features') == 'Garden' for f in data['Features_Property']))
+		self.assertIn('property_features', data)
+		self.assertTrue(any(f.get('features') == 'Garden' for f in data['property_features']))
 		self.assertIn('agent', data)
 		self.assertEqual(data['agent']['username'], 'test_agent')
 
@@ -57,12 +57,12 @@ class PropertySerializerTest(TestCase):
 			bathrooms=1,
 			city='OldCity'
 		)
-		Features.objects.create(property=prop, features='Garden')
+		PropertyFeature.objects.create(property=prop, features='Garden')
 
 		update_data = {
 			'title': 'Updated Title',
 			'city': 'NewCity',
-			'Features_Property': [
+			'property_features': [
 				{'features': 'Pool'},
 				{'features': 'Garage'},
 			]
@@ -76,7 +76,7 @@ class PropertySerializerTest(TestCase):
 		prop.refresh_from_db()
 		self.assertEqual(prop.title, 'Updated Title')
 		self.assertEqual(prop.city, 'NewCity')
-		feats = list(prop.Features_Property.values_list('features', flat=True))
+		feats = list(prop.property_features.values_list('features', flat=True))
 		self.assertCountEqual(feats, ['Pool', 'Garage'])
 
 	def test_media_upload_creates_mediaproperty(self):

@@ -1,9 +1,8 @@
 from decimal import Decimal
 import bleach
-
 from rest_framework import serializers
+
 from .models import (
-    AgentProfile, Property, MediaProperty, PropertyFeature, PropertyVisit,
     AgentProfile, Property, MediaProperty, PropertyFeature, PropertyVisit,
     Payment, SupportTicket, TicketMessage, TicketAttachment, AgentRating,
     PropertyLike
@@ -31,19 +30,7 @@ class PropertyFeatureSerializer(serializers.ModelSerializer):
         return bleach.clean(value, tags=[], strip=True)
 
 
-class PropertyVisitSerializer(serializers.ModelSerializer):
-    visitor_name = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = PropertyVisit
-        fields = ['id', 'property', 'visitor', 'visitor_name', 'scheduled_time', 'status', 'notes', 'created_at']
-        read_only_fields = ['visitor', 'visitor_name', 'created_at']
-    
-    def get_visitor_name(self, obj):
-        """Return the visitor's full name or username"""
-        if obj.visitor.first_name and obj.visitor.last_name:
-            return f"{obj.visitor.first_name} {obj.visitor.last_name}"
-        return obj.visitor.username
+
 
 class SerializerProperty(serializers.ModelSerializer):
     # use the related_name from MediaProperty and PropertyFeature models
@@ -456,3 +443,46 @@ class CreateAgentRatingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
+class PropertyVisitSerializer(serializers.ModelSerializer):
+    user_details = serializers.SerializerMethodField()
+    property_details = serializers.SerializerMethodField()
+    agent_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PropertyVisit
+        fields = [
+            'id', 'property', 'user', 'agent', 'date', 'time',
+            'status', 'notes', 'created_at', 'user_details',
+            'property_details', 'agent_details'
+        ]
+        read_only_fields = ['user', 'agent', 'created_at', 'updated_at']
+
+    def get_user_details(self, obj):
+        return {
+            "id": obj.user.id,
+            "username": obj.user.username,
+            "full_name": obj.user.get_full_name() or obj.user.username,
+            "email": obj.user.email
+        }
+        
+    def get_agent_details(self, obj):
+         return {
+            "id": obj.agent.id,
+            "username": obj.agent.username,
+            "full_name": obj.agent.get_full_name() or obj.agent.username,
+        }
+
+    def get_property_details(self, obj):
+        return {
+            "id": obj.property.id,
+            "title": obj.property.title,
+            "city": obj.property.city,
+            "price": obj.property.price,
+            "image": self.get_property_image(obj.property)
+        }
+
+    def get_property_image(self, property_obj):
+        media = property_obj.MediaProperty.first()
+        if media and media.Images:
+            return media.Images.url
+        return None

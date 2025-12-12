@@ -8,10 +8,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
   Search, Send, MessageSquare, Paperclip, Smile, MoreVertical,
-  File, Image as ImageIcon, X, Reply, Check, CheckCheck
+  File, Image as ImageIcon, X, Reply, Check, CheckCheck,
+  Video, Play, ArrowLeft, Delete, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useConversations, useMessages, useSendMessage } from '@/hooks/useConversations';
+import {
+  useConversations,
+  useMessages,
+  useSendMessage,
+  useDeleteConversation,
+  useDeleteMessageForMe,
+  useDeleteMessageForEveryone,
+} from '@/hooks/useConversations';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -23,69 +31,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface Message {
-  id: number;
-  sender: number;
-  sender_name: string;
-  sender_role: string;
-  sender_avatar?: string;
-  content: string;
-  is_read: boolean;
-  created_at: string;
-  attachments?: Attachment[];
-  reactions?: Reaction[];
-  reaction_summary?: Record<string, number>;
-  thread_info?: ThreadInfo;
-}
-
-interface Attachment {
-  id: number;
-  file_url: string;
-  file_name: string;
-  file_type: string;
-  file_size_display: string;
-}
-
-interface Reaction {
-  id: number;
-  user: number;
-  username: string;
-  emoji: string;
-}
-
-interface ThreadInfo {
-  is_reply: boolean;
-  parent_id?: number;
-  parent_preview?: string;
-  has_replies?: boolean;
-  reply_count?: number;
-}
-
-interface Conversation {
-  id: number;
-  other_participant: {
-    id: number;
-    username: string;
-    email: string;
-    role: string;
-    avatar?: string;
-  };
-  property_title?: string;
-  property_image?: string;
-  last_message?: {
-    id: number;
-    content: string;
-    sender_id: number;
-    sender_name: string;
-    created_at: string;
-    is_read: boolean;
-    has_attachments: boolean;
-  };
-  unread_count: number;
-  tags?: Array<{ id: number; name: string; color: string }>;
-  created_at: string;
-  updated_at: string;
-}
+import {
+  Message,
+  Conversation,
+  fetchConversations,
+  fetchMessages,
+  sendMessage,
+} from '@/api/communications';
 
 export default function AgentMessages() {
   const { user } = useAuth();
@@ -107,7 +59,27 @@ export default function AgentMessages() {
 
   const { data: conversations, isLoading: loadingConversations } = useConversations();
   const { data: messages, isLoading: loadingMessages } = useMessages(selectedConversationId || 0);
-  const sendMessage = useSendMessage();
+  const deleteConversation = useDeleteConversation();
+  const deleteMessageForMe = useDeleteMessageForMe();
+  const deleteMessageForEveryone = useDeleteMessageForEveryone();
+
+  const handleMessageDelete = (messageId: number, type: 'me' | 'everyone') => {
+    if (type === 'everyone') {
+      if (confirm('Are you sure you want to delete this message for everyone?')) {
+        deleteMessageForEveryone.mutate(messageId, {
+          onSuccess: () => toast({ title: 'Message deleted for everyone' }),
+          onError: () => toast({ title: 'Failed to delete message', variant: 'destructive' }),
+        });
+      }
+    } else {
+      if (confirm('Delete this message for yourself?')) {
+        deleteMessageForMe.mutate(messageId, {
+          onSuccess: () => toast({ title: 'Message deleted for you' }),
+          onError: () => toast({ title: 'Failed to delete message', variant: 'destructive' }),
+        });
+      }
+    }
+  };
 
   const conversationsList = Array.isArray(conversations) ? conversations : (conversations as any)?.results || [];
   const selectedConversation = conversationsList.find((c: Conversation) => c.id === selectedConversationId);
@@ -248,6 +220,7 @@ export default function AgentMessages() {
       await sendMessage.mutateAsync({
         conversationId: selectedConversationId,
         content: messageText.trim(),
+        parentMessageId: replyingTo?.id, // Pass parentMessageId here
       });
 
       setMessageText('');
@@ -264,6 +237,29 @@ export default function AgentMessages() {
         title: 'Error',
         description: 'Failed to send message. Please try again.',
         variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteConversation = () => {
+    if (!selectedConversationId) return;
+
+    if (confirm('Are you sure you want to delete this conversation? This will clear the history for you.')) {
+      deleteConversation.mutate(selectedConversationId, {
+        onSuccess: () => {
+          setSelectedConversationId(null);
+          toast({
+            title: 'Conversation deleted',
+            description: 'The conversation has been removed from your list.',
+          });
+        },
+        onError: () => {
+          toast({
+            title: 'Error',
+            description: 'Failed to delete conversation.',
+            variant: 'destructive',
+          });
+        }
       });
     }
   };
@@ -457,7 +453,7 @@ export default function AgentMessages() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem>View Profile</DropdownMenuItem>
                         <DropdownMenuItem>Mute Conversation</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem className="text-destructive" onClick={handleDeleteConversation}>
                           Delete Conversation
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -477,28 +473,37 @@ export default function AgentMessages() {
                         const currentUserId = user?.id ? parseInt(user.id) : 0;
                         const isOwn = message.sender === currentUserId;
 
+                        const isDeleted = message.is_deleted;
+                        const isDeletedUser = message.sender_name === 'Deleted User';
+
                         return (
                           <div
                             key={message.id}
                             className={cn(
-                              'flex gap-2',
+                              'flex gap-2 group',
                               isOwn ? 'justify-end' : 'justify-start'
                             )}
                           >
                             {!isOwn && (
                               <Avatar className="h-8 w-8">
-                                {message.sender_avatar && (
-                                  <AvatarImage src={message.sender_avatar} />
+                                {isDeletedUser ? (
+                                  <AvatarFallback>UNK</AvatarFallback>
+                                ) : (
+                                  <>
+                                    {message.sender_avatar && (
+                                      <AvatarImage src={message.sender_avatar} />
+                                    )}
+                                    <AvatarFallback>
+                                      {getInitials(message.sender_name)}
+                                    </AvatarFallback>
+                                  </>
                                 )}
-                                <AvatarFallback>
-                                  {getInitials(message.sender_name)}
-                                </AvatarFallback>
                               </Avatar>
                             )}
 
                             <div className={cn('flex flex-col gap-1', isOwn && 'items-end')}>
                               {/* Thread indicator */}
-                              {message.thread_info?.is_reply && (
+                              {!isDeleted && message.thread_info?.is_reply && (
                                 <div className="text-xs text-muted-foreground flex items-center gap-1 px-2">
                                   <Reply className="h-3 w-3" />
                                   Replying to: {message.thread_info.parent_preview}
@@ -507,44 +512,54 @@ export default function AgentMessages() {
 
                               <div
                                 className={cn(
-                                  'max-w-[70%] rounded-lg p-3',
+                                  'max-w-[70%] rounded-lg p-3 relative',
                                   isOwn
                                     ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted'
+                                    : 'bg-muted',
+                                  isDeleted && 'bg-muted/50 text-muted-foreground italic border border-dashed'
                                 )}
                               >
-                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-
-                                {/* Attachments */}
-                                {message.attachments && message.attachments.length > 0 && (
-                                  <div className="mt-2 space-y-2">
-                                    {message.attachments.map((attachment) => (
-                                      <a
-                                        key={attachment.id}
-                                        href={attachment.file_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={cn(
-                                          'flex items-center gap-2 p-2 rounded border',
-                                          isOwn
-                                            ? 'border-primary-foreground/20 hover:bg-primary-foreground/10'
-                                            : 'border-border hover:bg-muted-foreground/10'
-                                        )}
-                                      >
-                                        {attachment.file_type === 'image' ? (
-                                          <ImageIcon className="h-4 w-4" />
-                                        ) : (
-                                          <File className="h-4 w-4" />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs truncate">{attachment.file_name}</p>
-                                          <p className="text-xs opacity-70">
-                                            {attachment.file_size_display}
-                                          </p>
-                                        </div>
-                                      </a>
-                                    ))}
+                                {isDeleted ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-4 w-4 rounded-full border border-current flex items-center justify-center text-[10px]">!</div>
+                                    <p className="text-sm">This message was deleted</p>
                                   </div>
+                                ) : (
+                                  <>
+                                    <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+
+                                    {/* Attachments */}
+                                    {message.attachments && message.attachments.length > 0 && (
+                                      <div className="mt-2 space-y-2">
+                                        {message.attachments.map((attachment) => (
+                                          <a
+                                            key={attachment.id}
+                                            href={attachment.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={cn(
+                                              'flex items-center gap-2 p-2 rounded border',
+                                              isOwn
+                                                ? 'border-primary-foreground/20 hover:bg-primary-foreground/10'
+                                                : 'border-border hover:bg-muted-foreground/10'
+                                            )}
+                                          >
+                                            {attachment.file_type === 'image' ? (
+                                              <ImageIcon className="h-4 w-4" />
+                                            ) : (
+                                              <File className="h-4 w-4" />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-xs truncate">{attachment.file_name}</p>
+                                              <p className="text-xs opacity-70">
+                                                {attachment.file_size_display}
+                                              </p>
+                                            </div>
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
                                 )}
 
                                 <div className="flex items-center justify-between mt-1">
@@ -564,7 +579,7 @@ export default function AgentMessages() {
                               </div>
 
                               {/* Reactions */}
-                              {message.reaction_summary &&
+                              {!isDeleted && message.reaction_summary &&
                                 Object.keys(message.reaction_summary).length > 0 && (
                                   <div className="flex gap-1">
                                     {Object.entries(message.reaction_summary).map(
@@ -582,26 +597,50 @@ export default function AgentMessages() {
                                 )}
 
                               {/* Message actions */}
-                              <div className="flex gap-1 opacity-0 hover:opacity-100 transition-opacity">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-xs"
-                                  onClick={() => setReplyingTo(message)}
-                                >
-                                  <Reply className="h-3 w-3 mr-1" />
-                                  Reply
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-xs"
-                                  onClick={() => handleReaction(message.id, '👍')}
-                                >
-                                  <Smile className="h-3 w-3 mr-1" />
-                                  React
-                                </Button>
-                              </div>
+                              {!isDeleted && (
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs"
+                                    onClick={() => setReplyingTo(message)}
+                                  >
+                                    <Reply className="h-3 w-3 mr-1" />
+                                    Reply
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs"
+                                    onClick={() => handleReaction(message.id, '👍')}
+                                  >
+                                    <Smile className="h-3 w-3 mr-1" />
+                                    React
+                                  </Button>
+
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align={isOwn ? "end" : "start"}>
+                                      <DropdownMenuItem onClick={() => handleMessageDelete(message.id, 'me')}>
+                                        Delete for me
+                                      </DropdownMenuItem>
+
+                                      {isOwn && (new Date().getTime() - new Date(message.created_at).getTime() < 3600000) && (
+                                        <DropdownMenuItem
+                                          onClick={() => handleMessageDelete(message.id, 'everyone')}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          Delete for everyone
+                                        </DropdownMenuItem>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              )}
                             </div>
 
                             {isOwn && (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Calendar, Phone, MapPin, Info, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Conversation } from '../../api/messaging';
+import { Conversation } from '@/api/communications';
 
 interface QuickActionBarProps {
     conversation: Conversation;

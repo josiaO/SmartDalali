@@ -4,12 +4,12 @@ import { Heart, Eye, FileText, Loader2, Calendar, MessageSquare } from 'lucide-r
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getLikedProperties, getViewedProperties } from '@/api/properties';
-import { fetchVisits, Visit } from '@/api/visits';
+// import { fetchVisits, Visit } from '@/api/visits'; // HIDDEN
 import { getSupportTickets } from '@/api/support';
 import { useTranslation } from 'react-i18next';
 import { BecomeAgentCard } from '@/components/user/BecomeAgentCard';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
-import { SubscriptionTimer } from '@/components/subscription/SubscriptionTimer';
+// import { SubscriptionTimer } from '@/components/subscription/SubscriptionTimer'; // HIDDEN
 import { RecentlyViewed } from '@/components/properties/RecentlyViewed';
 
 export default function UserDashboard() {
@@ -29,14 +29,14 @@ export default function UserDashboard() {
     queryFn: getSupportTickets,
   });
 
-  const { data: visitsData, isLoading: loadingVisits } = useQuery({
-    queryKey: ['user-visits'],
-    queryFn: fetchVisits,
-  });
+  // const { data: visitsData, isLoading: loadingVisits } = useQuery({
+  //   queryKey: ['user-visits'],
+  //   queryFn: fetchVisits,
+  // });
 
-  const visits = visitsData?.results || [];
+  // const visits = visitsData?.results || [];
 
-  const isLoading = loadingLiked || loadingViewed || loadingTickets || loadingVisits;
+  const isLoading = loadingLiked || loadingViewed || loadingTickets;
 
   return (
     <div className="space-y-8">
@@ -51,12 +51,12 @@ export default function UserDashboard() {
       </div>
 
       {/* Subscription Timer */}
-      <SubscriptionTimer />
+      {/* <SubscriptionTimer /> */}
 
       {/* Agent Upgrade Card */}
       <BecomeAgentCard />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
         <Link to="/saved-properties">
           <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -88,6 +88,24 @@ export default function UserDashboard() {
             </p>
           </CardContent>
         </Card>
+
+        <Link to="/communication">
+          <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('dashboard.messages')}</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {/* TODO: Add unread count from messaging API */}
+                -
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('dashboard.view_all_messages')}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Link to="/support">
           <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
@@ -141,7 +159,8 @@ export default function UserDashboard() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Scheduled Visits Section - HIDDEN */}
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">{t('dashboard.scheduled_visits') || 'Scheduled Visits'}</CardTitle>
@@ -164,22 +183,21 @@ export default function UserDashboard() {
                     <div key={visit.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                       <div>
                         <p className="font-medium text-sm">
-                          {/* @ts-ignore - property might be an object or string depending on API */}
-                          {visit.property?.title || visit.property || 'Property Visit'}
+                          {visit.property_details?.title || 'Property Visit'}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <p className="text-xs text-muted-foreground">
-                            {new Date(visit.scheduled_date || visit.scheduled_time || visit.created_at).toLocaleDateString()}
+                            {visit.date} {visit.time}
                           </p>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize ${visit.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                              visit.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
+                            visit.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
                             }`}>
                             {visit.status}
                           </span>
                         </div>
                       </div>
-                      <Link to={typeof visit.property === 'object' ? `/properties/${visit.property.id}` : '#'}>
+                      <Link to={visit.property ? `/properties/${visit.property}` : '#'}>
                         <Button variant="ghost" size="sm">{t('common.view')}</Button>
                       </Link>
                     </div>
@@ -193,7 +211,7 @@ export default function UserDashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
       <div className="mt-8">
         <RecentlyViewed />

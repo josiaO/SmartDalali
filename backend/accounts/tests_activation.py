@@ -18,9 +18,9 @@ class RegistrationActivationTest(APITestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertIn('message', resp.data)
 
-        # Verify user exists and is NOT active until activation
+        # Verify user exists and is active (auto-activation enabled)
         user = User.objects.get(username='newuser')
-        self.assertFalse(user.is_active)
+        self.assertTrue(user.is_active)
 
         # Ensure email was sent with activation code/link
         self.assertEqual(len(mail.outbox), 1)

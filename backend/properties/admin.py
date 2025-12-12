@@ -55,9 +55,9 @@ class PropertyFeatureAdmin(admin.ModelAdmin):
 
 @admin.register(PropertyVisit)
 class PropertyVisitAdmin(admin.ModelAdmin):
-    list_display = ('property', 'visitor', 'scheduled_time', 'status')
-    list_filter = ('status',)
-    search_fields = ('property__title', 'visitor__username')
+    list_display = ['property', 'user', 'agent', 'date', 'time', 'status', 'created_at']
+    list_filter = ['status', 'date', 'created_at']
+    search_fields = ['property__title', 'user__username', 'agent__username']
 
 
 # Admin from payments app

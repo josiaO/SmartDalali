@@ -2,10 +2,14 @@ import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from communications.models import Conversation, Message, MessageNotification
 from communications.serializers import MessageSerializer
 from communications.notification_service import get_notification_service
+from communications.throttles import WebSocketRateLimit
+from rest_framework.exceptions import Throttled
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -78,6 +82,10 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 class ChatConsumer(AsyncWebsocketConsumer):
     """WebSocket consumer for real-time chat"""
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rate_limiter = WebSocketRateLimit(max_messages=10, window=10)
+    
     async def connect(self):
         """Handle WebSocket connection"""
         self.user = self.scope["user"]
@@ -144,8 +152,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send_error(str(e))
     
     async def handle_message(self, data):
-        """Handle new message"""
+        """Handle new message with rate limiting"""
         try:
+            # Check rate limit first
+            await self.check_rate_limit()
+            
             text = data.get('text', '').strip()
             # If front-end sends 'content', support that too for compatibility
             if not text:
@@ -175,6 +186,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Send notifications to other participants
             await self.notify_participants(message)
             
+        except Throttled as e:
+            logger.warning(f"Rate limit exceeded for user {self.user.id} in conversation {self.conversation_id}")
+            await self.send_error(f"Rate limit exceeded. Please wait {int(e.wait)} seconds.")
         except Exception as e:
             logger.error(f"Error handling message: {e}", exc_info=True)
             await self.send_error("Failed to send message")
@@ -283,8 +297,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if message.sender != self.user and not message.read_at:
                 from django.utils import timezone
                 message.read_at = timezone.now()
+                message.read_at = timezone.now()
                 message.save()
-                return True
                 
             notification = MessageNotification.objects.filter(
                 message_id=message_id,
@@ -341,12 +355,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             
             # Send multi-channel notification
             if notification_service:
+                from asgiref.sync import sync_to_async
                 content_preview = message.text[:100] if message.text else "Attachment"
-                notification_service.notify_new_message(
+                await sync_to_async(notification_service.notify_new_message)(
                     other_participant,
                     self.user.get_full_name() or self.user.username,
                     content_preview,
-                    channels=['push', 'email']
+                    channels=['push', 'email'],
+                    conversation_id=self.conversation_id
                 )
         except Exception as e:
             logger.error(f"Error notifying participants: {e}")
@@ -381,6 +397,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message=message,
             is_read=False,
         )
+    
+    @database_sync_to_async
+    def check_rate_limit(self):
+        """Check WebSocket rate limit"""
+        return self.rate_limiter.allow_message(self.user.id, self.conversation_id)
     
     async def send_error(self, error_message):
         """Send error message to client"""

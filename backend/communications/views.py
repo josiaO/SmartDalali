@@ -11,6 +11,7 @@ from .serializers import (
     NotificationSerializer
 )
 from communications.notification_service import get_notification_service
+from .throttles import MessageRateThrottle, ConversationRateThrottle
 import logging
 from django.utils import timezone
 from channels.layers import get_channel_layer
@@ -30,6 +31,14 @@ class ConversationViewSet(viewsets.ModelViewSet):
     pagination_class = None
     http_method_names = ['get', 'head', 'options', 'post']
     
+    def get_throttles(self):
+        """Apply specific throttles based on action"""
+        if self.action == 'send_message':
+            return [MessageRateThrottle()]
+        elif self.action == 'start_conversation':
+            return [ConversationRateThrottle()]
+        return super().get_throttles()
+    
     def create(self, request, *args, **kwargs):
         raise MethodNotAllowed('POST', detail="Use the 'start_conversation' endpoint to begin a conversation.")
 
@@ -48,7 +57,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
         ).select_related('user', 'agent', 'property').prefetch_related('messages')
         
         if self.action == 'list':
+            # DEBUG-LOG
+            print(f"DEBUG: Filtering list for user {user.id}. Total before: {queryset.count()}")
             queryset = queryset.exclude(hidden_by=user)
+            print(f"DEBUG: Total after hidden_by exclude: {queryset.count()}")
             
         return queryset
     
@@ -108,8 +120,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
             if serializer.is_valid():
                 message = serializer.save()
                 
-                # Unhide conversation for both participants
-                conversation.hidden_by.clear()
+                # Note: We do NOT unhide conversations here
+                # Deleted conversations stay deleted even when new messages arrive
                 
                 # Send notifications to other participant
                 notification_service = get_notification_service()
@@ -240,24 +252,25 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 except Property.DoesNotExist:
                     pass
 
-            # Check for existing
+            # Check for existing NON-HIDDEN conversation
+            # We allow multiple conversations, but only use the latest non-hidden one
             conversation = Conversation.objects.filter(
                 user=request.user,
                 agent=agent_user,
                 property=property_obj
-            ).first()
+            ).exclude(hidden_by=request.user).order_by('-created_at').first()
 
             if not conversation:
-                # Try swapped roles just in case existing logic differs? 
-                # Strict requirement says "property + user + agent". 
-                # So we stick to requester=user, target=agent.
+                # Create a new conversation
+                # This happens when: no conversation exists OR all conversations are hidden
                 conversation = Conversation.objects.create(
                     user=request.user,
                     agent=agent_user,
                     property=property_obj
                 )
+                logger.info(f"Created new conversation {conversation.id} for user {request.user.id} and agent {agent_user.id}")
                 
-                # Send notification
+                # Send notification for NEW conversation
                 notification_service = get_notification_service()
                 if notification_service:
                     property_title = conversation.property.title if conversation.property else "New Inquiry"
@@ -267,6 +280,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                         request.user.get_full_name() or request.user.username,
                         channels=['email', 'push']
                     )
+            
             
             return Response(
                 ConversationSerializer(
@@ -349,6 +363,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
             
             # 2. Hide the conversation itself from the list
             conversation.hidden_by.add(request.user)
+            # DEBUG-LOG
+            print(f"DEBUG: Added user {request.user.id} to hidden_by of conversation {conversation.id}")
+            print(f"DEBUG: hidden_by users: {list(conversation.hidden_by.values_list('id', flat=True))}")
             
             return Response({'status': 'Conversation history cleared and hidden'})
         except Exception as e:
@@ -444,17 +461,28 @@ class MessageViewSet(viewsets.ModelViewSet):
             logger.error(f"Error creating message: {e}")
             return Response({'error': 'Failed to create message'}, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, *args, **kwargs):
-        """Soft delete a message"""
+    @action(detail=True, methods=['delete'])
+    def delete_for_everyone(self, request, pk=None):
+        """Delete a message for everyone (within time window)"""
         try:
             message = self.get_object()
             
-            # Only sender can delete their message
+            # Only sender can delete
             if message.sender != request.user:
                 return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
             
-            # Soft delete
+            # Check time window (e.g., 1 hour)
+            time_diff = timezone.now() - message.created_at
+            if time_diff.total_seconds() > 3600:
+                return Response({'error': 'Message too old to delete for everyone'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Soft delete globally
             message.is_deleted = True
+            message.text = "This message was deleted" # Optional: update DB text too, but serializer handles it.
+            # We should probably clear connection to file to save space or just keep it?
+            # Req: "Remove attachments"
+            message.attachment = None
+            message.deleted_at = timezone.now()
             message.save()
             
             # Broadcast deletion
@@ -466,7 +494,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                         'type': 'chat.message',
                         'message': MessageSerializer(message).data,
                         'sender_id': request.user.id,
-                     }
+                    }
                 )
             except Exception as e:
                 logger.error(f"Error broadcasting deletion: {e}")
@@ -475,6 +503,9 @@ class MessageViewSet(viewsets.ModelViewSet):
         except Exception as e:
              logger.error(f"Error deleting message: {e}")
              return Response({'error': 'Failed to delete message'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        return self.delete_for_everyone(request, *args, **kwargs)
     
     def get_queryset(self):
         user = self.request.user
@@ -552,6 +583,38 @@ class NotificationViewSet(viewsets.ModelViewSet):
             return Response({'status': 'Notification marked as read'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def clear_history(self, request, pk=None):
+        """Clear conversation history for the current user (Hide)"""
+        try:
+            conversation = self.get_object()
+            
+            # Hide the conversation
+            conversation.hidden_by.add(request.user)
+            
+            # Also hide all CURRENT messages for this user
+            # This ensures they don't see them if they re-open the chat
+            conversation.messages.all().update() # Trick to get queryset, then loop?
+            # Better: bulk add to m2m is hard in Django without through model or loop.
+            # But we can just use the fact that Conversation is hidden.
+            # However, if they get a NEW message, conversation unhides (we did that in send_message).
+            # But OLD messages should remain hidden?
+            # The requirement: "Remove all chats -> remove user from message list"
+            # "If both sides hide -> conversation hidden but messages stay key".
+            # "Delete For Me" on conversation should wipe history.
+            
+            # So we should add user to hidden_by of ALl existing messages?
+            # That operation might be heavy for long chats.
+            # But necessary if we want "clear history" behavior.
+            messages = conversation.messages.all()
+            for msg in messages:
+                msg.hidden_by.add(request.user)
+                
+            return Response({'status': 'Conversation history cleared'})
+        except Exception as e:
+            logger.error(f"Error clearing history: {e}")
+            return Response({'error': 'Failed to clear history'}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], url_path='mark-all-read')
     def mark_all_read(self, request):

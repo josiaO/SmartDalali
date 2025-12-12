@@ -1,29 +1,35 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { messagingService, Message, Conversation } from '../../api/messaging';
+import { messagingService, Message, Conversation } from '@/api/communications';
 import { useAuth } from '../../contexts/AuthContext';
-import { Send, Paperclip, Loader2 } from 'lucide-react';
+import { Send, Paperclip, Loader2, X, Smile } from 'lucide-react';
 import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { SmartHeader } from './SmartHeader';
 import { QuickActionBar } from './QuickActionBar';
 import { TypingIndicator } from './TypingIndicator';
 import { cn } from '@/lib/utils';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 interface ChatRoomProps {
     conversation: Conversation;
     onBack?: () => void;
+    onConversationDeleted?: () => void;
 }
 
-const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
+const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversationDeleted }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [inputText, setInputText] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const socketRef = useRef<WebSocket | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const emojiPickerRef = useRef<HTMLDivElement>(null);
     const [isTyping, setIsTyping] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
 
@@ -46,6 +52,23 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
             setLoading(false);
         }
     };
+
+    // Close emoji picker when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+                setShowEmojiPicker(false);
+            }
+        };
+
+        if (showEmojiPicker) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showEmojiPicker]);
 
     useEffect(() => {
         fetchMessages();
@@ -120,7 +143,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
             read_at: null,
             is_deleted: false,
             created_at: new Date().toISOString(),
-            status: 'pending'
+            status: 'pending',
+            reply_to: replyingTo || undefined
         };
 
         try {
@@ -134,9 +158,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
 
             setInputText('');
             setAttachment(null);
+            setReplyingTo(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
 
-            const sentMsg = await messagingService.sendMessage(conversation.id, data);
+            const sentMsg = await messagingService.sendMessage(conversation.id, data, replyingTo?.id);
 
             setMessages(prev => {
                 // Robust deduplication:
@@ -150,8 +175,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
                     return withoutTemp;
                 }
 
-                // 3. Keep order: find where temp was? No, just append is usually fine for chat
-                // However, to be cleaner, we can try to insert at the end.
+                // 3. Keep order: insert at end
                 return [...withoutTemp, sentMsg];
             });
 
@@ -166,9 +190,13 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
 
     const handleClearChat = async () => {
         try {
+            console.log('[ChatRoom] Clearing conversation:', conversation.id);
             await messagingService.clearConversation(conversation.id);
             setMessages([]);
             toast.success("Conversation cleared");
+            console.log('[ChatRoom] Cleared successfully, calling callbacks');
+            if (onBack) onBack(); // Go back to list
+            if (onConversationDeleted) onConversationDeleted(); // Refresh list
         } catch (error) {
             console.error("Failed to clear chat", error);
             toast.error("Failed to clear conversation");
@@ -207,12 +235,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
 
         const isMe = message.sender === (Number(user?.id) || 0);
         const isAlreadyDeleted = message.is_deleted;
-
-        // Scenarios:
-        // 1. My message, active: "Delete for everyone?" (Soft delete)
-        // 2. My message, already deleted: "Remove from view?" (Hide)
-        // 3. Other message, active: "Delete for me?" (Hide)
-        // 4. Other message, already deleted: "Remove from view?" (Hide)
 
         let confirmText = "";
         if (isMe && !isAlreadyDeleted) {
@@ -259,6 +281,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
                 onClearChat={handleClearChat}
             />
 
+            {/* Connection Status Banner */}
+            {!isOnline && (
+                <div className="bg-yellow-500/90 dark:bg-yellow-600/90 text-white px-4 py-2 text-sm text-center flex items-center justify-center gap-2 animate-pulse">
+                    <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                    <span>⚠️ Reconnecting to chat...</span>
+                </div>
+            )}
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 relative scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
                 {/* Subtle Background Pattern or Gradient */}
@@ -274,6 +304,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
                             isMe={isMe}
                             showAvatar={showAvatar}
                             onDelete={handleDelete}
+                            onReply={setReplyingTo}
                         />
                     );
                 })}
@@ -286,6 +317,17 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
 
             {/* Expressive Input Area */}
             <div className="bg-card border-t border-border p-4 relative z-20 shadow-lg dark:shadow-none transition-colors duration-300">
+                {replyingTo && (
+                    <div className="flex items-center justify-between bg-muted/80 px-4 py-2 rounded-t-lg -mx-4 -mt-4 mb-4 border-b border-border/50 backdrop-blur-sm animate-slide-in-up">
+                        <div className="flex flex-col text-sm border-l-2 border-primary pl-2">
+                            <span className="font-semibold text-primary">Replying to {replyingTo.sender_name}</span>
+                            <span className="text-muted-foreground truncate max-w-xs">{replyingTo.text}</span>
+                        </div>
+                        <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-black/10 rounded-full">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
                 {attachment && (
                     <div className="flex items-center justify-between bg-muted/50 px-3 py-2 rounded-lg mb-2 animate-slide-in-right border border-border">
                         <div className="flex items-center text-sm text-foreground">
@@ -311,11 +353,38 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack }) => {
                         onChange={handleFileSelect}
                     />
 
+                    <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="p-3 text-muted-foreground hover:text-primary hover:bg-muted rounded-full transition-all duration-200"
+                    >
+                        <Smile className="w-5 h-5" />
+                    </button>
+
+                    {/* Emoji Picker */}
+                    {showEmojiPicker && (
+                        <div
+                            ref={emojiPickerRef}
+                            className="absolute bottom-16 left-12 z-50 shadow-2xl rounded-lg overflow-hidden border border-border"
+                        >
+                            <Picker
+                                data={data}
+                                onEmojiSelect={(emoji: any) => {
+                                    setInputText(inputText + emoji.native);
+                                    setShowEmojiPicker(false);
+                                }}
+                                theme="auto"
+                                previewPosition="none"
+                                skinTonePosition="none"
+                            />
+                        </div>
+                    )}
+
                     <div className="flex-1 relative">
                         <textarea
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
-                            placeholder="Type a message..."
+                            placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
                             className="w-full bg-muted/50 border-transparent focus:border-ring focus:bg-background text-foreground placeholder:text-muted-foreground rounded-2xl px-4 py-3 max-h-32 focus:ring-2 focus:ring-ring/20 resize-none overflow-y-auto transition-all duration-300 shadow-inner"
                             rows={1}
                             onKeyDown={(e) => {

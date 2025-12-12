@@ -16,6 +16,7 @@ class Profile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
 
     def __str__(self):
         return self.user.username

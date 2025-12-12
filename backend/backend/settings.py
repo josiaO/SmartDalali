@@ -195,6 +195,8 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'user': '1000/day',
+        'messages': '60/min',  # Messaging-specific rate limit
+        'conversations': '20/hour',  # Conversation creation rate limit
     },
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -253,6 +255,19 @@ CORS_ALLOW_HEADERS = ('accept', 'authorization', 'content-type', 'origin', 'user
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
 GOOGLE_MAPS_GEOCODE_TIMEOUT = int(os.getenv('GOOGLE_MAPS_GEOCODE_TIMEOUT', 5))
 REDIS_URL = os.getenv('REDIS_URL')
+
+# Message Encryption Configuration
+# Generate key with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+from cryptography.fernet import Fernet
+MESSAGE_ENCRYPTION_KEY = os.getenv('MESSAGE_ENCRYPTION_KEY')
+if not MESSAGE_ENCRYPTION_KEY:
+    if os.getenv('DJANGO_ENV') == 'production':
+        raise ValueError("MESSAGE_ENCRYPTION_KEY must be set in production environment")
+    else:
+        # Generate temporary key for development
+        MESSAGE_ENCRYPTION_KEY = Fernet.generate_key().decode()
+        print(f"Warning: Using temporary encryption key. Set MESSAGE_ENCRYPTION_KEY in .env for persistence.")
+
 
 # M-Pesa Payment Integration (Daraja API)
 DAR_AFFILIATE_CONSUMER_KEY = os.getenv('DAR_AFFILIATE_CONSUMER_KEY')

@@ -5,24 +5,69 @@ from accounts.roles import get_user_role
 
 
 # Serializers from messaging app
+
+class MinimalMessageSerializer(serializers.ModelSerializer):
+    """Minimal serializer for reply_to field"""
+    sender_name = serializers.CharField(source='sender.username', read_only=True)
+    
+    class Meta:
+        model = Message
+        fields = ['id', 'sender_name', 'text', 'attachment', 'created_at']
+
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.CharField(source='sender.username', read_only=True)
     sender_role = serializers.SerializerMethodField()
     sender_avatar = serializers.SerializerMethodField()
+    reply_to = MinimalMessageSerializer(read_only=True)
+    reply_to_id = serializers.PrimaryKeyRelatedField(
+        queryset=Message.objects.all(), source='reply_to', write_only=True, required=False, allow_null=True
+    )
     
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'sender_name', 'sender_role', 'sender_avatar', 'text', 'attachment', 'read_at', 'is_deleted', 'created_at']
+        fields = ['id', 'sender', 'sender_name', 'sender_role', 'sender_avatar', 'text', 'attachment', 'read_at', 'is_deleted', 'created_at', 'reply_to', 'reply_to_id']
         read_only_fields = ['sender', 'read_at', 'is_deleted', 'created_at']
     
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        
+        # Use decrypted text for encrypted messages
+        if instance.is_encrypted:
+            data['text'] = instance.decrypted_text
+        
+        # Handle Global Deletion (Delete for Everyone)
+        if instance.is_deleted:
+            data['text'] = "This message was deleted"
+            data['attachment'] = None
+            data['is_deleted'] = True
+            
+        # Handle Deleted User
+        try:
+            if hasattr(instance.sender, 'profile') and instance.sender.profile.is_deleted:
+                data['sender_name'] = "Deleted User"
+                data['sender_avatar'] = None # Or provide a generic URL if needed
+                # We keep sender_id (data['sender']) for linking but UI shows deleted
+        except Exception:
+            pass
+            
+        return data
+
     def get_sender_role(self, obj):
-        return get_user_role(obj.sender)
+        # ... existing logic ...
+        try:
+            if hasattr(obj.sender, 'profile') and obj.sender.profile.is_deleted:
+                return 'user' # Flatten role for deleted user
+            return get_user_role(obj.sender)
+        except:
+            return 'user'
     
     def get_sender_avatar(self, obj):
         try:
-            profile = obj.sender.profile
-            if profile and profile.image:
-                return profile.image.url
+            if hasattr(obj.sender, 'profile'):
+                if obj.sender.profile.is_deleted:
+                    return None
+                if obj.sender.profile.image:
+                    return obj.sender.profile.image.url
         except:
             pass
         return None
@@ -58,7 +103,12 @@ class ConversationSerializer(serializers.ModelSerializer):
     
     def get_last_message(self, obj):
         # We need to optimize this to avoid N+1 queries ideally, but for now logic:
-        last_msg = obj.messages.order_by('-created_at').first()
+        request = self.context.get('request')
+        qs = obj.messages.all()
+        if request and request.user:
+            qs = qs.exclude(hidden_by=request.user)
+            
+        last_msg = qs.order_by('-created_at').first()
         if last_msg:
             return {
                 'id': last_msg.id,
@@ -84,9 +134,13 @@ class ConversationSerializer(serializers.ModelSerializer):
 
 
 class CreateMessageSerializer(serializers.ModelSerializer):
+    reply_to_id = serializers.PrimaryKeyRelatedField(
+        queryset=Message.objects.all(), source='reply_to', write_only=True, required=False, allow_null=True
+    )
+
     class Meta:
         model = Message
-        fields = ['text', 'attachment']
+        fields = ['text', 'attachment', 'reply_to_id']
         extra_kwargs = {
             'text': {'required': False},
             'attachment': {'required': False}
@@ -105,7 +159,8 @@ class CreateMessageSerializer(serializers.ModelSerializer):
             conversation=conversation,
             sender=sender,
             text=validated_data.get('text', ''),
-            attachment=validated_data.get('attachment')
+            attachment=validated_data.get('attachment'),
+            reply_to=validated_data.get('reply_to')
         )
         # Notifications creation is handled by signal or view
         return message

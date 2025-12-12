@@ -9,6 +9,9 @@ import {
   addReaction,
   getUnreadCount,
   markNotificationAsRead,
+  deleteConversation,
+  deleteMessageForMe,
+  deleteMessageForEveryone,
 } from '@/api/communications';
 
 export function useConversations() {
@@ -128,6 +131,38 @@ export function useMarkNotificationAsRead() {
     mutationFn: (notificationId: string) => markNotificationAsRead(notificationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: number) => deleteConversation(conversationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+}
+
+export function useDeleteMessageForMe() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (messageId: number) => deleteMessageForMe(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+    },
+  });
+}
+
+export function useDeleteMessageForEveryone() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (messageId: number) => deleteMessageForEveryone(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
     },
   });
 }

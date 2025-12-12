@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { messagingService, Conversation } from '../../api/messaging';
+import { messagingService, Conversation } from '@/api/communications';
 import { useWebSocket } from '../../contexts/WebSocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -19,8 +19,10 @@ const ConversationList: React.FC<ConversationListProps> = ({ onSelectConversatio
 
     const fetchConversations = async () => {
         try {
+            console.log('[ConversationList] Fetching conversations...');
             setLoading(true);
             const data = await messagingService.getConversations();
+            console.log('[ConversationList] Received conversations:', data.length, data);
             setConversations(data);
         } catch (error) {
             console.error("Failed to load conversations", error);
@@ -30,6 +32,7 @@ const ConversationList: React.FC<ConversationListProps> = ({ onSelectConversatio
     };
 
     useEffect(() => {
+        console.log('[ConversationList] Component mounted, fetching...');
         fetchConversations();
     }, []);
 

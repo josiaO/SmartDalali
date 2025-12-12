@@ -19,7 +19,8 @@ class Conversation(models.Model):
     class Meta:
         app_label = 'communications'
         ordering = ['-updated_at']
-        unique_together = ['user', 'agent', 'property']
+        # Removed unique_together to allow multiple conversation threads
+        # Users can have fresh conversations after deleting old ones
     
     hidden_by = models.ManyToManyField(User, related_name='hidden_conversations', blank=True)
 
@@ -30,16 +31,50 @@ class Conversation(models.Model):
 class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
-    text = models.TextField()
+    text = models.TextField()  # Legacy plaintext field
+    text_encrypted = models.TextField(null=True, blank=True)  # Encrypted message content
+    is_encrypted = models.BooleanField(default=False)  # Flag to indicate if message is encrypted
     attachment = models.FileField(upload_to='message_attachments/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     read_at = models.DateTimeField(null=True, blank=True)
+    reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
     is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     hidden_by = models.ManyToManyField(User, related_name='hidden_messages', blank=True)
 
     class Meta:
         ordering = ['created_at']
         app_label = 'communications'
+    
+    def save(self, *args, **kwargs):
+        """Auto-encrypt message text on save"""
+        if self.text and not self.is_encrypted:
+            try:
+                from .encryption import get_encryptor
+                encryptor = get_encryptor()
+                self.text_encrypted = encryptor.encrypt(self.text)
+                self.is_encrypted = True
+            except Exception as e:
+                # Log error but don't fail the save
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to encrypt message: {e}")
+        super().save(*args, **kwargs)
+    
+    @property
+    def decrypted_text(self):
+        """Get decrypted message text"""
+        if self.is_encrypted and self.text_encrypted:
+            try:
+                from .encryption import get_encryptor
+                encryptor = get_encryptor()
+                return encryptor.decrypt(self.text_encrypted)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to decrypt message: {e}")
+                return "[Encrypted message]"
+        return self.text
 
     def __str__(self):
         return f"Message from {self.sender.username}"

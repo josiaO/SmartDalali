@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Conversation } from '../../api/messaging';
+import { Conversation } from '@/api/communications';
 import { ArrowLeft, MapPin, Trash2, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

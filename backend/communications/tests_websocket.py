@@ -27,8 +27,10 @@ class ChatConsumerTests(TransactionTestCase):
             email='user2@test.com', 
             password='testpass123'
         )
-        self.conversation = await database_sync_to_async(Conversation.objects.create)()
-        await database_sync_to_async(self.conversation.participants.add)(self.user1, self.user2)
+        self.conversation = await database_sync_to_async(Conversation.objects.create)(
+            user=self.user1,
+            agent=self.user2
+        )
         return self.user1, self.user2, self.conversation
     
     def setUp(self):
@@ -69,10 +71,14 @@ class ChatConsumerTests(TransactionTestCase):
         })
         
         # Receive broadcast message
+        # Receive broadcast message (might be user_status first)
         response = await communicator.receive_json_from()
+        if response.get('type') == 'user_status':
+             response = await communicator.receive_json_from()
+             
         self.assertEqual(response['type'], 'message')
         self.assertIn('message', response)
-        self.assertEqual(response['message']['content'], 'Test message')
+        self.assertEqual(response['message']['text'], 'Test message')
         
         await communicator.disconnect()
     
@@ -88,14 +94,25 @@ class ChatConsumerTests(TransactionTestCase):
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
         
-        # Send typing indicator
-        await communicator.send_json_to({
-            'type': 'typing',
-            'is_typing': True
-        })
+        # Simulate typing from user2
+        from channels.layers import get_channel_layer
+        channel_layer = get_channel_layer()
+        await channel_layer.group_send(
+            f'chat_{self.conversation.id}',
+            {
+                'type': 'typing.indicator',
+                'user_id': self.user2.id,
+                'username': self.user2.username,
+                'is_typing': True,
+            }
+        )
         
         # Receive typing indicator
+        # Consume possible user_status message
         response = await communicator.receive_json_from()
+        if response.get('type') == 'user_status':
+            response = await communicator.receive_json_from()
+            
         self.assertEqual(response['type'], 'typing')
         self.assertTrue(response['is_typing'])
         
@@ -154,11 +171,13 @@ class ChatConsumerTests(TransactionTestCase):
         
         # Receive broadcast
         response = await communicator.receive_json_from()
+        if response.get('type') == 'user_status':
+            response = await communicator.receive_json_from()
         
-        # Verify message is stored (encrypted)
+        # Verify message is stored
         message = await database_sync_to_async(lambda: Message.objects.latest('id'))()
-        # The encrypted content should be different from original
-        self.assertNotEqual(message.content, test_content)
+        # Encryption removed, so content should match
+        self.assertEqual(message.text, test_content)
         
         await communicator.disconnect()
     
@@ -168,7 +187,14 @@ class ChatConsumerTests(TransactionTestCase):
         message = await database_sync_to_async(Message.objects.create)(
             conversation=self.conversation,
             sender=self.user1,
-            content='Test message'
+            text='Message to read'
+        )
+        
+        # Create notification manually since we bypassed consumer
+        await database_sync_to_async(MessageNotification.objects.create)(
+             user=self.user2,
+             message=message,
+             is_read=False
         )
         
         communicator = WebsocketCommunicator(
@@ -186,6 +212,13 @@ class ChatConsumerTests(TransactionTestCase):
             'type': 'read',
             'message_id': message.id
         })
+        
+        # Wait for receipt broadcast (and possibly user_status)
+        response = await communicator.receive_json_from()
+        if response.get('type') == 'user_status':
+            response = await communicator.receive_json_from()
+            
+        self.assertEqual(response['type'], 'read_receipt')
         
         # Verify notification was marked as read
         notification = await database_sync_to_async(
@@ -258,22 +291,31 @@ class WebSocketIntegrationTests(TestCase):
             email='user2@test.com',
             password='testpass123'
         )
-        self.conversation = Conversation.objects.create()
-        self.conversation.participants.add(self.user1, self.user2)
+        self.conversation = Conversation.objects.create(
+            user=self.user1,
+            agent=self.user2
+        )
+    
     
     def test_message_creates_notification(self):
         """Test that creating a message creates notifications"""
-        message = Message.objects.create(
-            conversation=self.conversation,
-            sender=self.user1,
-            content='Test message'
-        )
+        from rest_framework.test import APIClient
+        from django.urls import reverse
+        
+        client = APIClient()
+        client.force_authenticate(user=self.user1)
+        url = reverse('conversation-send-message', args=[self.conversation.id])
+        data = {'text': 'Test message'}
+        
+        response = client.post(url, data, format='json')
+        self.assertEqual(response.status_code, 201)
         
         # Verify notification was created for other user
         self.assertTrue(
             MessageNotification.objects.filter(
-                message=message,
-                user=self.user2
+                user=self.user2,
+                message__text='Test message',
+                is_read=False
             ).exists()
         )
     

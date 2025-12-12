@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ConversationList from '../../components/messaging/ConversationList';
 import ChatRoom from '../../components/messaging/ChatRoom';
-import { messagingService, Conversation } from '../../api/messaging';
+import { messagingService, Conversation } from '@/api/communications';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -12,6 +12,20 @@ const ConversationsPage = () => {
   const { user } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleConversationDeleted = () => {
+    console.log('[Conversations] Conversation deleted, refreshing list. Current key:', refreshKey);
+    setRefreshKey(prev => prev + 1);
+    setSelectedConversation(null);
+
+    // CRITICAL: Clear location state to prevent startConversation from re-creating
+    // the conversation on page reload
+    if (location.state) {
+      console.log('[Conversations] Clearing location state to prevent recreation');
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  };
 
   // Check for "start conversation" intent from other pages
   useEffect(() => {
@@ -21,11 +35,15 @@ const ConversationsPage = () => {
       if (state?.recipientId) {
         try {
           setLoading(true);
+          console.log('[Conversations] Starting conversation with recipient:', state.recipientId, 'property:', state.propertyId);
+
+          // Clear state BEFORE making the API call to prevent re-triggering
+          navigate(location.pathname, { replace: true, state: null });
+
           const convo = await messagingService.startConversation(state.recipientId, state.propertyId);
+          console.log('[Conversations] Received conversation:', convo);
           setSelectedConversation(convo);
-          // Clear state so refresh doesn't re-trigger? 
-          // Actually navigating to same path cleans state typically, but good to be safe.
-          // We can replace historyState if needed, but likely fine.
+          console.log('[Conversations] Set selected conversation to:', convo?.id);
         } catch (error) {
           console.error("Failed to start conversation", error);
         } finally {
@@ -36,6 +54,21 @@ const ConversationsPage = () => {
 
     initConversation();
   }, [location.state]);
+
+  // Clear selected conversation if it no longer exists in the list
+  useEffect(() => {
+    // This effect runs when refreshKey changes (after deletion)
+    // If we have a selected conversation but the list is being refreshed,
+    // we should wait for the list to load and verify the conversation still exists
+    if (selectedConversation) {
+      // Reset selection - let user reselect from the fresh list
+      const timer = setTimeout(() => {
+        console.log('[Conversations] Clearing stale selection after refresh');
+        setSelectedConversation(null);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [refreshKey]);
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -62,6 +95,7 @@ const ConversationsPage = () => {
         </div>
         <div className="flex-1 overflow-y-auto">
           <ConversationList
+            key={refreshKey}
             onSelectConversation={handleSelectConversation}
             selectedId={selectedConversation?.id}
           />
@@ -74,6 +108,7 @@ const ConversationsPage = () => {
           <ChatRoom
             conversation={selectedConversation}
             onBack={handleBack}
+            onConversationDeleted={handleConversationDeleted}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 text-slate-400">

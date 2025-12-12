@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { RateAgentDialog } from '@/components/agent/RateAgentDialog';
 import { Star } from 'lucide-react';
-import { BookVisitDialog } from '@/components/properties/BookVisitDialog';
+// import { BookVisitDialog } from '@/components/properties/BookVisitDialog'; // HIDDEN
 import { formatTZS } from '@/lib/currency';
 import { ShareButton } from '@/components/common/ShareButton';
 
@@ -344,11 +344,11 @@ export default function PropertyDetails() {
                       <MessageSquare className="mr-2 h-4 w-4" />
                       Message Agent
                     </Button>
-                    <BookVisitDialog
+                    {/* <BookVisitDialog
                       propertyId={Number(property.id)}
                       propertyTitle={property.title}
                       trigger={<Button variant="outline" className="w-full">Schedule Visit</Button>}
-                    />
+                    /> */}
                     {user && (
                       <RateAgentDialog
                         agentId={Number(property.agent.id)}

@@ -43,7 +43,11 @@ export function useSendMessage() {
       content: string;
       attachments?: File[];
       parentMessageId?: number;
-    }) => sendMessage(conversationId, content, attachments, parentMessageId),
+    }) => sendMessage(
+      conversationId,
+      { content, attachments },
+      parentMessageId
+    ),
     onMutate: async (newMsg) => {
       await queryClient.cancelQueries({ queryKey: ['messages', newMsg.conversationId] });
 
@@ -149,7 +153,8 @@ export function useDeleteMessageForMe() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (messageId: number) => deleteMessageForMe(messageId),
+    mutationFn: ({ conversationId, messageId }: { conversationId: number; messageId: number }) =>
+      deleteMessageForMe(conversationId, messageId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages'] });
     },

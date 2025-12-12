@@ -7,6 +7,16 @@ import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { FeatureGate } from '../common/FeatureGate';
 import NotificationBell from '../ui/NotificationBell';
@@ -15,6 +25,7 @@ export function PublicHeader() { // Recompile trigger
   const { isAuthenticated, user, logout } = useAuth();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
     <>
@@ -136,7 +147,7 @@ export function PublicHeader() { // Recompile trigger
                           variant="outline"
                           className="w-full gap-2"
                           onClick={() => {
-                            logout();
+                            setShowLogoutDialog(true);
                             setIsOpen(false);
                           }}
                         >
@@ -180,7 +191,7 @@ export function PublicHeader() { // Recompile trigger
                       {user.role === 'admin' ? 'Admin' : user.role === 'agent' ? 'Agent' : 'User'}
                     </span>
                   )}
-                  <Button variant="ghost" size="sm" onClick={logout} className="gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowLogoutDialog(true)} className="gap-2">
                     <LogOut className="h-4 w-4" />
                     {t('nav.logout')}
                   </Button>
@@ -199,6 +210,27 @@ export function PublicHeader() { // Recompile trigger
           </div>
         </div>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('nav.logout_confirm_title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('nav.logout_confirm_message')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowLogoutDialog(false);
+              logout();
+            }}>
+              {t('nav.logout')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }

@@ -114,7 +114,10 @@ class SerializerProperty(serializers.ModelSerializer):
         return None
 
     def get_maps_url(self, obj):
-        lat, lng = obj.get_lat_lng()
+        result = obj.get_lat_lng()
+        if result is None:
+            return None
+        lat, lng = result
         if lat and lng:
             return build_maps_url(lat, lng)
         return None

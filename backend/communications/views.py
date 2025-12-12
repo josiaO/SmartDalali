@@ -120,8 +120,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
             if serializer.is_valid():
                 message = serializer.save()
                 
-                # Note: We do NOT unhide conversations here
-                # Deleted conversations stay deleted even when new messages arrive
+                # Unhide conversation for the receiver when new message arrives
+                # This ensures conversations reappear when you get a new message
+                other_participant = self._get_other_participant(request.user, conversation)
+                conversation.hidden_by.remove(other_participant)
                 
                 # Send notifications to other participant
                 notification_service = get_notification_service()

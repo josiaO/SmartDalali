@@ -27,6 +27,16 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 import { useFeatures } from '@/hooks/useFeatures';
@@ -47,6 +57,7 @@ export function DashboardSidebar() {
   const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const { isEnabled } = useFeatures();
 
   // Define menu items with role-based visibility
@@ -265,13 +276,34 @@ export function DashboardSidebar() {
         <Button
           variant="ghost"
           className={cn("w-full", (isCollapsed && !isMobile) ? "justify-center px-2" : "justify-start")}
-          onClick={logout}
+          onClick={() => setShowLogoutDialog(true)}
           title={(isCollapsed && !isMobile) ? t('nav.logout') : undefined}
         >
           <LogOut className="h-4 w-4 flex-shrink-0" />
           {(!isCollapsed || isMobile) && <span className="ml-2">{t('nav.logout')}</span>}
         </Button>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('nav.logout_confirm_title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('nav.logout_confirm_message')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowLogoutDialog(false);
+              logout();
+            }}>
+              {t('nav.logout')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 

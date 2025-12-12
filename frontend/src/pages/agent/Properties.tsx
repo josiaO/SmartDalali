@@ -25,17 +25,18 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProperties, useDeleteProperty } from '@/hooks/useProperties';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Search, Edit, Trash2, Eye, Lock } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Lock, MessageSquare } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useSubscription } from '@/hooks/useSubscription';
 import { checkPermission, FEATURES } from '@/lib/permissions';
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useMessageNavigation } from '@/hooks/useMessageNavigation';
 
 export default function AgentProperties() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const { user } = useAuth();
   const { hasActiveSubscription } = useSubscription();
@@ -45,6 +46,7 @@ export default function AgentProperties() {
   });
   const deleteProperty = useDeleteProperty();
   const { toast } = useToast();
+  const { navigateToMessage, isLoading: isLoadingMessage } = useMessageNavigation();
 
   const canCreateProperty = checkPermission(
     FEATURES.CREATE_PROPERTY,
@@ -156,41 +158,44 @@ export default function AgentProperties() {
         </Alert>
       )}
 
+      {/* Search and Filter Section - Sticky */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-            <CardTitle>All Listings ({filteredProperties.length})</CardTitle>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by title or location..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="for_sale">For Sale</SelectItem>
-                  <SelectItem value="for_rent">For Rent</SelectItem>
-                  <SelectItem value="sold">Sold</SelectItem>
-                  <SelectItem value="rented">Rented</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <CardTitle>All Listings ({filteredProperties.length})</CardTitle>
         </CardHeader>
-
         <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by title or location..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="for_sale">For Sale</SelectItem>
+                <SelectItem value="for_rent">For Rent</SelectItem>
+                <SelectItem value="sold">Sold</SelectItem>
+                <SelectItem value="rented">Rented</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results Table - Scrollable */}
+      <Card>
+        <CardContent className="p-0">
           {filteredProperties.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 px-4">
               <p className="text-muted-foreground mb-4">
                 {search || statusFilter !== 'all'
                   ? 'No properties found matching your filters'
@@ -206,9 +211,9 @@ export default function AgentProperties() {
               )}
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead>Property</TableHead>
                     <TableHead>Location</TableHead>
@@ -223,9 +228,9 @@ export default function AgentProperties() {
                     <TableRow key={property.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {property.images?.[0] && (
+                          {property.main_image_url && (
                             <img
-                              src={property.images[0]?.image}
+                              src={property.main_image_url}
                               alt={property.title}
                               className="h-12 w-16 object-cover rounded"
                             />
@@ -255,7 +260,7 @@ export default function AgentProperties() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <p className="capitalize">{property.property_type}</p>
+                        <p className="capitalize">{property.type}</p>
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(property.status)}
@@ -267,6 +272,20 @@ export default function AgentProperties() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
+                          {property.owner && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigateToMessage(
+                                typeof property.owner === 'number' ? property.owner : property.owner.id,
+                                property
+                              )}
+                              disabled={isLoadingMessage}
+                              title="Message about this property"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          )}
                           {canEditProperty.allowed ? (
                             <Link to={`/properties/${property.id}/edit`}>
                               <Button variant="ghost" size="sm">
@@ -286,7 +305,7 @@ export default function AgentProperties() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setDeleteId(property.id)}
+                            onClick={() => setDeleteId(Number(property.id))}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>

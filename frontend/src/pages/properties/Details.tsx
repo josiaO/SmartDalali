@@ -342,7 +342,7 @@ export default function PropertyDetails() {
                   <div className="space-y-2 pt-4">
                     <Button onClick={handleMessageAgent} className="w-full">
                       <MessageSquare className="mr-2 h-4 w-4" />
-                      Message Agent
+                      Chat about this Property
                     </Button>
                     {/* <BookVisitDialog
                       propertyId={Number(property.id)}

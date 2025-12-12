@@ -1,12 +1,5 @@
 // Helper functions for the application
 
-export function formatCurrency(amount: number, currency: string = 'KES'): string {
-  return new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency,
-  }).format(amount);
-}
-
 export function formatDate(date: string | Date): string {
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',

@@ -268,7 +268,7 @@ export default function Home() {
             </div>
             <Link to="/properties">
               <Button variant="outline" className="hidden md:flex items-center gap-2">
-                {t('common.view_all')}
+                {t('dashboard.view_all')}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -316,7 +316,7 @@ export default function Home() {
           <div className="mt-8 text-center md:hidden">
             <Link to="/properties">
               <Button variant="outline" className="w-full">
-                {t('common.view_all')}
+                {t('dashboard.view_all')}
               </Button>
             </Link>
           </div>

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Search, Send, MessageSquare, Paperclip, Smile, MoreVertical,
   File, Image as ImageIcon, X, Reply, Check, CheckCheck,
-  Video, Play, ArrowLeft, Delete, Trash2
+  Video, Play, ArrowLeft, Delete, Trash2, Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -31,12 +31,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
+import { communicationService } from '@/api/communications';
+import { PropertyChatCard } from '@/components/messaging/PropertyChatCard';
 import {
   Message,
   Conversation,
   fetchConversations,
   fetchMessages,
-  sendMessage,
 } from '@/api/communications';
 
 export default function AgentMessages() {
@@ -48,6 +49,7 @@ export default function AgentMessages() {
   const [isTyping, setIsTyping] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [showConversations, setShowConversations] = useState(true); // For mobile toggle
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -59,6 +61,7 @@ export default function AgentMessages() {
 
   const { data: conversations, isLoading: loadingConversations } = useConversations();
   const { data: messages, isLoading: loadingMessages } = useMessages(selectedConversationId || 0);
+  const sendMessageMutation = useSendMessage();
   const deleteConversation = useDeleteConversation();
   const deleteMessageForMe = useDeleteMessageForMe();
   const deleteMessageForEveryone = useDeleteMessageForEveryone();
@@ -73,7 +76,10 @@ export default function AgentMessages() {
       }
     } else {
       if (confirm('Delete this message for yourself?')) {
-        deleteMessageForMe.mutate(messageId, {
+        deleteMessageForMe.mutate({
+          conversationId: selectedConversationId!,
+          messageId
+        }, {
           onSuccess: () => toast({ title: 'Message deleted for you' }),
           onError: () => toast({ title: 'Failed to delete message', variant: 'destructive' }),
         });
@@ -217,10 +223,11 @@ export default function AgentMessages() {
         formData.append('attachments', file);
       });
 
-      await sendMessage.mutateAsync({
+      await sendMessageMutation.mutateAsync({
         conversationId: selectedConversationId,
         content: messageText.trim(),
-        parentMessageId: replyingTo?.id, // Pass parentMessageId here
+        attachments: selectedFiles.length > 0 ? selectedFiles : undefined,
+        parentMessageId: replyingTo?.id,
       });
 
       setMessageText('');
@@ -306,17 +313,23 @@ export default function AgentMessages() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Messages</h1>
-        <p className="text-muted-foreground">
-          Connect with potential buyers and renters
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Messages</h1>
+          <p className="text-muted-foreground">
+            Connect with potential buyers and renters
+          </p>
+        </div>
       </div>
 
-      <Card className="h-[calc(100vh-200px)]">
-        <div className="grid md:grid-cols-[380px_1fr] h-full">
+      <Card className="h-[calc(100vh-200px)] overflow-hidden">
+        <div className="grid md:grid-cols-[380px_1fr] h-full relative">
           {/* Conversations List */}
-          <div className="border-r">
+          <div className={cn(
+            "border-r transition-all duration-300 ease-in-out",
+            "md:block",
+            showConversations ? "block" : "hidden md:block"
+          )}>
             <CardHeader>
               <CardTitle className="text-lg">Conversations</CardTitle>
               <div className="relative mt-4">
@@ -346,10 +359,15 @@ export default function AgentMessages() {
                     return (
                       <button
                         key={conversation.id}
-                        onClick={() => setSelectedConversationId(conversation.id)}
+                        onClick={() => {
+                          setSelectedConversationId(conversation.id);
+                          setShowConversations(false); // Hide on mobile when conversation selected
+                        }}
                         className={cn(
-                          'w-full text-left p-3 rounded-lg hover:bg-muted transition-colors',
-                          isSelected && 'bg-muted'
+                          'w-full text-left p-3 rounded-lg transition-all duration-200',
+                          'hover:bg-gradient-to-r hover:from-accent/50 hover:to-transparent',
+                          'hover:shadow-sm hover:translate-x-1',
+                          isSelected && 'bg-gradient-to-r from-primary/10 to-transparent border-l-2 border-primary shadow-sm'
                         )}
                       >
                         <div className="flex items-start gap-3">
@@ -408,6 +426,23 @@ export default function AgentMessages() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Property Context - Compact Mode */}
+                        {conversation.property && typeof conversation.property === 'object' && conversation.property !== null && (
+                          <div className="mt-2">
+                            <PropertyChatCard
+                              property={{
+                                id: typeof conversation.property === 'number' ? conversation.property : (conversation.property?.id ?? 0),
+                                title: conversation.property_title || 'Property',
+                                price: 0,
+                                city: '',
+                                primary_image: conversation.property_image,
+                                status: 'active',
+                              }}
+                              compact
+                            />
+                          </div>
+                        )}
                       </button>
                     );
                   })
@@ -417,13 +452,26 @@ export default function AgentMessages() {
           </div>
 
           {/* Messages Panel */}
-          <div className="flex flex-col">
+          <div className={cn(
+            "flex flex-col",
+            "md:block",
+            !showConversations ? "block" : "hidden md:block"
+          )}>
             {selectedConversationId && selectedConversation ? (
               <>
                 {/* Chat Header */}
-                <CardHeader className="border-b">
+                <CardHeader className="border-b bg-gradient-to-r from-background to-accent/5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                      {/* Mobile back button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="md:hidden"
+                        onClick={() => setShowConversations(true)}
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
                       <Avatar>
                         {selectedConversation.other_participant?.avatar && (
                           <AvatarImage src={selectedConversation.other_participant.avatar} />
@@ -443,6 +491,22 @@ export default function AgentMessages() {
                         )}
                       </div>
                     </div>
+
+                    {/* Property Context Card */}
+                    {selectedConversation.property && typeof selectedConversation.property === 'object' && (
+                      <div className="px-4 pb-3">
+                        <PropertyChatCard
+                          property={{
+                            id: typeof selectedConversation.property === 'number' ? selectedConversation.property : (selectedConversation.property?.id ?? 0),
+                            title: selectedConversation.property_title || 'Property',
+                            price: 0,
+                            city: '',
+                            primary_image: selectedConversation.property_image,
+                            status: 'active',
+                          }}
+                        />
+                      </div>
+                    )}
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -512,10 +576,11 @@ export default function AgentMessages() {
 
                               <div
                                 className={cn(
-                                  'max-w-[70%] rounded-lg p-3 relative',
+                                  'max-w-[85%] md:max-w-[70%] rounded-lg p-3 relative',
+                                  'transition-all duration-200',
                                   isOwn
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted',
+                                    ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-md'
+                                    : 'bg-gradient-to-br from-muted to-muted/50 shadow-sm',
                                   isDeleted && 'bg-muted/50 text-muted-foreground italic border border-dashed'
                                 )}
                               >
@@ -660,11 +725,11 @@ export default function AgentMessages() {
 
                       {/* Typing indicator */}
                       {isTyping && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground animate-fade-in">
                           <div className="flex gap-1">
-                            <span className="animate-bounce">●</span>
-                            <span className="animate-bounce delay-100">●</span>
-                            <span className="animate-bounce delay-200">●</span>
+                            <span className="animate-bounce" style={{ animationDelay: '0ms' }}>●</span>
+                            <span className="animate-bounce" style={{ animationDelay: '150ms' }}>●</span>
+                            <span className="animate-bounce" style={{ animationDelay: '300ms' }}>●</span>
                           </div>
                           {selectedConversation.other_participant?.username} is typing...
                         </div>
@@ -674,7 +739,7 @@ export default function AgentMessages() {
                 </ScrollArea>
 
                 {/* Message Input */}
-                <div className="border-t p-4">
+                <div className="border-t p-3 md:p-4 bg-gradient-to-br from-background to-accent/5">
                   {/* Reply indicator */}
                   {replyingTo && (
                     <div className="mb-2 p-2 bg-muted rounded flex items-center justify-between">
@@ -731,9 +796,10 @@ export default function AgentMessages() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="flex-shrink-0 h-10 w-10 md:h-9 md:w-9"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <Paperclip className="h-4 w-4" />
+                      <Paperclip className="h-5 w-5 md:h-4 md:w-4" />
                     </Button>
                     <Input
                       placeholder="Type your message..."
@@ -748,16 +814,17 @@ export default function AgentMessages() {
                           handleSendMessage(e);
                         }
                       }}
-                      className="flex-1"
+                      className="flex-1 h-10 md:h-9 text-base md:text-sm"
                     />
                     <Button
                       type="submit"
                       disabled={
                         (!messageText.trim() && selectedFiles.length === 0) ||
-                        sendMessage.isPending
+                        sendMessageMutation.isPending
                       }
+                      className="flex-shrink-0 h-10 w-10 md:h-9 md:w-auto md:px-4"
                     >
-                      <Send className="h-4 w-4" />
+                      <Send className="h-5 w-5 md:h-4 md:w-4" />
                     </Button>
                   </form>
                   <p className="text-xs text-muted-foreground mt-2">

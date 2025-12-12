@@ -85,7 +85,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
         const wsUrl = `${protocol}//${host}/ws/chat/${conversation.id}/?token=${token}`;
         const ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => console.log(`Connected to chat ${conversation.id}`);
+        ws.onopen = () => {
+            console.log(`Connected to chat ${conversation.id}`);
+            setIsOnline(true);
+        };
 
         ws.onmessage = (event) => {
             try {
@@ -110,18 +113,35 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                     setIsOnline(data.is_online);
                 } else if (data.type === 'typing') {
                     setIsTyping(data.is_typing);
+                } else if (data.type === 'error') {
+                    toast.error(data.message || 'WebSocket error');
                 }
             } catch (e) {
                 console.error("WS Parse error", e);
             }
         };
 
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            setIsOnline(false);
+        };
+
+        ws.onclose = () => {
+            console.log(`Disconnected from chat ${conversation.id}`);
+            setIsOnline(false);
+        };
+
         socketRef.current = ws;
 
         return () => {
-            if (ws.readyState === WebSocket.OPEN) ws.close();
+            // CRITICAL: Proper cleanup to prevent memory leaks
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                ws.close();
+            }
+            setIsOnline(false);
+            socketRef.current = null;
         };
-    }, [conversation.id]);
+    }, [conversation.id, user]);
 
     useEffect(() => {
         scrollToBottom();
@@ -272,7 +292,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
     }
 
     return (
-        <div className="flex flex-col h-full bg-background relative overflow-hidden transition-colors duration-300">
+        <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-background relative overflow-hidden transition-colors duration-300">
             {/* Ultra-Smart Header */}
             <SmartHeader
                 conversation={conversation}
@@ -385,6 +405,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
+                            maxLength={5000}
                             className="w-full bg-muted/50 border-transparent focus:border-ring focus:bg-background text-foreground placeholder:text-muted-foreground rounded-2xl px-4 py-3 max-h-32 focus:ring-2 focus:ring-ring/20 resize-none overflow-y-auto transition-all duration-300 shadow-inner"
                             rows={1}
                             onKeyDown={(e) => {

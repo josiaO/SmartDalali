@@ -148,7 +148,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isMe, sho
                     <span>{formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}</span>
                     {isMe && (
                         <span className="flex items-center ml-1">
-                            {(message as any).status === 'pending' ? (
+                            {message.status === 'pending' ? (
                                 <Clock className="w-3 h-3 animate-pulse" />
                             ) : message.read_at ? (
                                 <CheckCheck className="w-3.5 h-3.5 text-accent" />

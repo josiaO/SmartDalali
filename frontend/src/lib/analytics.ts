@@ -97,7 +97,7 @@ export const trackQuickWinAction = (actionType: string, actionTitle: string) => 
 };
 
 // Set user properties
-export const setAnalyticsUser = (userId: string, userProperties?: Record<string, any>) => {
+export const setAnalyticsUser = (userId: string, userProperties?: Record<string, unknown>) => {
     setUserId(analytics, userId);
     if (userProperties) {
         setUserProperties(analytics, userProperties);
@@ -105,7 +105,7 @@ export const setAnalyticsUser = (userId: string, userProperties?: Record<string,
 };
 
 // Generic event tracker
-export const trackCustomEvent = (eventName: string, params?: Record<string, any>) => {
+export const trackCustomEvent = (eventName: string, params?: Record<string, unknown>) => {
     logEvent(analytics, eventName, {
         ...params,
         timestamp: new Date().toISOString(),

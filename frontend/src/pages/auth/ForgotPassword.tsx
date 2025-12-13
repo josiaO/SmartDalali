@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -26,12 +27,26 @@ export default function ForgotPassword() {
         title: 'Email Sent',
         description: 'Check your inbox for password reset instructions',
       });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.detail || 'Failed to send reset email',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        toast({
+          title: 'Error',
+          description: error.response?.data?.detail || 'Failed to send reset email',
+          variant: 'destructive',
+        });
+      } else if (error instanceof Error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to send reset email',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to send reset email',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }

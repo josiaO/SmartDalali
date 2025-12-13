@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Search, Send, MessageSquare, Paperclip, Smile, MoreVertical,
   File, Image as ImageIcon, X, Reply, Check, CheckCheck,
-  Video, Play, ArrowLeft, Delete, Trash2, Menu
+  ArrowLeft, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -31,14 +31,14 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
-import { communicationService } from '@/api/communications';
-import { PropertyChatCard } from '@/components/messaging/PropertyChatCard';
 import {
   Message,
   Conversation,
-  fetchConversations,
-  fetchMessages,
+  communicationService,
 } from '@/api/communications';
+import { PropertyChatCard } from '@/components/messaging/PropertyChatCard';
+import { PropertySelector } from '@/components/messaging/PropertySelector';
+import { Property } from '@/api/properties';
 
 export default function AgentMessages() {
   const { user } = useAuth();
@@ -65,6 +65,7 @@ export default function AgentMessages() {
   const deleteConversation = useDeleteConversation();
   const deleteMessageForMe = useDeleteMessageForMe();
   const deleteMessageForEveryone = useDeleteMessageForEveryone();
+  const [updatingProperty, setUpdatingProperty] = useState(false);
 
   const handleMessageDelete = (messageId: number, type: 'me' | 'everyone') => {
     if (type === 'everyone') {
@@ -87,7 +88,11 @@ export default function AgentMessages() {
     }
   };
 
-  const conversationsList = Array.isArray(conversations) ? conversations : (conversations as any)?.results || [];
+  const conversationsList = Array.isArray(conversations) 
+    ? conversations 
+    : (conversations && typeof conversations === 'object' && 'results' in conversations)
+      ? (conversations as { results: Conversation[] }).results
+      : [];
   const selectedConversation = conversationsList.find((c: Conversation) => c.id === selectedConversationId);
 
   // WebSocket connection with reconnection logic
@@ -109,7 +114,6 @@ export default function AgentMessages() {
       );
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
         setIsConnected(true);
         reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
       };
@@ -132,14 +136,12 @@ export default function AgentMessages() {
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
         setIsConnected(false);
 
         // Attempt to reconnect with exponential backoff
         const maxAttempts = 5;
         if (reconnectAttemptsRef.current < maxAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxAttempts})`);
 
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current += 1;
@@ -280,6 +282,70 @@ export default function AgentMessages() {
       });
     } catch (error) {
       console.error('Failed to add reaction:', error);
+    }
+  };
+
+  const handleAttachProperty = async (property: Property) => {
+    if (!selectedConversationId) return;
+
+    try {
+      setUpdatingProperty(true);
+      await communicationService.updateConversationProperty(
+        selectedConversationId,
+        parseInt(property.id)
+      );
+      
+      // Invalidate queries to refresh conversation data
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversationId] });
+      
+      toast({
+        title: 'Property attached',
+        description: `Property "${property.title}" has been attached to this conversation`,
+      });
+    } catch (error) {
+      console.error('Failed to attach property:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to attach property. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingProperty(false);
+    }
+  };
+
+  const handleRemoveProperty = async () => {
+    if (!selectedConversationId) return;
+
+    if (!confirm('Are you sure you want to remove the attached property from this conversation?')) {
+      return;
+    }
+
+    try {
+      setUpdatingProperty(true);
+      await communicationService.updateConversationProperty(
+        selectedConversationId,
+        null
+      );
+      
+      // Invalidate queries to refresh conversation data
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversationId] });
+      
+      toast({
+        title: 'Property removed',
+        description: 'Property has been removed from this conversation',
+      });
+    } catch (error) {
+      console.error('Failed to remove property:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove property. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingProperty(false);
     }
   };
 
@@ -428,21 +494,30 @@ export default function AgentMessages() {
                         </div>
 
                         {/* Property Context - Compact Mode */}
-                        {conversation.property && typeof conversation.property === 'object' && conversation.property !== null && (
-                          <div className="mt-2">
-                            <PropertyChatCard
-                              property={{
-                                id: typeof conversation.property === 'number' ? conversation.property : (conversation.property?.id ?? 0),
-                                title: conversation.property_title || 'Property',
-                                price: 0,
-                                city: '',
-                                primary_image: conversation.property_image,
-                                status: 'active',
-                              }}
-                              compact
-                            />
-                          </div>
-                        )}
+                        {(() => {
+                          const prop = conversation.property;
+                          if (prop && typeof prop === 'object' && prop !== null) {
+                            const propObj = prop as { id?: number };
+                            if ('id' in propObj && propObj.id !== undefined) {
+                              return (
+                                <div className="mt-2">
+                                  <PropertyChatCard
+                                    property={{
+                                      id: propObj.id,
+                                      title: conversation.property_title || 'Property',
+                                      price: 0,
+                                      city: '',
+                                      primary_image: conversation.property_image,
+                                      status: 'active',
+                                    }}
+                                    compact
+                                  />
+                                </div>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
                       </button>
                     );
                   })
@@ -492,21 +567,150 @@ export default function AgentMessages() {
                       </div>
                     </div>
 
-                    {/* Property Context Card */}
-                    {selectedConversation.property && typeof selectedConversation.property === 'object' && (
-                      <div className="px-4 pb-3">
-                        <PropertyChatCard
-                          property={{
-                            id: typeof selectedConversation.property === 'number' ? selectedConversation.property : (selectedConversation.property?.id ?? 0),
-                            title: selectedConversation.property_title || 'Property',
-                            price: 0,
-                            city: '',
-                            primary_image: selectedConversation.property_image,
-                            status: 'active',
-                          }}
-                        />
-                      </div>
-                    )}
+                    {/* Property Context Card - Prominently Displayed */}
+                    <div className="px-4 pb-4 space-y-2">
+                      {(() => {
+                        const prop = selectedConversation.property;
+                        if (prop && typeof prop === 'object' && prop !== null) {
+                          const propObj = prop as { id?: number };
+                          const propId = 'id' in propObj && propObj.id !== undefined ? propObj.id : undefined;
+                          return (
+                            <>
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                                    Property in Discussion
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <PropertySelector
+                                    onSelect={handleAttachProperty}
+                                    currentPropertyId={propId}
+                                    agentId={user?.id ? parseInt(user.id) : undefined}
+                                    trigger={
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        disabled={updatingProperty}
+                                      >
+                                        Change
+                                      </Button>
+                                    }
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={handleRemoveProperty}
+                                    disabled={updatingProperty}
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                              <PropertyChatCard
+                                property={{
+                                  id: propId ?? 0,
+                                  title: selectedConversation.property_title || 'Property',
+                                  price: 0,
+                                  city: '',
+                                  primary_image: selectedConversation.property_image,
+                                  status: 'active',
+                                }}
+                              />
+                            </>
+                          );
+                        } else if (typeof prop === 'number') {
+                          return (
+                            <>
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                                    Property in Discussion
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <PropertySelector
+                                    onSelect={handleAttachProperty}
+                                    currentPropertyId={prop}
+                                    agentId={user?.id ? parseInt(user.id) : undefined}
+                                    trigger={
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        disabled={updatingProperty}
+                                      >
+                                        Change
+                                      </Button>
+                                    }
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={handleRemoveProperty}
+                                    disabled={updatingProperty}
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                              <PropertyChatCard
+                                property={{
+                                  id: prop,
+                                  title: selectedConversation.property_title || 'Property',
+                                  price: 0,
+                                  city: '',
+                                  primary_image: selectedConversation.property_image,
+                                  status: 'active',
+                                }}
+                              />
+                            </>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {!selectedConversation.property && (
+                        <div className="border-2 border-dashed border-amber-300/50 dark:border-amber-700/50 rounded-xl p-4 bg-gradient-to-r from-amber-50/50 via-background to-background dark:from-amber-950/20">
+                          <div className="flex items-center justify-between mb-2 gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                <p className="text-sm font-semibold text-foreground">
+                                  No property attached to this conversation
+                                </p>
+                              </div>
+                              <p className="text-xs text-muted-foreground leading-relaxed">
+                                Attach a property to help identify what the user is inquiring about
+                              </p>
+                            </div>
+                            <PropertySelector
+                              onSelect={handleAttachProperty}
+                              agentId={user?.id ? parseInt(user.id) : undefined}
+                              trigger={
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  disabled={updatingProperty}
+                                >
+                                  Attach Property
+                                </Button>
+                              }
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Attach a property to help identify what the user is inquiring about
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

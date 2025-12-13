@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { upgradeToAgent } from '@/api/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { Building2, Phone } from 'lucide-react';
+import { AxiosError } from 'axios';
 
 interface AgentFormData {
     agency_name: string;
@@ -32,9 +33,14 @@ export default function BecomeAgent() {
             await refreshUser();
             toast.success('Successfully upgraded to Agent account!');
             navigate('/properties/create'); // Direct to action
-        } catch (error: any) {
-            console.error('Upgrade failed:', error);
-            toast.error(error.response?.data?.error || 'Failed to upgrade account');
+        } catch (error: unknown) {
+            if (error instanceof AxiosError) {
+                console.error('Upgrade failed:', error);
+                toast.error(error.response?.data?.error || 'Failed to upgrade account');
+            } else {
+                console.error('Upgrade failed:', error);
+                toast.error('Failed to upgrade account');
+            }
         } finally {
             setLoading(false);
         }
@@ -64,7 +70,7 @@ export default function BecomeAgent() {
                                     placeholder="e.g. Dream Homes Realty"
                                     className="pl-9"
                                     {...register('agency_name')}
-                                />
+                                 />
                             </div>
                             <p className="text-xs text-muted-foreground">If you work independently, you can leave this blank or use your name.</p>
                         </div>
@@ -78,7 +84,7 @@ export default function BecomeAgent() {
                                     placeholder="+255..."
                                     className="pl-9"
                                     {...register('phone', { required: 'Phone number is required' })}
-                                />
+                                 />
                             </div>
                             {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
                         </div>

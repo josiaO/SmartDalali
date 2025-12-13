@@ -26,7 +26,7 @@ daphne==4.0.0
 defusedxml==0.7.1
 dj-database-url==3.0.1
 Django==5.1
-django-allauth==0.57.0
+django-allauth==65.13.1
 django-anymail==11.1
 django-cors-headers==4.3.1
 django-filter==24.3

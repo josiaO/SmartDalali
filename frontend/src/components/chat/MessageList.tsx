@@ -3,7 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Message } from '@/api/communications';
+import { Message, MessageAttachment } from '@/api/communications';
 
 interface MessageListProps {
     messages: Message[];
@@ -52,7 +52,7 @@ export default function MessageList({ messages, isLoading, currentUserId }: Mess
         <ScrollArea className="flex-1 p-4 h-full" ref={scrollRef}>
             <div className="flex flex-col gap-4 pb-4">
                 {messages.map((message) => {
-                    const isOptimistic = (message as any).isOptimistic;
+                    const isOptimistic = message.isOptimistic;
                     // Determine if own message.
                     // Note: API `sender` is an ID.
                     const isOwn = message.sender === currentUserId || isOptimistic;
@@ -77,7 +77,7 @@ export default function MessageList({ messages, isLoading, currentUserId }: Mess
                                 {/* Attachments */}
                                 {message.attachments && message.attachments.length > 0 && (
                                     <div className="mb-2 flex flex-col gap-1">
-                                        {message.attachments.map((att: any, i: number) => (
+                                        {message.attachments.map((att: MessageAttachment, i: number) => (
                                             <div key={i} className="flex items-center gap-2 bg-black/10 p-2 rounded">
                                                 <Paperclip className="h-3 w-3" />
                                                 <span className="truncate max-w-[150px]">{att.file_name || 'Attachment'}</span>

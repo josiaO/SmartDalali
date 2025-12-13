@@ -6,6 +6,11 @@ import { Users, Shield, Star, TrendingUp, Home } from 'lucide-react';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
+interface PropertyTypeStats {
+  type: string;
+  count: number;
+}
+
 export default function Analytics() {
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
@@ -122,12 +127,12 @@ export default function Analytics() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={(entry) => `${entry.type}: ${entry.count}`}
+                  label={(entry: PropertyTypeStats) => `${entry.type}: ${entry.count}`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="count"
                 >
-                  {(propertyStatsData?.by_type || []).map((entry: any, index: number) => (
+                  {(propertyStatsData?.by_type || []).map((entry: PropertyTypeStats, index: number) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

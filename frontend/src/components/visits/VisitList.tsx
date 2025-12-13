@@ -5,6 +5,10 @@ import { VisitCard } from './VisitCard';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface FetchVisitsResponse {
+    results: Visit[];
+}
+
 export function VisitList() {
     const [visits, setVisits] = useState<Visit[]>([]);
     const [loading, setLoading] = useState(true);
@@ -14,8 +18,9 @@ export function VisitList() {
         try {
             setLoading(true);
             const data = await fetchVisits();
-            // data is Visit[] because we handled .results in api function
-            setVisits(data);
+            // Ensure data is always Visit[] (handle both array and paginated response)
+            const visitsArray = Array.isArray(data) ? data : (data as FetchVisitsResponse).results || [];
+            setVisits(visitsArray);
         } catch (error) {
             console.error('Failed to load visits:', error);
         } finally {

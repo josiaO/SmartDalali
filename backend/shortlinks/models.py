@@ -1,13 +1,13 @@
 from django.db import models
 import uuid
 import string
-import random
+import secrets
 
 def generate_short_code():
     length = 6
     chars = string.ascii_letters + string.digits
     while True:
-        code = ''.join(random.choices(chars, k=length))
+        code = ''.join(secrets.choice(chars) for _ in range(length))
         if not ShortLink.objects.filter(code=code).exists():
             return code
 

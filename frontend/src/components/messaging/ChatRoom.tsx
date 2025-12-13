@@ -1,24 +1,60 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { messagingService, Message, Conversation } from '@/api/communications';
 import { useAuth } from '../../contexts/AuthContext';
-import { Send, Paperclip, Loader2, X, Smile } from 'lucide-react';
+import { Send, Paperclip, Loader2, X, Smile, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { SmartHeader } from './SmartHeader';
 import { QuickActionBar } from './QuickActionBar';
 import { TypingIndicator } from './TypingIndicator';
+import { PropertyChatCard } from './PropertyChatCard';
+import { PropertySelector } from './PropertySelector';
 import { cn } from '@/lib/utils';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
+import { communicationService } from '@/api/communications';
+import { Property } from '@/api/properties';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ChatRoomProps {
     conversation: Conversation;
     onBack?: () => void;
     onConversationDeleted?: () => void;
+    onConversationUpdated?: (conversation: Conversation) => void;
 }
 
-const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversationDeleted }) => {
+const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversationDeleted, onConversationUpdated }) => {
     const { user } = useAuth();
+    const queryClient = useQueryClient();
+    const [localConversation, setLocalConversation] = useState<Conversation>(conversation);
+    
+    // Determine the agent ID for property filtering
+    // - If current user is a regular user, show properties from the agent they're chatting with
+    // - If current user is an agent, show their own properties
+    const agentId = React.useMemo(() => {
+        const currentUserId = user?.id ? parseInt(user.id) : null;
+        const userRole = user?.role || conversation.other_participant?.role;
+        
+        // If current user is an agent, they should see their own properties
+        if (userRole === 'agent' && currentUserId) {
+            return currentUserId;
+        }
+        
+        // If current user is a regular user, show properties from the agent they're chatting with
+        // If conversation has agent field, use it
+        if (conversation.agent) {
+            return conversation.agent;
+        }
+        // Otherwise, if other_participant is an agent, use their ID
+        if (conversation.other_participant && conversation.other_participant.role === 'agent') {
+            return conversation.other_participant.id;
+        }
+        // Fallback: if user is not the agent, the other participant must be
+        if (conversation.user === currentUserId && conversation.other_participant) {
+            return conversation.other_participant.id;
+        }
+        return undefined;
+    }, [conversation, user]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
@@ -32,26 +68,27 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
     const emojiPickerRef = useRef<HTMLDivElement>(null);
     const [isTyping, setIsTyping] = useState(false);
     const [isOnline, setIsOnline] = useState(false);
+    const [updatingProperty, setUpdatingProperty] = useState(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const fetchMessages = async () => {
+    const fetchMessages = React.useCallback(async () => {
         try {
             setLoading(true);
-            const data = await messagingService.getMessages(conversation.id);
+            const data = await messagingService.getMessages(localConversation.id);
             // Ensure no duplicates from initial fetch
             setMessages(data);
             scrollToBottom();
-            messagingService.markRead(conversation.id);
+            messagingService.markRead(localConversation.id);
         } catch (error) {
             console.error("Failed to load messages", error);
             toast.error("Failed to load conversation history");
         } finally {
             setLoading(false);
         }
-    };
+    }, [localConversation.id]);
 
     // Close emoji picker when clicking outside
     useEffect(() => {
@@ -82,11 +119,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
             ? new URL(import.meta.env.VITE_API_URL).host
             : 'localhost:8000';
 
-        const wsUrl = `${protocol}//${host}/ws/chat/${conversation.id}/?token=${token}`;
+        const wsUrl = `${protocol}//${host}/ws/chat/${localConversation.id}/?token=${token}`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-            console.log(`Connected to chat ${conversation.id}`);
             setIsOnline(true);
         };
 
@@ -127,7 +163,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
         };
 
         ws.onclose = () => {
-            console.log(`Disconnected from chat ${conversation.id}`);
             setIsOnline(false);
         };
 
@@ -141,7 +176,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
             setIsOnline(false);
             socketRef.current = null;
         };
-    }, [conversation.id, user]);
+    }, [localConversation.id, user, fetchMessages]);
 
     useEffect(() => {
         scrollToBottom();
@@ -181,7 +216,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
             setReplyingTo(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
 
-            const sentMsg = await messagingService.sendMessage(conversation.id, data, replyingTo?.id);
+            const sentMsg = await messagingService.sendMessage(localConversation.id, data, replyingTo?.id);
 
             setMessages(prev => {
                 // Robust deduplication:
@@ -210,11 +245,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
 
     const handleClearChat = async () => {
         try {
-            console.log('[ChatRoom] Clearing conversation:', conversation.id);
-            await messagingService.clearConversation(conversation.id);
+            await messagingService.clearConversation(localConversation.id);
             setMessages([]);
             toast.success("Conversation cleared");
-            console.log('[ChatRoom] Cleared successfully, calling callbacks');
             if (onBack) onBack(); // Go back to list
             if (onConversationDeleted) onConversationDeleted(); // Refresh list
         } catch (error) {
@@ -268,18 +301,83 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
         try {
             if (isMe && !isAlreadyDeleted) {
                 // Soft delete (for everyone)
-                await messagingService.deleteMessage(conversation.id, messageId);
+                await messagingService.deleteMessage(localConversation.id, messageId);
                 setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
                 toast.success("Message deleted");
             } else {
                 // Hide (delete for me)
-                await messagingService.deleteMessageForMe(conversation.id, messageId);
+                await messagingService.deleteMessageForMe(localConversation.id, messageId);
                 setMessages(prev => prev.filter(m => m.id !== messageId));
                 toast.success("Message removed from view");
             }
         } catch (error) {
             console.error("Failed to delete message", error);
             toast.error("Failed to delete message");
+        }
+    };
+
+    // Update local conversation when prop changes
+    useEffect(() => {
+        setLocalConversation(conversation);
+    }, [conversation]);
+
+    const handleAttachProperty = async (property: Property) => {
+        try {
+            setUpdatingProperty(true);
+            const updatedConversation = await communicationService.updateConversationProperty(
+                localConversation.id,
+                parseInt(property.id)
+            );
+            
+            // Update local state
+            setLocalConversation(updatedConversation);
+            
+            // Notify parent component
+            if (onConversationUpdated) {
+                onConversationUpdated(updatedConversation);
+            }
+            
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            
+            toast.success(`Property "${property.title}" attached to conversation`);
+        } catch (error) {
+            console.error("Failed to attach property:", error);
+            toast.error("Failed to attach property. Please try again.");
+        } finally {
+            setUpdatingProperty(false);
+        }
+    };
+
+    const handleRemoveProperty = async () => {
+        if (!confirm('Are you sure you want to remove the attached property from this conversation?')) {
+            return;
+        }
+
+        try {
+            setUpdatingProperty(true);
+            const updatedConversation = await communicationService.updateConversationProperty(
+                localConversation.id,
+                null
+            );
+            
+            // Update local state
+            setLocalConversation(updatedConversation);
+            
+            // Notify parent component
+            if (onConversationUpdated) {
+                onConversationUpdated(updatedConversation);
+            }
+            
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            
+            toast.success("Property removed from conversation");
+        } catch (error) {
+            console.error("Failed to remove property:", error);
+            toast.error("Failed to remove property. Please try again.");
+        } finally {
+            setUpdatingProperty(false);
         }
     };
 
@@ -295,11 +393,103 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
         <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen bg-background relative overflow-hidden transition-colors duration-300">
             {/* Ultra-Smart Header */}
             <SmartHeader
-                conversation={conversation}
+                conversation={localConversation}
                 onBack={onBack}
                 active={isOnline}
                 onClearChat={handleClearChat}
             />
+
+            {/* Property Context - Prominently Displayed */}
+            {localConversation.property ? (() => {
+                const prop = localConversation.property;
+                const propId = typeof prop === 'number' 
+                    ? prop 
+                    : (typeof prop === 'object' && prop !== null && 'id' in prop 
+                        ? (prop as { id: number }).id 
+                        : null);
+                
+                return (
+                    <div className="px-4 py-4 border-b bg-gradient-to-r from-primary/5 via-background to-background border-primary/20">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                                    Property in Discussion
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <PropertySelector
+                                    onSelect={handleAttachProperty}
+                                    currentPropertyId={propId}
+                                    agentId={agentId}
+                                    trigger={
+                                        <button
+                                            className="text-xs text-primary hover:underline font-medium px-2 py-1 rounded hover:bg-primary/10 transition-colors"
+                                            disabled={updatingProperty}
+                                        >
+                                            {updatingProperty ? 'Updating...' : 'Change'}
+                                        </button>
+                                    }
+                                />
+                                <button
+                                    onClick={handleRemoveProperty}
+                                    disabled={updatingProperty}
+                                    className="text-xs text-destructive hover:text-destructive/80 font-medium px-2 py-1 rounded hover:bg-destructive/10 transition-colors flex items-center gap-1"
+                                    aria-label="Remove property"
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                        <PropertyChatCard
+                            property={{
+                                id: propId || 0,
+                                title: localConversation.property_title || 'Property',
+                                price: 0,
+                                city: '',
+                                primary_image: localConversation.property_image || undefined,
+                                status: 'active',
+                            }}
+                        />
+                    </div>
+                );
+            })() : (
+                <div className="px-4 py-4 border-b bg-gradient-to-r from-amber-50/50 via-background to-background border-amber-200/50 border-dashed dark:from-amber-950/20 dark:border-amber-800/30">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                <p className="text-sm font-semibold text-foreground">
+                                    No property attached
+                                </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                Attach a property to help the receiver understand your inquiry
+                            </p>
+                        </div>
+                        <PropertySelector
+                            onSelect={handleAttachProperty}
+                            agentId={agentId}
+                            trigger={
+                                <button
+                                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={updatingProperty}
+                                >
+                                    {updatingProperty ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin inline" />
+                                            Attaching...
+                                        </>
+                                    ) : (
+                                        'Attach Property'
+                                    )}
+                                </button>
+                            }
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Connection Status Banner */}
             {!isOnline && (
@@ -333,7 +523,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
             </div>
 
             {/* Quick Action Bar (Floating) */}
-            <QuickActionBar conversation={conversation} onAction={handleQuickAction} />
+            <QuickActionBar conversation={localConversation} onAction={handleQuickAction} />
 
             {/* Expressive Input Area */}
             <div className="bg-card border-t border-border p-4 relative z-20 shadow-lg dark:shadow-none transition-colors duration-300">
@@ -358,11 +548,12 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                     </div>
                 )}
 
-                <form onSubmit={handleSend} className="flex items-end space-x-2 relative z-10">
+                <form onSubmit={handleSend} className="flex items-end gap-2 relative z-10">
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-3 text-muted-foreground hover:text-primary hover:bg-muted rounded-full transition-all duration-200"
+                        className="p-2.5 text-muted-foreground hover:text-primary hover:bg-muted rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+                        aria-label="Attach file"
                     >
                         <Paperclip className="w-5 h-5" />
                     </button>
@@ -371,12 +562,19 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                         ref={fileInputRef}
                         className="hidden"
                         onChange={handleFileSelect}
+                        accept="image/*,.pdf,.doc,.docx"
                     />
 
                     <button
                         type="button"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="p-3 text-muted-foreground hover:text-primary hover:bg-muted rounded-full transition-all duration-200"
+                        className={cn(
+                            "p-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95",
+                            showEmojiPicker 
+                                ? "text-primary bg-primary/10" 
+                                : "text-muted-foreground hover:text-primary hover:bg-muted"
+                        )}
+                        aria-label="Add emoji"
                     >
                         <Smile className="w-5 h-5" />
                     </button>
@@ -385,11 +583,11 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                     {showEmojiPicker && (
                         <div
                             ref={emojiPickerRef}
-                            className="absolute bottom-16 left-12 z-50 shadow-2xl rounded-lg overflow-hidden border border-border"
+                            className="absolute bottom-16 left-12 z-50 shadow-2xl rounded-xl overflow-hidden border border-border/50 backdrop-blur-sm"
                         >
                             <Picker
                                 data={data}
-                                onEmojiSelect={(emoji: any) => {
+                                onEmojiSelect={(emoji: { native: string }) => {
                                     setInputText(inputText + emoji.native);
                                     setShowEmojiPicker(false);
                                 }}
@@ -406,7 +604,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                             onChange={(e) => setInputText(e.target.value)}
                             placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
                             maxLength={5000}
-                            className="w-full bg-muted/50 border-transparent focus:border-ring focus:bg-background text-foreground placeholder:text-muted-foreground rounded-2xl px-4 py-3 max-h-32 focus:ring-2 focus:ring-ring/20 resize-none overflow-y-auto transition-all duration-300 shadow-inner"
+                            className="w-full bg-muted/60 dark:bg-muted/40 border-2 border-transparent focus:border-primary/30 focus:bg-background text-foreground placeholder:text-muted-foreground rounded-2xl px-4 py-3 max-h-32 focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300 shadow-sm"
                             rows={1}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -415,19 +613,29 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ conversation, onBack, onConversatio
                                 }
                             }}
                         />
+                        {inputText.length > 0 && (
+                            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                                {inputText.length}/5000
+                            </div>
+                        )}
                     </div>
 
                     <button
                         type="submit"
                         disabled={sending || (!inputText.trim() && !attachment)}
                         className={cn(
-                            "p-3 rounded-full text-primary-foreground transition-all duration-300 shadow-md flex items-center justify-center",
+                            "p-3 rounded-xl text-primary-foreground transition-all duration-300 shadow-md flex items-center justify-center min-w-[48px]",
                             (sending || (!inputText.trim() && !attachment))
-                                ? "bg-muted text-muted-foreground cursor-not-allowed scale-95 opacity-70"
-                                : "bg-primary hover:scale-110 hover:shadow-lg active:scale-95"
+                                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+                                : "bg-primary hover:scale-105 hover:shadow-lg active:scale-95"
                         )}
+                        aria-label="Send message"
                     >
-                        {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
+                        {sending ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Send className="w-5 h-5" />
+                        )}
                     </button>
                 </form>
             </div>

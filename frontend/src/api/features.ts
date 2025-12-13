@@ -9,8 +9,12 @@ export interface Feature {
     is_global: boolean;
 }
 
+export interface FeaturesResponse {
+    results: Feature[];
+}
+
 export const getFeatures = async () => {
-    const response = await api.get<any>('/api/v1/features/features/?page_size=100');
+    const response = await api.get<FeaturesResponse>('/api/v1/features/features/?page_size=100');
     if (response.data.results && Array.isArray(response.data.results)) {
         return response.data.results;
     }

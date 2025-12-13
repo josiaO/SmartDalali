@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchPlans, createPlan, updatePlan, deletePlan, SubscriptionPlan } from '@/api/admin';
 import { useToast } from './use-toast';
+import { AxiosError } from 'axios';
 
 interface UsePlansReturn {
     plans: SubscriptionPlan[];
@@ -28,8 +29,13 @@ export function usePlans(): UsePlansReturn {
         try {
             const data = await fetchPlans();
             setPlans(data);
-        } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || err?.message || 'Failed to fetch plans';
+        } catch (err: unknown) {
+            let errorMsg = 'Failed to fetch plans';
+            if (err instanceof AxiosError && err.response?.data?.message) {
+                errorMsg = err.response.data.message;
+            } else if (err instanceof Error) {
+                errorMsg = err.message;
+            }
             setError(errorMsg);
             console.error('Error fetching plans:', err);
         } finally {
@@ -50,8 +56,13 @@ export function usePlans(): UsePlansReturn {
                 description: 'Plan created successfully',
             });
             return newPlan;
-        } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || err?.message || 'Failed to create plan';
+        } catch (err: unknown) {
+            let errorMsg = 'Failed to create plan';
+            if (err instanceof AxiosError && err.response?.data?.message) {
+                errorMsg = err.response.data.message;
+            } else if (err instanceof Error) {
+                errorMsg = err.message;
+            }
             toast({
                 title: 'Error',
                 description: errorMsg,
@@ -71,8 +82,13 @@ export function usePlans(): UsePlansReturn {
                 description: 'Plan updated successfully',
             });
             return updatedPlan;
-        } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || err?.message || 'Failed to update plan';
+        } catch (err: unknown) {
+            let errorMsg = 'Failed to update plan';
+            if (err instanceof AxiosError && err.response?.data?.message) {
+                errorMsg = err.response.data.message;
+            } else if (err instanceof Error) {
+                errorMsg = err.message;
+            }
             toast({
                 title: 'Error',
                 description: errorMsg,
@@ -92,8 +108,13 @@ export function usePlans(): UsePlansReturn {
                 description: 'Plan deleted successfully',
             });
             return true;
-        } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || err?.message || 'Failed to delete plan';
+        } catch (err: unknown) {
+            let errorMsg = 'Failed to delete plan';
+            if (err instanceof AxiosError && err.response?.data?.message) {
+                errorMsg = err.response.data.message;
+            } else if (err instanceof Error) {
+                errorMsg = err.message;
+            }
             toast({
                 title: 'Error',
                 description: errorMsg,

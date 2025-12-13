@@ -24,16 +24,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv()  # take environment variables from .env.
 
 # Observability / Error tracking
-'''SENTRY_DSN = os.getenv('SENTRY_DSN')
+SENTRY_DSN = os.getenv('SENTRY_DSN')
 if SENTRY_DSN:
-    # sentry_sdk.init(
-    #     dsn=SENTRY_DSN,
-    #     integrations=[DjangoIntegration()],
-    #     traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE')),
-    #     profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE')),
-    #     send_default_pii=os.getenv('SENTRY_SEND_DEFAULT_PII').lower() in ('1', 'true', 'yes'),
-    # )
-'''
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE')),
+        profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE')),
+        send_default_pii=os.getenv('SENTRY_SEND_DEFAULT_PII').lower() in ('1', 'true', 'yes'),
+    )
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
@@ -89,7 +88,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_HTTPONLY = True
 CSRF_USE_SESSIONS = False
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = False
@@ -266,7 +265,9 @@ if not MESSAGE_ENCRYPTION_KEY:
     else:
         # Generate temporary key for development
         MESSAGE_ENCRYPTION_KEY = Fernet.generate_key().decode()
-        print(f"Warning: Using temporary encryption key. Set MESSAGE_ENCRYPTION_KEY in .env for persistence.")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning("Using temporary encryption key. Set MESSAGE_ENCRYPTION_KEY in .env for persistence.")
 
 
 # M-Pesa Payment Integration (Daraja API)
@@ -495,19 +496,19 @@ if not firebase_admin._apps:
             if os.getenv('DJANGO_ENV') == 'production':
                 raise ValueError(error_message)
             else:
-                print(f"Warning: {error_message}")
+                logger.warning(error_message)
         except Exception as e:
             error_message = f"Could not initialize Firebase Admin SDK: {e}"
             if os.getenv('DJANGO_ENV') == 'production':
                 raise ValueError(error_message)
             else:
-                print(f"Warning: {error_message}")
+                logger.warning(error_message)
     elif os.getenv('DJANGO_ENV') == 'production':
         # In production, require Firebase credentials
         raise ValueError("FIREBASE_CREDENTIALS_JSON environment variable is not set. This is required for production.")
     else:
         # In development, it's a non-fatal warning
-        print("Warning: FIREBASE_CREDENTIALS_JSON is not set. Firebase authentication will not work.")
+        logger.warning("FIREBASE_CREDENTIALS_JSON is not set. Firebase authentication will not work.")
 
 # AI Configuration
 AI_API_KEY = os.getenv('AI_API_KEY')

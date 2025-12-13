@@ -1,8 +1,6 @@
 import React, { createContext, useContext } from 'react';
 
-interface UIContextType {
-    // Add UI state properties here as needed
-}
+type UIContextType = Record<string, never>;
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
 

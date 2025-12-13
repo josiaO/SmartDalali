@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Building2, Edit, Eye, Heart, Search, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getAgentProperties, deleteProperty, updatePropertyStatus } from '@/api/properties';
+import { getAgentProperties, deleteProperty, updatePropertyStatus, Property } from '@/api/properties';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
@@ -64,8 +64,8 @@ export default function MyProperties() {
         },
     });
 
-    const propertiesList = Array.isArray(properties) ? properties : (properties as any)?.results || [];
-    const filteredProperties = propertiesList.filter((prop: any) =>
+    const propertiesList: Property[] = properties || [];
+    const filteredProperties = propertiesList.filter((prop: Property) =>
         prop.title.toLowerCase().includes(search.toLowerCase())
     );
 
@@ -144,7 +144,7 @@ export default function MyProperties() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredProperties.map((property: any) => (
+                                    {filteredProperties.map((property: Property) => (
                                         <TableRow key={property.id}>
                                             <TableCell className="font-medium max-w-xs truncate">
                                                 {property.title}
@@ -155,7 +155,7 @@ export default function MyProperties() {
                                                 <Select
                                                     value={property.status}
                                                     onValueChange={(value) =>
-                                                        statusMutation.mutate({ id: property.id, status: value })
+                                                        statusMutation.mutate({ id: parseInt(property.id), status: value })
                                                     }
                                                 >
                                                     <SelectTrigger className="w-[130px]">
@@ -182,7 +182,7 @@ export default function MyProperties() {
                                             <TableCell className="text-center">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <Heart className="h-4 w-4 text-muted-foreground" />
-                                                    {property.likes_count || 0}
+                                                    {property.like_count || 0}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -197,7 +197,7 @@ export default function MyProperties() {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => setDeleteId(property.id)}
+                                                        onClick={() => setDeleteId(parseInt(property.id))}
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>

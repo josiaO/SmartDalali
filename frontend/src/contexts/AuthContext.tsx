@@ -61,13 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const userProfile = await getCurrentUser();
       setUser(userProfile);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Auth check failed:', err);
       // If token is invalid, clear it
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       setUser(null);
-      setError(err.message || 'Authentication failed');
+      if (err instanceof Error) {
+        setError(err.message || 'Authentication failed');
+      } else {
+        setError('Authentication failed');
+      }
     }
   }
 
@@ -93,8 +97,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           navigate('/dashboard');
           break;
       }
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'Login failed');
+      } else {
+        setError('Login failed');
+      }
       throw err;
     }
   }

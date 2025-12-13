@@ -10,7 +10,7 @@ import {
   Users, MapPin, Star, CheckCircle
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { getPublicStats, fetchProperties } from '@/api/properties';
+import { getPublicStats, fetchProperties, Property } from '@/api/properties';
 import { PropertyCard } from '@/components/properties/PropertyCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import {
@@ -293,7 +293,7 @@ export default function Home() {
                 className="w-full max-w-7xl mx-auto"
               >
                 <CarouselContent className="-ml-4">
-                  {properties?.results?.slice(0, 10).map((property: any) => (
+                  {properties?.results?.slice(0, 10).map((property: Property) => (
                     <CarouselItem key={property.id} className="pl-4 md:basis-1/2 lg:basis-1/3">
                       <div className="h-full">
                         <PropertyCard property={property} />

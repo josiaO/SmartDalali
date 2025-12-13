@@ -15,14 +15,12 @@ const ConversationsPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleConversationDeleted = () => {
-    console.log('[Conversations] Conversation deleted, refreshing list. Current key:', refreshKey);
     setRefreshKey(prev => prev + 1);
     setSelectedConversation(null);
 
     // CRITICAL: Clear location state to prevent startConversation from re-creating
     // the conversation on page reload
     if (location.state) {
-      console.log('[Conversations] Clearing location state to prevent recreation');
       navigate(location.pathname, { replace: true, state: null });
     }
   };
@@ -35,15 +33,12 @@ const ConversationsPage = () => {
       if (state?.recipientId) {
         try {
           setLoading(true);
-          console.log('[Conversations] Starting conversation with recipient:', state.recipientId, 'property:', state.propertyId);
 
           // Clear state BEFORE making the API call to prevent re-triggering
           navigate(location.pathname, { replace: true, state: null });
 
           const convo = await messagingService.startConversation(state.recipientId, state.propertyId);
-          console.log('[Conversations] Received conversation:', convo);
           setSelectedConversation(convo);
-          console.log('[Conversations] Set selected conversation to:', convo?.id);
         } catch (error) {
           console.error("Failed to start conversation", error);
         } finally {
@@ -63,7 +58,6 @@ const ConversationsPage = () => {
     if (selectedConversation) {
       // Reset selection - let user reselect from the fresh list
       const timer = setTimeout(() => {
-        console.log('[Conversations] Clearing stale selection after refresh');
         setSelectedConversation(null);
       }, 100);
       return () => clearTimeout(timer);
@@ -76,6 +70,10 @@ const ConversationsPage = () => {
 
   const handleBack = () => {
     setSelectedConversation(null);
+  };
+
+  const handleConversationUpdated = (updatedConversation: Conversation) => {
+    setSelectedConversation(updatedConversation);
   };
 
   if (loading) {
@@ -109,6 +107,7 @@ const ConversationsPage = () => {
             conversation={selectedConversation}
             onBack={handleBack}
             onConversationDeleted={handleConversationDeleted}
+            onConversationUpdated={handleConversationUpdated}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 text-slate-400">

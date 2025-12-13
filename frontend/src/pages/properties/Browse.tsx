@@ -29,10 +29,6 @@ export default function BrowseProperties() {
     loadProperties();
   }, [searchParams]);
 
-  useEffect(() => {
-    loadProperties();
-  }, [searchParams]);
-
   async function loadProperties() {
     setLoading(true);
     try {

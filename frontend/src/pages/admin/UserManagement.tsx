@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Shield, User as UserIcon, Crown, Loader2, Search } from 'lucide-react';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 interface User {
   id: number;
@@ -61,8 +62,14 @@ export default function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success(data.message || 'User role updated');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update user role');
+    onError: (error: unknown) => {
+      if (error instanceof AxiosError) {
+        toast.error(error.response?.data?.error || 'Failed to update user role');
+      } else if (error instanceof Error) {
+        toast.error(error.message || 'Failed to update user role');
+      } else {
+        toast.error('Failed to update user role');
+      }
     },
   });
 
@@ -75,8 +82,14 @@ export default function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success(data.message || 'User status updated');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update user status');
+    onError: (error: unknown) => {
+      if (error instanceof AxiosError) {
+        toast.error(error.response?.data?.error || 'Failed to update user status');
+      } else if (error instanceof Error) {
+        toast.error(error.message || 'Failed to update user status');
+      } else {
+        toast.error('Failed to update user status');
+      }
     },
   });
 
@@ -122,7 +135,7 @@ export default function UserManagement() {
               className="pl-10"
             />
           </div>
-          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as any)}>
+          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as 'all' | 'admin' | 'agent' | 'user')}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>

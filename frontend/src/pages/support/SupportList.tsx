@@ -19,11 +19,6 @@ export default function SupportList() {
         refetchOnMount: 'always', // Always refetch when component mounts
     });
 
-    // Debug logging
-    console.log('SupportList - tickets:', tickets);
-    console.log('SupportList - isLoading:', isLoading);
-    console.log('SupportList - error:', error);
-
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'open': return 'bg-blue-500';

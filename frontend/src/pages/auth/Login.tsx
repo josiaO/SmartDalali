@@ -11,6 +11,7 @@ import { firebaseLogin, getUserRole, login as apiLogin } from '@/api/auth';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { AxiosError } from 'axios';
 
 // Background images for the slider
 const BACKGROUND_IMAGES = [
@@ -96,9 +97,13 @@ export default function Login() {
       );
 
       await handleLoginSuccess(access, refresh);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google login error:', error);
-      toast.error(error.message || t('auth.google_login_failed'));
+      if (error instanceof Error) {
+        toast.error(error.message || t('auth.google_login_failed'));
+      } else {
+        toast.error(t('auth.google_login_failed'));
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -114,16 +119,22 @@ export default function Login() {
       });
 
       await handleLoginSuccess(access, refresh);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.detail;
+      if (error instanceof AxiosError) {
+        const errorMessage = error.response?.data?.error || error.response?.data?.detail;
 
-      if (error.response?.status === 401) {
-        toast.error(errorMessage || t('auth.invalid_credentials'));
-      } else if (error.response?.status === 404 || errorMessage?.toLowerCase().includes('not found')) {
-        toast.error(t('auth.account_not_found'));
+        if (error.response?.status === 401) {
+          toast.error(errorMessage || t('auth.invalid_credentials'));
+        } else if (error.response?.status === 404 || errorMessage?.toLowerCase().includes('not found')) {
+          toast.error(t('auth.account_not_found'));
+        } else {
+          toast.error(errorMessage || t('auth.login_failed'));
+        }
+      } else if (error instanceof Error) {
+        toast.error(error.message || t('auth.login_failed'));
       } else {
-        toast.error(errorMessage || t('auth.login_failed'));
+        toast.error(t('auth.login_failed'));
       }
     } finally {
       setLoading(false);

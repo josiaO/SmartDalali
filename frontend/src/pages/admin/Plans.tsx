@@ -15,7 +15,7 @@ interface Feature {
     name: string;
     code: string;
     description: string;
-    status: string;
+    status: 'active' | 'coming_soon' | 'disabled';
 }
 
 interface Plan {
@@ -26,6 +26,14 @@ interface Plan {
     price_yearly: number;
     highlight: boolean;
     features: { feature: Feature; included: boolean }[];
+}
+
+interface PlansResponse {
+  results: Plan[];
+}
+
+interface FeaturesResponse {
+  results: Feature[];
 }
 
 export default function AdminPlans() {
@@ -52,8 +60,8 @@ export default function AdminPlans() {
     async function loadData() {
         try {
             const [plansData, featuresData] = await Promise.all([fetchPlans(), fetchFeatures()]);
-            const pResults = Array.isArray(plansData) ? plansData : (plansData as any).results || [];
-            const fResults = Array.isArray(featuresData) ? featuresData : (featuresData as any).results || [];
+            const pResults = Array.isArray(plansData) ? plansData : (plansData as PlansResponse).results || [];
+            const fResults = Array.isArray(featuresData) ? featuresData : (featuresData as FeaturesResponse).results || [];
 
             setPlans(pResults);
             setFeatures(fResults);

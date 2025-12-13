@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Edit, Save, X, Upload, CheckCircle, Shield } from 'lucide-react';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 export default function AgentProfile() {
   const { user } = useAuth();
@@ -78,12 +79,26 @@ export default function AgentProfile() {
 
       // Refresh page to get updated data
       window.location.reload();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.detail || 'Failed to update profile',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        toast({
+          title: 'Error',
+          description: error.response?.data?.detail || 'Failed to update profile',
+          variant: 'destructive',
+        });
+      } else if (error instanceof Error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to update profile',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to update profile',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsSaving(false);
     }

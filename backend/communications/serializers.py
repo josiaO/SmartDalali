@@ -78,11 +78,12 @@ class ConversationSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     property_title = serializers.CharField(source='property.title', read_only=True)
+    property_image = serializers.SerializerMethodField()
     
     class Meta:
         model = Conversation
         fields = [
-            'id', 'user', 'agent', 'other_participant', 'property', 'property_title',
+            'id', 'user', 'agent', 'other_participant', 'property', 'property_title', 'property_image',
             'last_message', 'unread_count', 'created_at', 'updated_at', 'is_active'
         ]
         read_only_fields = ['user', 'agent', 'created_at', 'updated_at']
@@ -131,6 +132,23 @@ class ConversationSerializer(serializers.ModelSerializer):
             # I will use read_at logic.
             return obj.messages.filter(read_at__isnull=True).exclude(sender=request.user).count()
         return 0
+    
+    def get_property_image(self, obj):
+        """Get the main image URL for the property"""
+        if not obj.property:
+            return None
+        
+        try:
+            # Get first MediaProperty image
+            first_media = obj.property.MediaProperty.first()
+            if first_media and first_media.Images:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(first_media.Images.url)
+                return first_media.Images.url
+        except Exception:
+            pass
+        return None
 
 
 class CreateMessageSerializer(serializers.ModelSerializer):

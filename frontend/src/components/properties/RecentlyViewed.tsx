@@ -7,6 +7,10 @@ import { PropertyCard } from './PropertyCard';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
 
+interface ViewedPropertiesResponse {
+    results: Property[];
+}
+
 export function RecentlyViewed() {
     const { user } = useAuth();
     const [properties, setProperties] = useState<Property[]>([]);
@@ -20,7 +24,7 @@ export function RecentlyViewed() {
                     const data = await getViewedProperties();
                     // API returns objects directly? Or paginated?
                     // backend views_properties returns serializer.data (list).
-                    setProperties(Array.isArray(data) ? data : (data as any).results || []);
+                    setProperties(Array.isArray(data) ? data : (data as ViewedPropertiesResponse).results || []);
                 } else {
                     // Guest: Fetch from localStorage
                     const viewedIds = JSON.parse(localStorage.getItem('recently_viewed') || '[]');

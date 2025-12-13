@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Eye, EyeOff } from 'lucide-react';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -67,12 +68,26 @@ export default function ResetPassword() {
       });
 
       navigate('/auth/login');
-    } catch (error: any) {
-      toast({
-        title: 'Reset Failed',
-        description: error.response?.data?.detail || 'Failed to reset password. The link may have expired.',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        toast({
+          title: 'Reset Failed',
+          description: error.response?.data?.detail || 'Failed to reset password. The link may have expired.',
+          variant: 'destructive',
+        });
+      } else if (error instanceof Error) {
+        toast({
+          title: 'Reset Failed',
+          description: error.message || 'Failed to reset password. The link may have expired.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Reset Failed',
+          description: 'Failed to reset password. The link may have expired.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }

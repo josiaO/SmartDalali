@@ -63,6 +63,8 @@ export interface Message {
   thread_info?: ThreadInfo;
   is_deleted?: boolean;
   reply_to?: Message;
+  isOptimistic?: boolean;
+  status?: 'pending' | 'sent' | 'delivered' | 'read';
 }
 
 export interface User {
@@ -119,7 +121,8 @@ export interface Notification {
   message: string;
   read: boolean;
   created_at: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
+  related_object_id?: number;
 }
 
 // Unified Service Object (from messaging.ts) + Individual Functions (from communications.ts)
@@ -223,6 +226,15 @@ export const communicationService = {
   // Add reaction
   addReaction: async (messageId: number, emoji: string): Promise<void> => {
     await api.post(`/api/v1/communications/messages/${messageId}/react/`, { emoji });
+  },
+
+  // Update conversation property
+  updateConversationProperty: async (conversationId: number, propertyId: number | null): Promise<Conversation> => {
+    const response = await api.patch<Conversation>(
+      `/api/v1/communications/conversations/${conversationId}/update_property/`,
+      { property_id: propertyId }
+    );
+    return response.data;
   },
 
   // Notifications

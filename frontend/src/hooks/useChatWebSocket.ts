@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { Message } from '@/api/communications';
+
+interface MessageCacheData {
+    results: Message[];
+}
 
 export function useChatWebSocket(conversationId: number | null) {
     const { isAuthenticated } = useAuth();
@@ -19,7 +24,6 @@ export function useChatWebSocket(conversationId: number | null) {
 
     const connect = useCallback(() => {
         if (!isAuthenticated || !conversationId) {
-            console.log('WebSocket connect skipped: Not authenticated or no conversationId');
             return;
         }
 
@@ -36,63 +40,83 @@ export function useChatWebSocket(conversationId: number | null) {
 
         // Connect to specific chat room
         const wsUrl = `${protocol}//${host}/ws/chat/${conversationId}/?token=${token}`;
+        const ws = new WebSocket(wsUrl);
 
-        // If it's a flat array
-        return [...results, newMessage];
-    });
-
-    // Also update conversations list "last_message"
-    queryClient.invalidateQueries({ queryKey: ['conversations'] });
-} else if (data.type === 'read.receipt') {
-    // Mark message as read in cache
-    queryClient.setQueryData(['messages', conversationId], (oldData: any) => {
-        if (!oldData) return oldData;
-        const results = Array.isArray(oldData.results) ? oldData.results : (Array.isArray(oldData) ? oldData : []);
-
-        const newResults = results.map((m: any) => {
-            if (m.id === data.message_id) {
-                return { ...m, is_read: true };
-            }
-            return m;
-        });
-
-        if (oldData.results) {
-            return { ...oldData, results: newResults };
-        }
-        return newResults;
-    });
-}
-            } catch (e) {
-    console.error('Chat WS Parse Error', e);
-}
+        ws.onopen = () => {
+            setIsConnected(true);
+            setReconnectAttempts(0);
         };
 
-ws.onclose = () => {
-    console.log(`Chat ${conversationId} WebSocket Disconnected`);
-    setIsConnected(false);
-};
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
 
-socketRef.current = ws;
+                if (data.type === 'chat.message') {
+                    const newMessage = data.message;
+                    queryClient.setQueryData(['messages', conversationId], (oldData: MessageCacheData | undefined) => {
+                        if (!oldData) return { results: [newMessage] };
 
-return () => {
-    if (socketRef.current) {
-        socketRef.current.close();
-    }
-};
+                        const results = Array.isArray(oldData.results) ? oldData.results : (Array.isArray(oldData) ? oldData : []);
+                        // Avoid duplicates
+                        if (results.find((m: Message) => m.id === newMessage.id)) {
+                            return oldData;
+                        }
+
+                        // If it's a flat array
+                        return { ...oldData, results: [...results, newMessage] };
+                    });
+
+                    // Also update conversations list "last_message"
+                    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                } else if (data.type === 'read.receipt') {
+                    // Mark message as read in cache
+                    queryClient.setQueryData(['messages', conversationId], (oldData: MessageCacheData | undefined) => {
+                        if (!oldData) return oldData;
+                        const results = Array.isArray(oldData.results) ? oldData.results : (Array.isArray(oldData) ? oldData : []);
+
+                        const newResults = results.map((m: Message) => {
+                            if (m.id === data.message_id) {
+                                return { ...m, is_read: true };
+                            }
+                            return m;
+                        });
+
+                        if (oldData.results) {
+                            return { ...oldData, results: newResults };
+                        }
+                        return newResults;
+                    });
+                }
+            } catch (e) {
+                console.error('Chat WS Parse Error', e);
+            }
+        };
+
+        ws.onclose = () => {
+            setIsConnected(false);
+        };
+
+        socketRef.current = ws;
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.close();
+            }
+        };
     }, [isAuthenticated, conversationId, queryClient]);
 
-const sendMessage = (content: string) => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-        socketRef.current.send(JSON.stringify({
-            type: 'message',
-            content: content
-        }));
-    } else {
-        console.warn('Chat WS not open');
-        // Fallback to REST API is handled by useSendMessage hook in UI
-        // But we could throw error here
-    }
-};
+    const sendMessage = (content: string) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+                type: 'message',
+                content: content
+            }));
+        } else {
+            console.warn('Chat WS not open');
+            // Fallback to REST API is handled by useSendMessage hook in UI
+            // But we could throw error here
+        }
+    };
 
-return { sendMessage, isConnected };
+    return { sendMessage, isConnected };
 }

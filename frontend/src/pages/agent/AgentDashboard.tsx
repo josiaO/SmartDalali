@@ -16,7 +16,9 @@ import {
     getGeographicInsights,
     getEngagementHeatmap,
     getOptimizationSuggestions,
-    getQuickWins
+    getQuickWins,
+    LeadInsights, // Import LeadInsights
+    EngagementHeatmap as EngagementHeatmapType, // Import EngagementHeatmap with alias
 } from '@/api/analytics';
 import { trackDashboardView, trackKPICardClick } from '@/lib/analytics';
 import { AnimatedNumber } from '@/components/ui/animated-number';
@@ -398,7 +400,7 @@ export default function AgentDashboard() {
                 </div>
                 <div>
                     <LeadMetricsCard
-                        insights={leadInsights as any}
+                        insights={leadInsights as LeadInsights}
                         isLoading={leadLoading}
                     />
                 </div>
@@ -412,7 +414,7 @@ export default function AgentDashboard() {
                     isLoading={geoLoading}
                 />
                 <EngagementHeatmap
-                    heatmapData={heatmap as any}
+                    heatmapData={heatmap as EngagementHeatmapType}
                     isLoading={heatmapLoading}
                 />
             </motion.div>

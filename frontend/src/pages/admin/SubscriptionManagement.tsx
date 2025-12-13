@@ -18,6 +18,7 @@ import {
   type Agent,
   type SubscriptionPlan
 } from '@/api/subscriptions';
+import { AxiosError } from 'axios';
 
 export default function SubscriptionManagement() {
   const queryClient = useQueryClient();
@@ -49,8 +50,14 @@ export default function SubscriptionManagement() {
       setSelectedAgentId('');
       setSelectedPlanId('');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to assign subscription');
+    onError: (error: unknown) => {
+      if (error instanceof AxiosError) {
+        toast.error(error.response?.data?.error || 'Failed to assign subscription');
+      } else if (error instanceof Error) {
+        toast.error(error.message || 'Failed to assign subscription');
+      } else {
+        toast.error('Failed to assign subscription');
+      }
     },
   });
 
@@ -63,8 +70,14 @@ export default function SubscriptionManagement() {
       queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
       toast.success(data.message);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to remove subscription');
+    onError: (error: unknown) => {
+      if (error instanceof AxiosError) {
+        toast.error(error.response?.data?.error || 'Failed to remove subscription');
+      } else if (error instanceof Error) {
+        toast.error(error.message || 'Failed to remove subscription');
+      } else {
+        toast.error('Failed to remove subscription');
+      }
     },
   });
 

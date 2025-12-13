@@ -5,7 +5,28 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Search, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Conversation } from '@/api/communications';
+import { Conversation, OtherParticipant, User } from '@/api/communications';
+
+// Type for participant object that might be returned by API (even though interface says number[])
+interface ParticipantObject {
+    id: number;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    avatar?: string | null;
+    email?: string;
+    role?: string;
+}
+
+// Type guard to check if a value is a participant object
+function isParticipantObject(value: unknown): value is ParticipantObject {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        'id' in value &&
+        typeof (value as ParticipantObject).id === 'number'
+    );
+}
 
 interface ConversationListProps {
     conversations: Conversation[];
@@ -32,27 +53,20 @@ export default function ConversationList({
 
     const filteredConversations = conversations.filter((conv) => {
         if (!search) return true;
-        const participant = conv.participants && conv.participants.length > 0 ? (conv.participants[0] as any) : null;
-        // Note: The type definition in api/communications.ts defines participants as number[], 
-        // but the actual API response seems to populate it or use 'other_participant' field based on my previous read.
-        // I will double check the type definition I saw earlier.
-        // In `communications.ts` I saw `participants: number[]` but in `Conversations.tsx` it was accessing fields on it.
-        // Usage in Conversations.tsx:
-        // const otherParticipant = conversation.participants && conversation.participants.length > 0 ? conversation.participants[0] : null;
-        // This implies `participants` is an array of objects in the runtime response even if the interface says number[].
-        // Wait, let me check `communications.ts` again. It has `other_participant: OtherParticipant`.
-        // I should probably use `other_participant`.
+        
+        // Prefer other_participant, fall back to participants array if needed
+        let participantName = '';
+        if (conv.other_participant) {
+            participantName = conv.other_participant.username || '';
+        } else if (conv.participants && conv.participants.length > 0) {
+            const firstParticipant = conv.participants[0];
+            if (isParticipantObject(firstParticipant)) {
+                participantName = firstParticipant.username || 
+                    `${firstParticipant.first_name || ''} ${firstParticipant.last_name || ''}`.trim();
+            }
+        }
 
-        // Let's look at `Conversations.tsx` again.
-        // It maps `conversation.participants`.
-
-        // To be safe and robust, I will try to use `other_participant` if available, or fall back to checking `participants` array if it contains objects.
-
-        const name = conv.other_participant
-            ? `${conv.other_participant.username}`
-            : (participant && typeof participant === 'object' ? `${participant.first_name} ${participant.last_name}` : '');
-
-        return name.toLowerCase().includes(search.toLowerCase());
+        return participantName.toLowerCase().includes(search.toLowerCase());
     });
 
     return (
@@ -79,19 +93,19 @@ export default function ConversationList({
                     ) : (
                         filteredConversations.map((conversation) => {
                             // Logic to extract name and details.
-                            // Based on `Conversations.tsx`, `other_participant` seems to be the one intended for use or `participants[0]`.
-                            // I'll stick to a safe extraction.
-                            let other = conversation.other_participant;
+                            // Prefer other_participant, fall back to participants array if needed
+                            let other: OtherParticipant | User | null = conversation.other_participant || null;
                             if (!other && conversation.participants && conversation.participants.length > 0) {
-                                // Dynamic check if it's an object (runtime fix)
-                                const p: any = conversation.participants[0];
-                                if (typeof p === 'object') {
+                                const firstParticipant = conversation.participants[0];
+                                if (isParticipantObject(firstParticipant)) {
                                     other = {
-                                        id: p.id,
-                                        username: p.username || `${p.first_name} ${p.last_name}`,
-                                        email: '',
-                                        role: '',
-                                        avatar: p.avatar
+                                        id: firstParticipant.id,
+                                        username: firstParticipant.username || 
+                                            `${firstParticipant.first_name || ''} ${firstParticipant.last_name || ''}`.trim() ||
+                                            'User',
+                                        email: firstParticipant.email || '',
+                                        role: firstParticipant.role || '',
+                                        avatar: firstParticipant.avatar || null
                                     };
                                 }
                             }

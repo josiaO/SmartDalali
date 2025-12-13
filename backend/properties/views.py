@@ -889,8 +889,9 @@ def agent_stats(request):
     except Exception as e:
         # Fallback to original implementation if analytics service fails
         import traceback
-        print(f"Analytics service error: {str(e)}")
-        print(traceback.format_exc())
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Analytics service error: {str(e)}", exc_info=True)
         
         # Original simple implementation as fallback
         agent_properties = Property.objects.filter(owner=user)

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { AxiosError } from 'axios';
 
 export default function AccountActivation() {
     const { username } = useParams();
@@ -66,12 +67,26 @@ export default function AccountActivation() {
                 description: 'You can now log in.',
             });
             navigate('/login');
-        } catch (error: any) {
-            toast({
-                title: 'Activation Failed',
-                description: error.response?.data?.detail || 'Invalid code or expired.',
-                variant: 'destructive',
-            });
+        } catch (error: unknown) {
+            if (error instanceof AxiosError) {
+                toast({
+                    title: 'Activation Failed',
+                    description: error.response?.data?.detail || 'Invalid code or expired.',
+                    variant: 'destructive',
+                });
+            } else if (error instanceof Error) {
+                toast({
+                    title: 'Activation Failed',
+                    description: error.message || 'Invalid code or expired.',
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Activation Failed',
+                    description: 'Invalid code or expired.',
+                    variant: 'destructive',
+                });
+            }
         } finally {
             setLoading(false);
         }

@@ -8,12 +8,12 @@ export interface TicketMessage {
   sender_email: string;
   message: string;
   created_at: string;
-  attachments: any[];
+  attachments: unknown[];
 }
 export interface ApiError {
   response?: {
     data?: {
-      [key: string]: any;
+      [key: string]: unknown;
     };
   };
   message: string;
@@ -37,7 +37,7 @@ export interface SupportTicket {
   closed_at: string | null;
   messages: TicketMessage[];
   message_count: number;
-  attachments?: any[];
+  attachments?: unknown[];
 }
 
 export interface CreateTicketData {
@@ -48,10 +48,9 @@ export interface CreateTicketData {
   attachments?: File[];
 }
 
-export const getSupportTickets = async (params?: Record<string, any>) => {
+export const getSupportTickets = async (params?: Record<string, unknown>) => {
   try {
     const response = await api.get<SupportTicket[]>('/api/v1/properties/support/tickets/', { params });
-    console.log('Support tickets response:', response.data);
     return response.data;
   } catch (error: unknown) {
     const apiError = error as ApiError
@@ -63,7 +62,6 @@ export const getSupportTickets = async (params?: Record<string, any>) => {
 export const getSupportTicket = async (id: string) => {
   try {
     const response = await api.get<SupportTicket>(`/api/v1/properties/support/tickets/${id}/`);
-    console.log('Support ticket detail response:', response.data);
     return response.data;
   } catch (error: unknown) {
     const apiError = error as ApiError
@@ -74,9 +72,7 @@ export const getSupportTicket = async (id: string) => {
 
 export const createSupportTicket = async (data: CreateTicketData) => {
   try {
-    console.log('Creating support ticket with data:', data);
-
-    let requestData: any = data;
+    let requestData: CreateTicketData | FormData = data;
     let headers = {};
 
     if (data.attachments && data.attachments.length > 0) {
@@ -93,7 +89,6 @@ export const createSupportTicket = async (data: CreateTicketData) => {
     }
 
     const response = await api.post<SupportTicket>('/api/v1/properties/support/tickets/', requestData, { headers });
-    console.log('Support ticket created:', response.data);
     return response.data;
   } catch (error: unknown) {
     const apiError = error as ApiError
@@ -112,7 +107,7 @@ export const closeTicket = async (id: string) => {
   return response.data;
 };
 
-export const updateSupportTicket = async (id: string, data: any) => {
+export const updateSupportTicket = async (id: string, data: Partial<SupportTicket>) => {
   const response = await api.patch<SupportTicket>(`/api/v1/properties/support/tickets/${id}/`, data);
   return response.data;
 };

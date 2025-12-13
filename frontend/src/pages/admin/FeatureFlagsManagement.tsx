@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Settings, Lock, Loader2 } from 'lucide-react';
 import { fetchFeatures, toggleFeatureStatus, type Feature } from '@/api/subscriptions';
+import { AxiosError } from 'axios';
 
 export default function FeatureFlagsManagement() {
   const queryClient = useQueryClient();
@@ -21,8 +22,14 @@ export default function FeatureFlagsManagement() {
       queryClient.invalidateQueries({ queryKey: ['features'] });
       toast.success('Feature flag updated');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update feature flag');
+    onError: (error: unknown) => {
+      if (error instanceof AxiosError) {
+        toast.error(error.response?.data?.error || 'Failed to update feature flag');
+      } else if (error instanceof Error) {
+        toast.error(error.message || 'Failed to update feature flag');
+      } else {
+        toast.error('Failed to update feature flag');
+      }
     },
   });
 

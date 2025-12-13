@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { upgradeToAgent } from '@/api/auth';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { AxiosError } from 'axios';
 
 export function BecomeAgentCard() {
     const { t } = useTranslation();
@@ -22,7 +23,7 @@ export function BecomeAgentCard() {
     });
 
     // Don't show the card if user is already an agent
-    if (user?.groups?.some((g: any) => g.name === 'agent')) {
+    if (user?.groups?.some((g: string) => g === 'agent')) {
         return null;
     }
 
@@ -34,8 +35,16 @@ export function BecomeAgentCard() {
             await refreshUser();
             toast.success(t('profile.upgrade_success'));
             setOpen(false);
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || t('profile.upgrade_error'));
+        } catch (error: unknown) {
+            if (error instanceof AxiosError) {
+                if (error.response?.data?.error) {
+                    toast.error(error.response.data.error);
+                } else {
+                    toast.error(t('profile.upgrade_error'));
+                }
+            } else {
+                toast.error(t('profile.upgrade_error'));
+            }
         } finally {
             setLoading(false);
         }

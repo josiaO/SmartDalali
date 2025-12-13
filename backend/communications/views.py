@@ -29,7 +29,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'updated_at']
     ordering = ['-updated_at']
     pagination_class = None
-    http_method_names = ['get', 'head', 'options', 'post']
+    http_method_names = ['get', 'head', 'options', 'post', 'patch', 'put']
     
     def get_throttles(self):
         """Apply specific throttles based on action"""
@@ -57,10 +57,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         ).select_related('user', 'agent', 'property').prefetch_related('messages')
         
         if self.action == 'list':
-            # DEBUG-LOG
-            print(f"DEBUG: Filtering list for user {user.id}. Total before: {queryset.count()}")
             queryset = queryset.exclude(hidden_by=user)
-            print(f"DEBUG: Total after hidden_by exclude: {queryset.count()}")
             
         return queryset
     
@@ -298,6 +295,62 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['patch', 'put'])
+    def update_property(self, request, pk=None):
+        """Update the property associated with a conversation"""
+        try:
+            conversation = self.get_object()
+            
+            # Verify user has permission (must be part of the conversation)
+            if conversation.user != request.user and conversation.agent != request.user:
+                return Response(
+                    {'error': 'You do not have permission to update this conversation'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            property_id = request.data.get('property_id')
+            
+            if property_id is None:
+                # Allow removing property by setting to null
+                conversation.property = None
+                conversation.save()
+                return Response(
+                    ConversationSerializer(conversation, context={'request': request}).data,
+                    status=status.HTTP_200_OK
+                )
+            
+            # Validate and set property
+            from properties.models import Property
+            try:
+                property_obj = Property.objects.get(id=property_id)
+                
+                # If user is the agent, verify they own the property
+                if conversation.agent == request.user:
+                    if property_obj.owner != request.user:
+                        return Response(
+                            {'error': 'You can only attach properties that you own'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                
+                conversation.property = property_obj
+                conversation.save()
+                
+                return Response(
+                    ConversationSerializer(conversation, context={'request': request}).data,
+                    status=status.HTTP_200_OK
+                )
+            except Property.DoesNotExist:
+                return Response(
+                    {'error': 'Property not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            logger.error(f"Error updating conversation property: {e}", exc_info=True)
+            return Response(
+                {'error': 'Failed to update conversation property'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Get active conversations"""
@@ -365,9 +418,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
             
             # 2. Hide the conversation itself from the list
             conversation.hidden_by.add(request.user)
-            # DEBUG-LOG
-            print(f"DEBUG: Added user {request.user.id} to hidden_by of conversation {conversation.id}")
-            print(f"DEBUG: hidden_by users: {list(conversation.hidden_by.values_list('id', flat=True))}")
             
             return Response({'status': 'Conversation history cleared and hidden'})
         except Exception as e:

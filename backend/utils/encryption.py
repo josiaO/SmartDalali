@@ -5,6 +5,9 @@ from cryptography.fernet import Fernet
 from django.conf import settings
 import os
 import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MessageEncryption:
@@ -28,7 +31,7 @@ class MessageEncryption:
             encrypted = self.cipher.encrypt(message.encode())
             return encrypted.decode()
         except Exception as e:
-            print(f"Encryption error: {e}")
+            logger.error(f"Encryption error: {e}", exc_info=True)
             return message
     
     def decrypt_message(self, encrypted_message: str) -> str:
@@ -37,7 +40,7 @@ class MessageEncryption:
             decrypted = self.cipher.decrypt(encrypted_message.encode())
             return decrypted.decode()
         except Exception as e:
-            print(f"Decryption error: {e}")
+            logger.error(f"Decryption error: {e}", exc_info=True)
             return encrypted_message
 
 

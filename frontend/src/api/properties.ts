@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { AxiosProgressEvent } from 'axios';
 
 export interface Property {
   id: string;
@@ -44,6 +45,8 @@ export interface PropertyFilters {
   ordering?: string;
   owner?: string;
   agent_id?: number;
+  page_size?: number;
+  is_published?: boolean;
 }
 
 export async function fetchProperties(params?: PropertyFilters) {
@@ -98,7 +101,7 @@ export async function fetchProperty(id: string) {
   return response.data;
 }
 
-export async function createProperty(formData: FormData, onUploadProgress?: (progressEvent: any) => void) {
+export async function createProperty(formData: FormData, onUploadProgress?: (progressEvent: AxiosProgressEvent) => void) {
   const response = await api.post<Property>('/api/v1/properties/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
@@ -108,7 +111,7 @@ export async function createProperty(formData: FormData, onUploadProgress?: (pro
   return response.data;
 }
 
-export async function updateProperty(id: string, formData: FormData, onUploadProgress?: (progressEvent: any) => void) {
+export async function updateProperty(id: string, formData: FormData, onUploadProgress?: (progressEvent: AxiosProgressEvent) => void) {
   const response = await api.patch<Property>(`/api/v1/properties/${id}/`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',

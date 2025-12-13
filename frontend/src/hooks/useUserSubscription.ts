@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/axios';
 import { Feature } from '@/api/admin';
+import { AxiosError } from 'axios';
 
 export interface UserSubscriptionData {
     id: number;
@@ -55,13 +56,22 @@ export function useUserSubscription(): UseUserSubscriptionReturn {
             // Fetch user's current subscription
             const response = await api.get<UserSubscriptionData>('/api/v1/features/subscriptions/current/');
             setSubscription(response.data);
-        } catch (err: any) {
-            if (err?.response?.status === 404) {
-                // User has no subscription
-                setSubscription(null);
-            } else {
-                const errorMsg = err?.response?.data?.message || err?.message || 'Failed to fetch subscription';
+        } catch (err: unknown) {
+            if (err instanceof AxiosError) {
+                if (err.response?.status === 404) {
+                    // User has no subscription
+                    setSubscription(null);
+                } else {
+                    const errorMsg = err.response?.data?.message || err.message || 'Failed to fetch subscription';
+                    setError(errorMsg);
+                    console.error('Error fetching subscription:', err);
+                }
+            } else if (err instanceof Error) {
+                const errorMsg = err.message || 'Failed to fetch subscription';
                 setError(errorMsg);
+                console.error('Error fetching subscription:', err);
+            } else {
+                setError('Failed to fetch subscription');
                 console.error('Error fetching subscription:', err);
             }
         } finally {

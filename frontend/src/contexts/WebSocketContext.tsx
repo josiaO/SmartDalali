@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 interface WebSocketContextType {
     socket: WebSocket | null;
     isConnected: boolean;
-    sendMessage: (data: any) => void;
-    lastMessage: any;
+    sendMessage: (data: unknown) => void;
+    lastMessage: unknown;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -14,7 +14,7 @@ const WebSocketContext = createContext<WebSocketContextType | undefined>(undefin
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, user } = useAuth();
     const [isConnected, setIsConnected] = useState(false);
-    const [lastMessage, setLastMessage] = useState<any>(null);
+    const [lastMessage, setLastMessage] = useState<unknown>(null);
     const socketRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
@@ -83,7 +83,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         };
 
         ws.onclose = () => {
-            console.log('Notification WebSocket Disconnected');
             setIsConnected(false);
             socketRef.current = null;
 
@@ -95,7 +94,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
-        ws.onerror = (error) => {
+        ws.onerror = (error: Event) => {
             console.error('WS Error', error);
             ws.close();
         };
@@ -116,7 +115,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         };
     }, [isAuthenticated]);
 
-    const sendMessage = (data: any) => {
+    const sendMessage = (data: unknown) => {
         if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify(data));
         } else {

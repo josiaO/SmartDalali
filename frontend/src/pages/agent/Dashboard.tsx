@@ -12,6 +12,27 @@ import { useAgentStats } from '@/hooks/useAgentStats';
 import { useTranslation } from 'react-i18next';
 import { formatTZS } from '@/lib/currency';
 
+interface SubscriptionPlansResponse {
+  results: SubscriptionPlan[];
+}
+
+interface RecentViewer {
+  id: number;
+  visitor_name: string;
+  property_title: string;
+  status: string;
+  date: string;
+}
+
+interface RecentReview {
+  id: number;
+  reviewer_name: string;
+  rating: number;
+  comment: string;
+  property_title: string;
+  date: string;
+}
+
 export default function AgentDashboard() {
   const { data: propertiesData } = useProperties();
   const properties = propertiesData?.results || [];
@@ -25,7 +46,7 @@ export default function AgentDashboard() {
     async function loadPlans() {
       try {
         const data = await fetchSubscriptionPlans();
-        const results = Array.isArray(data) ? data : (data as any).results || [];
+        const results = Array.isArray(data) ? data : (data as SubscriptionPlansResponse).results || [];
         setPlans(results.filter(plan => plan.is_active));
       } catch (error) {
         toast({
@@ -230,7 +251,7 @@ export default function AgentDashboard() {
           <CardContent>
             {agentStats?.recent_viewers && agentStats.recent_viewers.length > 0 ? (
               <div className="space-y-4">
-                {agentStats.recent_viewers.map((viewer: any) => (
+                {agentStats.recent_viewers.map((viewer: RecentViewer) => (
                   <div key={viewer.id} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
                     <div>
                       <p className="font-medium">{viewer.visitor_name}</p>
@@ -263,7 +284,7 @@ export default function AgentDashboard() {
           <CardContent>
             {agentStats?.recent_reviews && agentStats.recent_reviews.length > 0 ? (
               <div className="space-y-4">
-                {agentStats.recent_reviews.map((review: any) => (
+                {agentStats.recent_reviews.map((review: RecentReview) => (
                   <div key={review.id} className="border-b pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between mb-2">
                       <p className="font-medium">{review.reviewer_name}</p>

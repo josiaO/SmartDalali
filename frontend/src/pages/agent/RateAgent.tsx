@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Star } from 'lucide-react';
+import { AxiosError } from 'axios';
 
 export default function RateAgent() {
     const queryClient = useQueryClient();
@@ -27,8 +28,14 @@ export default function RateAgent() {
             toast.success('Rating submitted successfully');
             queryClient.invalidateQueries({ queryKey: ['agent-ratings'] });
         },
-        onError: (error: any) => {
-            toast.error(error.response?.data?.error || 'Failed to submit rating');
+        onError: (error: unknown) => {
+            if (error instanceof AxiosError) {
+                toast.error(error.response?.data?.error || 'Failed to submit rating');
+            } else if (error instanceof Error) {
+                toast.error(error.message || 'Failed to submit rating');
+            } else {
+                toast.error('Failed to submit rating');
+            }
         },
     });
 
@@ -38,7 +45,7 @@ export default function RateAgent() {
             toast.error('Select an agent');
             return;
         }
-        const data: any = { agent: Number(agentId), rating };
+        const data: { agent: number; rating: number; review?: string; property?: number } = { agent: Number(agentId), rating };
         if (review) data.review = review;
         if (propertyId) data.property = Number(propertyId);
         mutation.mutate(data);

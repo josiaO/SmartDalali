@@ -12,7 +12,12 @@ import {
   deleteConversation,
   deleteMessageForMe,
   deleteMessageForEveryone,
+  Message, // Import Message interface
 } from '@/api/communications';
+
+interface MessageData {
+  results?: Message[];
+}
 
 export function useConversations() {
   return useQuery({
@@ -53,27 +58,38 @@ export function useSendMessage() {
 
       const previousMessages = queryClient.getQueryData(['messages', newMsg.conversationId]);
 
-      queryClient.setQueryData(['messages', newMsg.conversationId], (old: any) => {
-        const optimisticMessage = {
+      queryClient.setQueryData(['messages', newMsg.conversationId], (old: MessageData | undefined) => {
+        const optimisticMessage: Message = {
           id: Date.now(), // Temporary ID
-          content: newMsg.content,
-          sender: { id: 'me', first_name: 'Me', last_name: '' }, // Placeholder sender
+          text: newMsg.content,
+          sender_name: 'Me', // Placeholder sender
+          sender: -1, // Placeholder for current user id
+          sender_role: 'user', // Placeholder
           created_at: new Date().toISOString(),
-          read: false,
+          is_read: false,
           isOptimistic: true,
-          attachments: newMsg.attachments ? Array.from(newMsg.attachments).map(f => ({ file: URL.createObjectURL(f), file_type: f.type })) : []
+          attachments: newMsg.attachments ? Array.from(newMsg.attachments).map(f => ({
+            id: Date.now(), // Temp ID
+            file_url: URL.createObjectURL(f),
+            file_name: f.name,
+            file_type: f.type,
+            file_size: f.size,
+            file_size_display: `${(f.size / 1024).toFixed(0)} KB`,
+            mime_type: f.type,
+            uploaded_at: new Date().toISOString(),
+          })) : []
         };
 
         if (old?.results) {
           return { ...old, results: [...old.results, optimisticMessage] };
         }
-        return old ? [...old, optimisticMessage] : [optimisticMessage];
+        return { results: [optimisticMessage] };
       });
 
       return { previousMessages };
     },
-    onError: (err, newMsg, context) => {
-      queryClient.setQueryData(['messages', newMsg.conversationId], context?.previousMessages);
+    onError: (err, newMsg, context: { previousMessages: MessageData | undefined } | unknown) => {
+      queryClient.setQueryData(['messages', newMsg.conversationId], (context as { previousMessages: MessageData | undefined })?.previousMessages);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['messages', variables.conversationId] });

@@ -23,6 +23,10 @@ interface Feature {
   icon?: string;
 }
 
+interface FeaturesResponse {
+  results: Feature[];
+}
+
 export default function AdminFeatures() {
   const [features, setFeatures] = useState<Feature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +40,7 @@ export default function AdminFeatures() {
     setLoading(true);
     try {
       const data = await fetchFeatures();
-      const results = Array.isArray(data) ? data : (data as any).results || [];
+      const results = Array.isArray(data) ? data : (data as FeaturesResponse).results || [];
       setFeatures(results);
     } catch (error) {
       toast({
@@ -49,9 +53,9 @@ export default function AdminFeatures() {
     }
   }
 
-  async function handleStatusChange(featureId: number, newStatus: string) {
+  async function handleStatusChange(featureId: number, newStatus: 'active' | 'coming_soon' | 'disabled') {
     try {
-      await updateFeature(featureId, { status: newStatus as any });
+      await updateFeature(featureId, { status: newStatus });
       toast({
         title: 'Success',
         description: 'Feature status updated',
@@ -166,7 +170,7 @@ export default function AdminFeatures() {
                   <label className="text-sm font-medium">Status</label>
                   <Select
                     value={feature.status}
-                    onValueChange={(value) => handleStatusChange(feature.id, value)}
+                    onValueChange={(value) => handleStatusChange(feature.id, value as 'active' | 'coming_soon' | 'disabled')}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue />

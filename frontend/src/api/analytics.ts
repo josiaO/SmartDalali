@@ -69,10 +69,10 @@ export interface AgentStatsExtended {
     inquiries_7d: number;
     inquiries_30d: number;
     earnings: number;
-    recent_viewers: any[];
-    recent_reviews: any[];
-    most_viewed: any[];
-    most_liked: any[];
+    recent_viewers: unknown[];
+    recent_reviews: unknown[];
+    most_viewed: unknown[];
+    most_liked: unknown[];
 }
 
 // API Functions
@@ -94,7 +94,7 @@ export const getPropertyPerformance = async (
     propertyId?: string,
     days: number = 30
 ): Promise<PropertyPerformance[]> => {
-    const params: any = { days };
+    const params: { days: number; property_id?: string } = { days };
     if (propertyId) {
         params.property_id = propertyId;
     }

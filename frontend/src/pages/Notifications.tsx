@@ -4,6 +4,7 @@ import { PublicHeader } from '../components/layout/PublicHeader';
 import { Check, Mail, Calendar, Info, Clock, Trash2, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { Notification } from '@/api/communications';
 
 const Notifications: React.FC = () => {
     const { notifications, markAllAsRead, markAsRead, deleteNotification, fetchNotifications } = useNotifications();
@@ -17,7 +18,7 @@ const Notifications: React.FC = () => {
         await markAllAsRead();
     };
 
-    const handleNotificationClick = async (notification: any) => {
+    const handleNotificationClick = async (notification: Notification) => {
         if (!notification.is_read) {
             await markAsRead(notification.id);
         }
